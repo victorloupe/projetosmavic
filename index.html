@@ -409,7 +409,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:68px}
           <thead><tr style="background:var(--surface2)">
             <th style="padding:7px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);text-align:left">Serviço</th>
             <th style="padding:7px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);text-align:left;width:120px">Preço</th>
-            <th style="width:36px"></th>
+            <th style="width:70px"></th>
           </tr></thead>
           <tbody id="cliProdTable"></tbody>
         </table>
@@ -501,8 +501,17 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:68px}
           <span id="gnStatusLabel" style="font-size:13px;font-weight:600;color:var(--green)">Ativo</span>
         </label>
       </div>
-      <div class="fld"><label class="flbl">Mensagem *</label>
-        <textarea class="inp" id="gnMsg" rows="4" oninput="updateGnPreview()" placeholder="Ex: Escritório em recesso de 20/12 a 05/01."></textarea>
+      <div class="fld">
+        <label class="flbl">Mensagem *</label>
+        <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')" title="Negrito"><b>N</b></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')" title="Itálico"><i>I</i></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n')" title="Quebra de linha">↵ Linha</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')" title="Tópico">• Tópico</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n')" title="Parágrafo">¶ Parágrafo</button>
+        </div>
+        <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Ex: Escritório em recesso de 20/12 a 05/01.&#10;&#10;Use os botões acima para formatar."></textarea>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px"><i class="bi bi-info-circle"></i> *negrito* · _itálico_ · Enter = nova linha</div>
       </div>
       <div class="fld">
         <label class="flbl">Destinatários</label>
@@ -927,6 +936,7 @@ async function handleImageUpload(input){
     const{error}=await sb.storage.from('mavic-images').upload(path,file,{upsert:true,contentType:file.type});
     if(error)throw error;
     const{data:urlData}=sb.storage.from('mavic-images').getPublicUrl(path);
+    document.getElementById('projImage').value=urlData.publicUrl;
     setImagePreview(urlData.publicUrl,false);
     status.innerHTML='<i class="bi bi-check-circle-fill" style="color:var(--green)"></i> Imagem enviada!';
     status.style.color='var(--green)';
@@ -1143,10 +1153,44 @@ function genToken(){document.getElementById('cliToken').value=genTokenStr();show
 function genTokenStr(){return Math.random().toString(36).substring(2,10)+Math.random().toString(36).substring(2,6);}
 function copyCliLink(){copyText(document.getElementById('cliLinkBox').textContent,'Link copiado!');}
 function buildLink(name,token){return `${window.CLIENT_PANEL_URL}?nome=${encodeURIComponent(name)}&token=${token}`;}
-function renderCliProductsTable(cl){
+function renderCliProductsTable(cl,editingId=null){
   const tb=document.getElementById('cliProdTable');
-  if(!cl.products?.length){tb.innerHTML='<tr><td colspan="3" style="padding:14px;text-align:center;color:var(--text3);font-size:13px">Tabela vazia</td></tr>';return;}
-  tb.innerHTML=cl.products.map(p=>`<tr><td style="padding:7px 10px;font-size:13px;font-weight:500">${p.name}</td><td style="padding:7px 10px;font-family:'Courier New',monospace;font-weight:700;color:var(--green)">${fmt(p.price)}</td><td style="padding:7px 10px;text-align:right"><button class="prod-del" onclick="removeProdFromCli(${p.id})"><i class="bi bi-trash" style="font-size:12px"></i></button></td></tr>`).join('');
+  if(!cl.products?.length){tb.innerHTML='<tr><td colspan="4" style="padding:14px;text-align:center;color:var(--text3);font-size:13px">Tabela vazia</td></tr>';return;}
+  tb.innerHTML=cl.products.map(p=>{
+    if(p.id===editingId){
+      return `<tr style="background:var(--accent-bg)">
+        <td style="padding:5px 8px"><input id="epName_${p.id}" class="inp inp-sm" value="${p.name}" style="width:100%"></td>
+        <td style="padding:5px 8px"><input id="epPrice_${p.id}" type="number" class="inp inp-sm" value="${p.price}" step="0.01" style="width:90px"></td>
+        <td style="padding:5px 8px;text-align:right;white-space:nowrap">
+          <button class="btn btn-primary btn-sm" onclick="saveProdEdit(${p.id})"><i class="bi bi-check2"></i></button>
+          <button class="prod-del" onclick="renderCliProductsTable(clients.find(x=>x.id===currentCliId))"><i class="bi bi-x-lg"></i></button>
+        </td>
+      </tr>`;
+    }
+    return `<tr>
+      <td style="padding:7px 10px;font-size:13px;font-weight:500">${p.name}</td>
+      <td style="padding:7px 10px;font-family:'Courier New',monospace;font-weight:700;color:var(--green)">${fmt(p.price)}</td>
+      <td style="padding:7px 10px;text-align:right;white-space:nowrap">
+        <button class="prod-del" onclick="editProdCli(${p.id})" title="Editar"><i class="bi bi-pencil" style="font-size:12px"></i></button>
+        <button class="prod-del" onclick="removeProdFromCli(${p.id})" title="Excluir"><i class="bi bi-trash" style="font-size:12px"></i></button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function editProdCli(id){
+  const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
+  renderCliProductsTable(cl,id);
+  setTimeout(()=>document.getElementById('epName_'+id)?.focus(),50);
+}
+function saveProdEdit(id){
+  const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
+  const p=cl.products.find(x=>x.id===id);if(!p)return;
+  const newName=document.getElementById('epName_'+id)?.value.trim();
+  const newPrice=parseFloat(document.getElementById('epPrice_'+id)?.value);
+  if(!newName)return showToast('Nome não pode ser vazio','warning');
+  if(isNaN(newPrice)||newPrice<0)return showToast('Preço inválido','warning');
+  p.name=newName;p.price=newPrice;
+  renderCliProductsTable(cl);renderCliList();scheduleSync();showToast('Serviço atualizado!','success');
 }
 function addProdToCli(){
   const n=document.getElementById('newProdName').value.trim(),pr=parseFloat(document.getElementById('newProdPrice').value);
@@ -1222,7 +1266,7 @@ function openWhatsApp(projId){
   const dl=p.date?new Date(p.date+'T12:00:00').toLocaleDateString('pt-BR'):'';
   const firstName=p.client.split(' ')[0];
 
-  let msg=`Olá, *${firstName}*! 👋\n`;
+  let msg=`Olá, *${firstName}*!\n`;
   msg+=`\n`;
   msg+=`*${p.name}*\n`;
   msg+=`\n`;
@@ -1230,12 +1274,12 @@ function openWhatsApp(projId){
   if(dl)msg+=`*Prazo:* ${dl}\n`;
   if(total>0){
     msg+=`*Valor contratado:* ${fmt(total)}\n`;
-    if(rest<=0) msg+=`*Pagamento:* ✅ Quitado\n`;
-    else if(paid>0) msg+=`*Pago:* ${fmt(paid)} | *Pendente:* ${fmt(rest)} ⚠️\n`;
-    else msg+=`*Pendente:* ${fmt(rest)} 🔴\n`;
+    if(rest<=0) msg+=`*Pagamento:* Quitado\n`;
+    else if(paid>0) msg+=`*Pago:* ${fmt(paid)} | *Pendente:* ${fmt(rest)}\n`;
+    else msg+=`*Pendente:* ${fmt(rest)}\n`;
   }
-  if(p.note)msg+=`\n📝 _${p.note}_\n`;
-  if(link)msg+=`\n🔗 *Seu painel:*\n${link}\n`;
+  if(p.note)msg+=`\n_${p.note}_\n`;
+  if(link)msg+=`\n*Seu painel:*\n${link}\n`;
   msg+=`\n`;
   msg+=`_Equipe MAVIC Projetos_`;
 
@@ -1340,7 +1384,7 @@ function renderGnList(){
     }).join('');
     return `<div style="background:var(--surface2);border:1px solid ${gn.active?'var(--accent)':'var(--border)'};border-radius:10px;padding:11px 13px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
-        <div style="font-size:13px;font-weight:500;line-height:1.5;flex:1">${gn.message}</div>
+        <div style="font-size:13px;font-weight:500;line-height:1.6;flex:1">${formatNoticeText(gn.message)}</div>
         <div style="display:flex;gap:3px;flex-shrink:0">
           <button class="cbtn" style="color:${gn.active?'var(--green)':'var(--text3)'}" title="${gn.active?'Desativar':'Ativar'}" onclick="toggleGnActive(${gn.id})"><i class="bi bi-${gn.active?'toggle-on':'toggle-off'}"></i></button>
           <button class="cbtn del" onclick="deleteGnNotice(${gn.id})" title="Excluir"><i class="bi bi-trash3"></i></button>
@@ -1371,8 +1415,28 @@ function updateGnPreview(){
   const lbl=document.getElementById('gnStatusLabel');
   lbl.textContent=active?'Ativo':'Inativo';
   lbl.style.color=active?'var(--green)':'var(--text2)';
-  if(msg){document.getElementById('gnPreview').style.display='block';document.getElementById('gnPreviewText').textContent=msg;}
+  if(msg){document.getElementById('gnPreview').style.display='block';document.getElementById('gnPreviewText').innerHTML=formatNoticeText(msg);}
   else document.getElementById('gnPreview').style.display='none';
+}
+function formatNoticeText(t){
+  return t
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*([^*\n]+)\*/g,'<strong>$1</strong>')
+    .replace(/_([^_\n]+)_/g,'<em>$1</em>')
+    .replace(/\n/g,'<br>');
+}
+function wrapGnText(before,after){
+  const ta=document.getElementById('gnMsg');
+  const s=ta.selectionStart,e=ta.selectionEnd;
+  const sel=ta.value.substring(s,e)||'texto';
+  ta.setRangeText(before+sel+after,s,e,'select');
+  ta.focus();updateGnPreview();
+}
+function insertGnText(text){
+  const ta=document.getElementById('gnMsg');
+  const s=ta.selectionStart;
+  ta.setRangeText(text,s,s,'end');
+  ta.focus();updateGnPreview();
 }
 function saveGlobalNotice(){
   const msg=document.getElementById('gnMsg').value.trim();

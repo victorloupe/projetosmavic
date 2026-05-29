@@ -351,12 +351,19 @@ function checkGlobalNotice(){
 function showCurrentNotice(){
   if(currentNoticeIdx>=pendingNotices.length){document.getElementById('gnOverlay').style.display='none';return;}
   const gn=pendingNotices[currentNoticeIdx];
-  document.getElementById('gnMessage').textContent=gn.message;
+  document.getElementById('gnMessage').innerHTML=formatNoticeText(gn.message);
   const dt=new Date(gn.createdAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
   document.getElementById('gnDate').textContent=dt;
   const total=pendingNotices.length;
   document.getElementById('gnCounter').textContent=total>1?`${currentNoticeIdx+1} de ${total}`:'';
   document.getElementById('gnOverlay').style.display='flex';
+}
+function formatNoticeText(t){
+  return t
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*([^*\n]+)\*/g,'<strong>$1</strong>')
+    .replace(/_([^_\n]+)_/g,'<em>$1</em>')
+    .replace(/\n/g,'<br>');
 }
 async function dismissNotice(){
   const gn=pendingNotices[currentNoticeIdx];

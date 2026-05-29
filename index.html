@@ -159,18 +159,55 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:68px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:10px}
 ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+/* ── FAB ── */
+.fab{position:fixed;bottom:20px;right:16px;width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.28);display:none;align-items:center;justify-content:center;z-index:200;transition:background .15s}
+.fab:hover{background:var(--accent2)}
+
 @media(max-width:768px){
+  /* GERAL */
   body{overflow:auto;height:auto}
-  .board-outer{overflow:visible}
-  .board{flex-direction:column;height:auto}
+
+  /* NAV */
+  .nav{height:auto;padding:10px 12px 8px;flex-wrap:wrap;justify-content:center;gap:6px 8px}
+  .nav-brand{width:100%;justify-content:center;flex-direction:row;align-items:center;gap:9px}
+  .nav-brand .nav-logo{height:44px}
+  .nav-brand > div{text-align:left}
+  .nav-brand .nav-name{font-size:14px}
+  .nav-brand .nav-sync{margin-top:0}
+  .nav-search{display:none}
+  .nav-tabs{display:none}
+  .nav-sep{display:none}
+  .nav-spacer{display:none}
+  .btn-novo-desktop{display:none}
+  .fab{display:flex}
+
+  /* TOOLBAR */
+  .toolbar{flex-wrap:wrap;padding:6px 10px;gap:6px;overflow:visible}
+  .toolbar select,.toolbar button{flex:1;min-width:120px}
+
+  /* BOARD */
+  .board-outer{overflow:visible;padding:10px}
+  .board{flex-direction:column;height:auto;gap:8px}
   .kcol{width:100%}
   .kcol-mini{width:100%;flex-direction:row;height:auto;padding:9px 13px;justify-content:space-between}
   .kcol-mini .ml{writing-mode:horizontal-tb;transform:none}
-  .nav-search{display:none}
-  .nav-tabs{display:none}
+
+  /* CARDS — botões maiores no touch */
+  .cbtn{width:32px;height:32px;font-size:14px}
+  .kcard-exp{padding-left:10px}
+
+  /* DASHBOARD */
+  .dash-view{padding:12px 10px}
   .dash-grid{grid-template-columns:1fr 1fr}
-  .mxl{max-width:100%}
+
+  /* MODAIS */
+  .mxl,.mlg,.mmd,.msm{max-width:100%;margin:0;border-radius:12px 12px 0 0}
+  .overlay{align-items:flex-end;padding:0}
   .mbody > div[style*="grid"]{display:flex!important;flex-direction:column!important}
+  .row2{grid-template-columns:1fr!important}
+
+  /* CRM */
+  .mbody[style*="grid-template-columns:250px"]{display:flex!important;flex-direction:column!important}
 }
 </style>
 </head>
@@ -208,8 +245,9 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:68px}
   <button class="btn-icon" onclick="openArchiveModal()" title="Arquivados"><i class="bi bi-archive-fill"></i></button>
   <button class="btn-icon" onclick="openSettings()" title="Configurações"><i class="bi bi-gear-fill"></i></button>
   <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Tema"><i class="bi bi-moon-stars-fill"></i></button>
-  <button class="btn btn-primary btn-sm" onclick="openProjectModal()"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
+  <button class="btn btn-primary btn-sm btn-novo-desktop" onclick="openProjectModal()"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
 </nav>
+<button class="fab" onclick="openProjectModal()" title="Novo Projeto"><i class="bi bi-plus-lg"></i></button>
 
 <!-- BOARD VIEW -->
 <div class="board-view" id="boardView">
@@ -242,10 +280,6 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:68px}
 <!-- DASHBOARD VIEW -->
 <div class="dash-view" id="dashView">
   <div class="dash-grid" id="dashCards"></div>
-  <div class="dash-title">Recebimentos Mensais</div>
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px">
-    <canvas id="revenueChart" height="75"></canvas>
-  </div>
   <div class="dash-title">Projetos com saldo pendente</div>
   <div class="dash-table" id="dashTable"></div>
 </div>
@@ -1334,7 +1368,6 @@ function renderDashboard(){
     <div class="dash-card"><div class="dc-lbl">Vencidos</div><div class="dc-val" style="color:${venc>0?'var(--red)':'var(--text3)'}">${venc}</div><div class="dc-sub">projetos com prazo vencido</div></div>
     <div class="dash-card"><div class="dc-lbl">Clientes</div><div class="dc-val" style="color:var(--accent)">${clients.length}</div><div class="dc-sub">no CRM</div></div>`;
   const sorted=pendingProjs.sort((a,b)=>{const ra=parseFloat(a.value||0)-(a.payments||[]).reduce((s,x)=>s+parseFloat(x.amount||0),0);const rb=parseFloat(b.value||0)-(b.payments||[]).reduce((s,x)=>s+parseFloat(x.amount||0),0);return rb-ra;});
-  renderRevenueChart();
   if(!sorted.length){document.getElementById('dashTable').innerHTML='<div style="padding:24px;text-align:center;color:var(--text3)">Nenhum saldo pendente! ✅</div>';return;}
   document.getElementById('dashTable').innerHTML=`<table><thead><tr><th>Projeto</th><th>Cliente</th><th>Etapa</th><th>Total</th><th>Recebido</th><th>Saldo</th><th>Prazo</th></tr></thead><tbody>${sorted.map(p=>{
     const t=parseFloat(p.value||0);const pg=(p.payments||[]).reduce((s,x)=>s+parseFloat(x.amount||0),0);const rest=t-pg;
@@ -1553,7 +1586,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   renderBoard();
   document.getElementById('loading').style.display='none';
   document.addEventListener('click',e=>{
-    if(!e.target.closest('.kcol-acts'))document.querySelectorAll('.sort-menu').forEach(m=>m.classList.remove('open'));
+    if(!e.target.closest('.kcol-acts'))document.querySelectorAll('.sort-menu:not(#colsMenu)').forEach(m=>m.classList.remove('open'));
     if(!e.target.closest('[onclick*="toggleColsMenu"]')&&!e.target.closest('#colsMenu'))closeColsMenu();
   });
 });

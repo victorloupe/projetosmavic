@@ -137,12 +137,33 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sa
 /* MOBILE */
 @media(max-width:768px){
   body{overflow:auto;height:auto}
-  .board-outer{overflow:visible}
-  .board{flex-direction:column;height:auto}
-  .kcol{width:100%}
+
+  /* NAV */
+  .nav{height:auto;padding:10px 12px 8px;flex-wrap:wrap;justify-content:center;gap:6px 8px}
+  .nav-brand{width:100%;justify-content:center;flex-direction:row;align-items:center;gap:9px}
+  .nav-brand .nav-logo{height:44px}
+  .nav-brand > div{text-align:left}
+  .nav-brand .nav-name{font-size:14px}
+  .nav-brand .nav-sub{margin-top:0;font-size:12px}
   .nav-search{display:none}
+  .nav-sep{display:none}
+  .nav-spacer{display:none}
   .fin-bar{display:none}
   .fin-bar-mobile{display:flex!important}
+
+  /* TOOLBAR */
+  .toolbar{overflow-x:auto;flex-wrap:nowrap;padding:6px 10px}
+
+  /* BOARD */
+  .board-outer{overflow:visible;padding:10px}
+  .board{flex-direction:column;height:auto;gap:8px}
+  .kcol{width:100%}
+
+  /* CARDS */
+  .cbtn{width:32px;height:32px;font-size:14px}
+
+  /* NOTIFICAÇÕES */
+  .notif-wrap{padding:8px 10px 0}
 }
 .fin-bar-mobile{display:none;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;flex-shrink:0}
 .fin-bar-mobile .fin-item{flex:1;align-items:center}

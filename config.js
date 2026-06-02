@@ -1,0 +1,3 @@
+// MAVIC Configurações Centrais do Banco de Dados Supabase
+const SB_URL = 'https://ygwrpwkkriaeqaeuuxan.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3Jwd2trcmlhZXFhZXV1eGFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMTM5MjYsImV4cCI6MjA5NTU4OTkyNn0.WuWbVwgF1DAZLEMMTDR3WPpoLLfCu0HockD2ty4F9iA';

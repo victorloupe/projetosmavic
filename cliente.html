@@ -8,8 +8,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="cliente.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
+<!-- supabase-js e config.js removidos: o cliente não acessa o banco diretamente.
+     Os dados chegam via Edge Function com autenticação server-side. -->
 </head>
 <body>
 
@@ -85,6 +85,4 @@
   <div class="board-outer"><div class="board" id="board"></div></div>
 </div>
 
-<script src="cliente.js"></script>
-</body>
-</html>
+<script src="cliente.js">

@@ -1,4 +1,7 @@
-let sb=null,projects=[],clients=[],globalNotices=[],appColumns=[{id:'Briefing',icon:'📋'},{id:'Desenvolvimento',icon:'✏️'},{id:'Revisão',icon:'🔍'},{id:'Obra',icon:'🏗️'},{id:'Concluído',icon:'✅'}];
+// URL da Edge Function — ajuste se o projeto Supabase mudar
+const EDGE_FN = 'https://ygwrpwkkriaeqaeuuxan.supabase.co/functions/v1/cliente-data';
+
+let projects=[],clients=[],globalNotices=[],appColumns=[{id:'Briefing',icon:'📋'},{id:'Desenvolvimento',icon:'✏️'},{id:'Revisão',icon:'🔍'},{id:'Obra',icon:'🏗️'},{id:'Concluído',icon:'✅'}];
 let notifications=[],appTheme='light';
 let clientName='',clientToken='';
 let pinnedCards=new Set(),expandedFin=new Set();
@@ -11,48 +14,64 @@ const params=new URLSearchParams(window.location.search);
 clientName=(params.get('nome')||'').trim();
 clientToken=(params.get('token')||'').trim();
 
-function initSb(){
-  sb=window.supabase.createClient(SB_URL,SB_KEY);
-  return true;
-}
-
+// ══════════════════════════════════════════
+//  LOAD DATA — via Edge Function (server-side auth)
+// ══════════════════════════════════════════
 async function loadData(){
   document.getElementById('loading').style.display='flex';
   document.getElementById('errorScreen').classList.add('d-none');
   document.getElementById('boardView').style.display='flex';
+
   if(!clientName){showError('bi-link-45deg','Link inválido','Nenhum cliente especificado na URL.');return;}
   document.getElementById('clientLabel').textContent=clientName;
   document.getElementById('loadingText').textContent=`Carregando projetos de ${clientName}`;
 
-  initSb();
   try{
-    const{data,error}=await sb.from('mavic_store').select('key,data');
-    if(error)throw error;
-    const map={};(data||[]).forEach(r=>map[r.key]=r.data);
-    projects=map.projects||[];clients=map.clients||[];notifications=map.notifications||[];
-    globalNotices=map.global_notices||(map.global_notice?[map.global_notice]:[]);
-    const cfg=map.config||{};
-    if(cfg.columns?.length)appColumns=cfg.columns;
-    applyTheme(cfg.theme||localStorage.getItem('mavic_theme')||'light');
-  }catch(e){
-    console.warn(e);
-    projects=JSON.parse(localStorage.getItem('mavic_projects')||'[]');
-    clients=JSON.parse(localStorage.getItem('mavic_clients')||'[]');
-    notifications=JSON.parse(localStorage.getItem('mavic_notifications')||'[]');
-    globalNotices=JSON.parse(localStorage.getItem('mavic_global_notices')||'[]');
-    const cfg=JSON.parse(localStorage.getItem('mavic_config')||'{}');
-    if(cfg.columns?.length)appColumns=cfg.columns;
-  }
+    const url=`${EDGE_FN}?nome=${encodeURIComponent(clientName)}${clientToken?'&token='+encodeURIComponent(clientToken):''}`;
+    const res=await fetch(url);
+    const payload=await res.json();
 
-  // Validate token
-  const cli=clients.find(c=>c.name?.toLowerCase().trim()===clientName.toLowerCase());
-  if(clientToken&&cli?.token&&cli.token!==clientToken){
-    showError('bi-shield-lock','Acesso negado','Token inválido. Solicite um novo link ao escritório MAVIC.');
-    return;
+    if(!res.ok){
+      if(res.status===401||payload.error==='invalid_token')
+        showError('bi-shield-lock','Acesso negado','Token inválido. Solicite um novo link ao escritório MAVIC.');
+      else if(res.status===404||payload.error==='client_not_found')
+        showError('bi-person-x','Cliente não encontrado','Verifique o link recebido ou entre em contato com o escritório.');
+      else
+        showError('bi-exclamation-triangle','Erro ao carregar','Não foi possível conectar ao servidor. Tente novamente.');
+      return;
+    }
+
+    projects      = payload.projects      || [];
+    notifications = payload.notifications || [];
+    globalNotices = payload.globalNotices || [];
+    if(payload.config?.columns?.length) appColumns=payload.config.columns;
+    applyTheme(payload.config?.theme || localStorage.getItem('mavic_theme') || 'light');
+
+  }catch(e){
+    console.warn('Edge Function indisponível, usando cache local:', e);
+    // Fallback para dados locais (sem dados reais do servidor)
+    projects      = JSON.parse(localStorage.getItem('mavic_projects_'+clientName)||'[]');
+    notifications = JSON.parse(localStorage.getItem('mavic_notifications_'+clientName)||'[]');
+    globalNotices = JSON.parse(localStorage.getItem('mavic_global_notices')||'[]');
+    const cfg=JSON.parse(localStorage.getItem('mavic_config')||'{}');
+    if(cfg.columns?.length) appColumns=cfg.columns;
   }
 
   document.getElementById('loading').style.display='none';
   calcFinance();renderNotifications();renderBoard();
+}
+
+// ══════════════════════════════════════════
+//  WRITE — marcar avisos como lidos (server-side)
+// ══════════════════════════════════════════
+async function postEdgeFn(body){
+  try{
+    await fetch(EDGE_FN,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...body, nome:clientName, token:clientToken})
+    });
+  }catch(e){console.warn('Falha ao sincronizar leitura:', e);}
 }
 
 function showError(icon,title,msg){
@@ -69,7 +88,7 @@ function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{style:'currency'
 
 function calcFinance(){
   let pago=0,rest=0;
-  projects.filter(p=>!p.archived&&p.client?.toLowerCase().trim()===clientName.toLowerCase()).forEach(p=>{
+  projects.filter(p=>!p.archived).forEach(p=>{
     const t=parseFloat(p.value||0);const pg=(p.payments||[]).reduce((s,x)=>s+parseFloat(x.amount||0),0);
     pago+=pg;if(t-pg>0)rest+=t-pg;
   });
@@ -99,14 +118,9 @@ async function confirmNotice(id, type) {
     const d = getNotifDismissed();
     if (!d.includes(id)) d.push(id);
     localStorage.setItem('mavic_notif_read_' + clientName, JSON.stringify(d));
-    // marcar como lido no Supabase para o admin ver
-    if(sb){
-      try{
-        const updated = notifications.map(n => n.id===id ? {...n, read:true} : n);
-        await sb.from('mavic_store').upsert([{key:'notifications', data:updated}], {onConflict:'key'});
-        notifications = updated;
-      }catch(e){console.warn('Erro ao marcar lido:', e);}
-    }
+    // Sincronizar com o servidor via Edge Function
+    await postEdgeFn({ action: 'mark_read', notifId: id });
+    notifications = notifications.map(n => n.id===id ? {...n, read:true} : n);
     renderNotifications();renderBoard();
   } else if (type === 'global') {
     dismissGlobalNotice(id);
@@ -122,32 +136,14 @@ function deleteNotice(id, type) {
 }
 
 async function dismissGlobalNotice(id) {
-  const gn = globalNotices.find(n => n.id === id);
-  if (gn) {
-    localStorage.setItem('mavic_notice_read_' + gn.id, '1');
-    if (sb) {
-      try {
-        const updated = globalNotices.map(n => {
-          if (n.id !== gn.id) return n;
-          const readBy = Array.isArray(n.readBy) ? [...n.readBy] : [];
-          if (!readBy.includes(clientName)) readBy.push(clientName);
-          return { ...n, readBy };
-        });
-        await sb.from('mavic_store').upsert([{ key: 'global_notices', data: updated }], { onConflict: 'key' });
-      } catch (e) {
-        console.warn('Global notice read registration failed', e);
-      }
-    }
-  }
+  localStorage.setItem('mavic_notice_read_' + id, '1');
+  await postEdgeFn({ action: 'mark_global_read', noticeId: id });
   renderNotifications();
 }
 
 function toggleAccordion(id) {
-  if (openNotifIds.has(id)) {
-    openNotifIds.delete(id);
-  } else {
-    openNotifIds.add(id);
-  }
+  if (openNotifIds.has(id)) openNotifIds.delete(id);
+  else openNotifIds.add(id);
   renderNotifications();
 }
 
@@ -161,39 +157,29 @@ function formatNoticeText(t){
 
 function renderNotifications(){
   const wrap=document.getElementById('notifWrap');
-  const cli=clients.find(c=>c.name?.toLowerCase().trim()===clientName.toLowerCase());
-  if(!cli?.token){wrap.classList.add('d-none');return;}
-
   const dismissed = getNotifDismissed();
-  const deleted = getNotifDeleted();
+  const deleted   = getNotifDeleted();
 
-  // Load individual notices
+  // Notificações individuais
   const myIndiv = notifications
-    .filter(n => n.clientToken === cli.token && !deleted.includes(n.id))
+    .filter(n => !deleted.includes(n.id))
     .map(n => ({
-      id: n.id,
-      type: 'individual',
+      id: n.id, type: 'individual',
       title: n.title || `Aviso do Projeto: ${n.projectName || 'MAVIC'}`,
-      message: n.message,
-      projectName: n.projectName,
-      createdAt: n.createdAt,
-      read: dismissed.includes(n.id)
+      message: n.message, projectName: n.projectName, createdAt: n.createdAt,
+      read: dismissed.includes(n.id) || !!n.read
     }));
 
-  // Load active global notices
+  // Avisos globais ativos (já filtrados pelo servidor)
   const myGlobals = globalNotices
-    .filter(gn => gn.active && (gn.targetAll || gn.targetClients?.some(n => n.toLowerCase() === clientName.toLowerCase())) && !deleted.includes(gn.id))
+    .filter(gn => !deleted.includes(gn.id))
     .map(gn => ({
-      id: gn.id,
-      type: 'global',
+      id: gn.id, type: 'global',
       title: gn.title || 'Aviso Geral MAVIC',
-      message: gn.message,
-      projectName: null,
-      createdAt: gn.createdAt,
+      message: gn.message, projectName: null, createdAt: gn.createdAt,
       read: !!localStorage.getItem('mavic_notice_read_' + gn.id)
     }));
 
-  // Combine and sort by date descending
   const allNotices = [...myIndiv, ...myGlobals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   if(!allNotices.length){wrap.classList.add('d-none');return;}
@@ -202,15 +188,15 @@ function renderNotifications(){
   const unreadCount = allNotices.filter(n => !n.read).length;
 
   let html = `<div class="notif-title">
-    <i class="bi bi-bell-fill"></i> Central de Avisos 
+    <i class="bi bi-bell-fill"></i> Central de Avisos
     ${unreadCount > 0 ? `<span style="background:var(--accent);color:#fff;padding:1px 7px;border-radius:20px;font-size:11px;margin-left:6px">${unreadCount} novo(s)</span>` : ''}
   </div>`;
 
   html += allNotices.map(n => {
     const dt = new Date(n.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-    const isUnread = !n.read;
+    const isUnread   = !n.read;
     const borderClass = isUnread ? (n.type === 'global' ? 'notif-global-unread' : 'notif-unread') : 'notif-read';
-    const isOpen = openNotifIds.has(n.id);
+    const isOpen      = openNotifIds.has(n.id);
 
     return `<div class="notif-accordion ${borderClass} ${isOpen ? 'open' : ''}">
       <div class="notif-header" onclick="toggleAccordion(${n.id})">
@@ -225,7 +211,7 @@ function renderNotifications(){
         <div class="notif-msg" style="font-size:13px;line-height:1.6;color:var(--text)">${formatNoticeText(n.message)}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);flex-wrap:wrap;gap:8px">
           <span style="font-size:11px;color:var(--text3)">
-            <i class="bi bi-calendar3"></i> ${dt} ${n.projectName ? `&middot; <i class="bi bi-folder2"></i> ${n.projectName}` : ''}
+            <i class="bi bi-calendar3"></i> ${dt}${n.projectName ? ` &middot; <i class="bi bi-folder2"></i> ${n.projectName}` : ''}
           </span>
           <div style="display:flex;align-items:center;gap:6px">
             ${isUnread ? `
@@ -255,7 +241,6 @@ function renderBoard(){
   const srch=document.getElementById('srch').value.toLowerCase().trim();
   const fType=document.getElementById('fType').value;
   const myProjs=projects.filter(p=>!p.archived
-    &&p.client?.toLowerCase().trim()===clientName.toLowerCase()
     &&(!fType||p.type===fType)
     &&(!srch||p.name?.toLowerCase().includes(srch)));
   let total=0;
@@ -295,8 +280,6 @@ function createCardHTML(p, cardIdx=0){
   const pIcon={Alta:'🔴',Média:'🟡',Baixa:'🟢'};
   let sClass='',sLabel='';
   if(total>0){if(rest<=0){sClass='b-pago';sLabel='✓ Pago';}else if(paid>0){sClass='b-parcial';sLabel='Parcial';}else{sClass='b-pendente';sLabel='Pendente';}}
-  // Avatar e progresso
-  const avatarColor=getClientColor(clientName);
   const subs=p.subtasks||[];
   const subDone=subs.filter(s=>s.done).length;
   const subPct=subs.length?Math.round((subDone/subs.length)*100):0;
@@ -340,13 +323,12 @@ function createCardHTML(p, cardIdx=0){
   // Checklist
   let checkHtml='';
   if(subs.length){
-    const done=subDone;const pct=subPct;
     checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px">
       <div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600">
         <span><i class="bi bi-ui-checks"></i> Andamento</span>
-        <span style="font-family:'Courier New',monospace">${done}/${subs.length}</span>
+        <span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span>
       </div>
-      <div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${pct===100?'done':''}" style="width:${pct}%"></div></div>
+      <div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>
       ${subs.map(s=>`<div class="sub-row"><input type="checkbox" disabled ${s.done?'checked':''}><span class="${s.done?'sub-done':''}">${s.text}</span></div>`).join('')}
     </div>`;
   }
@@ -354,13 +336,8 @@ function createCardHTML(p, cardIdx=0){
   const noteHtml=p.note?`<p style="font-size:12px;color:var(--text2);margin-top:7px;line-height:1.5;background:var(--surface2);padding:6px 8px;border-radius:6px">${p.note}</p>`:'';
 
   // Notificações não lidas para este projeto
-  const cli=clients.find(c=>c.name?.toLowerCase().trim()===clientName.toLowerCase());
   const dismissed=getNotifDismissed();
-  const unreadNotifs=cli?.token?notifications.filter(n=>
-    n.clientToken===cli.token&&
-    n.projectName===p.name&&
-    !dismissed.includes(n.id)
-  ):[];
+  const unreadNotifs=notifications.filter(n=>n.projectName===p.name&&!dismissed.includes(n.id)&&!n.read);
   const hasBell=unreadNotifs.length>0;
 
   return `<div class="kcard t-${p.type} ${dlClass}" data-id="${p.id}" onclick="togglePin(event,${p.id})" style="animation-delay:${cardIdx*0.04}s">
@@ -393,11 +370,9 @@ function scrollToNotif(e,projectName){
   const wrap=document.getElementById('notifWrap');
   if(wrap.classList.contains('d-none'))return;
   wrap.scrollIntoView({behavior:'smooth',block:'start'});
-  // destacar o aviso do projeto
-  const items=wrap.querySelectorAll('.notif-item');
+  const items=wrap.querySelectorAll('.notif-accordion');
   items.forEach(item=>{
-    const txt=item.textContent||'';
-    if(txt.includes(projectName)){
+    if((item.textContent||'').includes(projectName)){
       item.style.transition='background .3s';
       item.style.background='var(--yellow-bg)';
       item.style.border='1px solid var(--yellow)';
@@ -414,20 +389,5 @@ function togglePin(e,id){
 }
 function toggleFin(id){if(expandedFin.has(id))expandedFin.delete(id);else expandedFin.add(id);renderBoard();}
 
-function scrollToNotif(e,projectName){
-  e.stopPropagation();
-  const wrap=document.getElementById('notifWrap');
-  if(wrap.classList.contains('d-none'))return;
-  wrap.scrollIntoView({behavior:'smooth',block:'start'});
-  const items=wrap.querySelectorAll('.notif-item');
-  items.forEach(item=>{
-    if((item.textContent||'').includes(projectName)){
-      item.style.transition='background .3s';
-      item.style.background='var(--yellow-bg)';
-      item.style.border='1px solid var(--yellow)';
-      setTimeout(()=>{item.style.background='';item.style.border='';},2500);
-    }
-  });
-}
-
 document.addEventListener('DOMContentLoaded',loadData);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      

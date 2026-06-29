@@ -1013,6 +1013,12 @@ function saveSettings(){
 // ══════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════
+// Ping a cada 30 min para evitar hibernação do Supabase
+setInterval(async()=>{
+  if(!sb)return;
+  try{await sb.from('mavic_store').select('key').limit(1);}catch(e){}
+},30*60*1000);
+
 document.addEventListener('DOMContentLoaded',async()=>{
   await loadData();
   updateProjColSelect();updateProjClientSelect();updateClientFilter();
@@ -1020,7 +1026,4 @@ document.addEventListener('DOMContentLoaded',async()=>{
   renderBoard();
   document.getElementById('loading').style.display='none';
   document.addEventListener('click',e=>{
-    if(!e.target.closest('.kcol-acts'))document.querySelectorAll('.sort-menu:not(#colsMenu)').forEach(m=>m.classList.remove('open'));
-    if(!e.target.closest('[onclick*="toggleColsMenu"]')&&!e.target.closest('#colsMenu'))closeColsMenu();
-  });
-});
+    if(!e.target.closest('.kcol-acts'))document.querySelectorAll

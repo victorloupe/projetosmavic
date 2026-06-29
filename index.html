@@ -412,4 +412,17 @@
 <div class="mbox msm">
   <div class="mhdr"><h5><i class="bi bi-share-fill"></i> Link do Cliente</h5><button class="btn-icon btn-sm" onclick="document.getElementById('shareLinkOverlay').classList.remove('open')"><i class="bi bi-x-lg"></i></button></div>
   <div class="mbody">
-    <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Copie e envie ao client
+    <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Copie e envie ao cliente:</p>
+    <div style="display:flex;gap:7px"><input class="inp" id="shareLinkInput" readonly style="font-family:'Courier New',monospace;font-size:12px"><button class="btn btn-primary" onclick="copyShareInput()"><i class="bi bi-clipboard"></i></button></div>
+  </div>
+</div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+  }
+</script>
+</body>
+</html>

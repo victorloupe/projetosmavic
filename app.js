@@ -33,7 +33,9 @@ function initSupabase(){
 async function loadData(){
   if(!initSupabase()){loadLocal();return;}
   try{
-    const{data,error}=await sb.from('mavic_store').select('key,data');
+    const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),8000));
+    const query=sb.from('mavic_store').select('key,data');
+    const{data,error}=await Promise.race([query,timeout]);
     if(error)throw error;
     const map={};(data||[]).forEach(r=>map[r.key]=r.data);
     projects=map.projects||[];clients=map.clients||[];notifications=map.notifications||[];
@@ -1026,4 +1028,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   renderBoard();
   document.getElementById('loading').style.display='none';
   document.addEventListener('click',e=>{
-    if(!e.target.closest('.kcol-acts'))document.querySelectorAll
+    if(!e.target.closest('.kcol-acts'))document.querySelectorAll('.sort-menu:not(#colsMenu)').forEach(m=>m.classList.remove('open'));
+    if(!e.target.closest('[onclick*="toggleColsMenu"]')&&!e.target.closest('#colsMenu'))closeColsMenu();
+  });
+});

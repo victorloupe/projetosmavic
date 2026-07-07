@@ -126,4 +126,11 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sa
 .notif-accordion{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;transition:all .15s}
 .notif-accordion:hover{box-shadow:var(--sh2);border-color:var(--border2)}
 .notif-header{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:var(--surface2);user-select:none}
-.notif-header-title{display:flex;align-items:center;gap:8px;font-weight:600;
+.notif-header-title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--text)}
+.notif-header-arrow{transition:transform .2s;color:var(--text3);font-size:12px}
+.notif-accordion.open .notif-header-arrow{transform:rotate(180deg)}
+.notif-content{padding:12px 14px;border-top:1px solid var(--border);display:none;background:var(--surface);max-height:150px;overflow-y:auto}
+.notif-accordion.open .notif-content{display:block}
+.notif-unread{border-left:3.5px solid var(--green)}
+.notif-global-unread{border-left:3.5px solid var(--yellow)}
+.notif-read{border-left:3.5px solid var(--border);opacity:0.85}

@@ -45,7 +45,9 @@ function initSupabase(){
   return false;
 }
 async function loadData(){
-  if(!initSupabase()){loadLocal();return;}
+  let hasSb=false;
+  try{hasSb=initSupabase();}catch(e){console.warn('initSupabase falhou',e);hasSb=false;}
+  if(!hasSb){loadLocal();return;}
   try{
     const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),8000));
     const query=sb.from('mavic_store').select('key,data');
@@ -1049,4 +1051,52 @@ function moveNext(id){
   renderBoard();scheduleSync();showToast(`➡ ${p.column}`,'info');
 }
 
-// ═════�
+// ══════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════
+function openSettings(){
+  document.getElementById('clientUrl').value=localStorage.getItem('mavic_clientUrl')||'cliente.html';
+  document.getElementById('pixKey').value=localStorage.getItem('mavic_pixKey')||'';
+  document.getElementById('pixName').value=localStorage.getItem('mavic_pixName')||'';
+  document.getElementById('pixBank').value=localStorage.getItem('mavic_pixBank')||'';
+  document.getElementById('stProjCnt').textContent=projects.length;
+  document.getElementById('stCliCnt').textContent=clients.length;
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+function closeSettings(){document.getElementById('settingsOverlay').classList.remove('open');}
+function saveSettings(){
+  const cUrl=document.getElementById('clientUrl').value.trim()||'cliente.html';
+  localStorage.setItem('mavic_clientUrl',cUrl);window.CLIENT_PANEL_URL=cUrl;
+  localStorage.setItem('mavic_pixKey',document.getElementById('pixKey').value.trim());
+  localStorage.setItem('mavic_pixName',document.getElementById('pixName').value.trim());
+  localStorage.setItem('mavic_pixBank',document.getElementById('pixBank').value.trim());
+  closeSettings();showToast('Configurações salvas!','success');
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+// Ping a cada 30 min para evitar hibernação do Supabase
+setInterval(async()=>{
+  if(!sb)return;
+  try{await sb.from('mavic_store').select('key').limit(1);}catch(e){}
+},30*60*1000);
+
+document.addEventListener('DOMContentLoaded',async()=>{
+  try{
+    await loadData();
+  }catch(e){
+    console.error('Falha ao carregar dados, usando modo local',e);
+    try{loadLocal();}catch(e2){console.error('loadLocal também falhou',e2);}
+  }
+  try{
+    updateProjColSelect();updateProjClientSelect();updateClientFilter();
+    updateGnNavBtn();
+    renderBoard();
+  }catch(e){console.error('Erro ao renderizar tela inicial',e);}
+  document.getElementById('loading').style.display='none';
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('.kcol-acts'))document.querySelectorAll('.sort-menu:not(#colsMenu)').forEach(m=>m.classList.remove('open'));
+    if(!e.target.closest('[onclick*="toggleColsMenu"]')&&!e.target.closest('#colsMenu'))closeColsMenu();
+  });
+});

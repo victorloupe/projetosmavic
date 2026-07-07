@@ -386,4 +386,9 @@ function scrollToNotif(e,projectName){
 function togglePin(e,id){
   if(e.target.closest('button')||e.target.closest('input'))return;
   const card=e.currentTarget;
-  if(pinnedCards.has(id)){pinnedCards.delete(id);card.classList.remove('pinned')
+  if(pinnedCards.has(id)){pinnedCards.delete(id);card.classList.remove('pinned');}
+  else{pinnedCards.add(id);card.classList.add('pinned');}
+}
+function toggleFin(id){if(expandedFin.has(id))expandedFin.delete(id);else expandedFin.add(id);renderBoard();}
+
+document.addEventListener('DOMContentLoaded',loadData);

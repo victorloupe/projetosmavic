@@ -1,7 +1,14 @@
 // ══════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════
-const INIT_COLS=[{id:'Briefing',icon:'📋'},{id:'Desenvolvimento',icon:'✏️'},{id:'Revisão',icon:'🔍'},{id:'Obra',icon:'🏗️'},{id:'Concluído',icon:'✅'}];
+const INIT_COLS=[{id:'Briefing',icon:'bi-clipboard',color:'#92623a'},{id:'Desenvolvimento',icon:'bi-pencil',color:'#ea580c'},{id:'Revisão',icon:'bi-search',color:'#2563eb'},{id:'Obra',icon:'bi-hammer',color:'#d97706'},{id:'Concluído',icon:'bi-check-circle',color:'#16a34a'}];
+const DEFAULT_COL_COLOR='#92623a';
+const DEFAULT_COL_ICON='bi-folder';
+const COL_ICONS=[
+  {v:'bi-clipboard',l:'Clipboard'},{v:'bi-pencil',l:'Lápis'},{v:'bi-search',l:'Lupa'},{v:'bi-hammer',l:'Martelo'},
+  {v:'bi-check-circle',l:'Check'},{v:'bi-flag',l:'Bandeira'},{v:'bi-folder',l:'Pasta'},{v:'bi-chat-dots',l:'Chat'},
+  {v:'bi-star',l:'Estrela'},{v:'bi-bookmark',l:'Marcador'},{v:'bi-lightning',l:'Urgente'},{v:'bi-send',l:'Envio'}
+];
 const QUICK_MSGS=[
   { title: "Andamento do Projeto", msg: "Projeto em andamento! Em breve temos novidades." },
   { title: "Aprovação Necessária", msg: "Precisamos de sua aprovação para avançar." },
@@ -21,6 +28,13 @@ let pinnedCards=new Set(),expandedFin=new Set();
 let isDragging=false,currentCliId=null,notifyProjId=null;
 let syncTimer=null,touchTimer=null,touchDragId=null,touchGhost=null;
 window.CLIENT_PANEL_URL=localStorage.getItem('mavic_clientUrl')||'cliente.html';
+if(localStorage.getItem('mavic_pixKey')===null){
+  localStorage.setItem('mavic_pixKey','350.605.018-41');
+  localStorage.setItem('mavic_pixName','Victor Lourenço Pereira');
+  localStorage.setItem('mavic_pixBank','Nu Pagamentos');
+}
+let waPixBlock='';
+let waLinkBlock='';
 
 // ══════════════════════════════════════════
 //  SUPABASE
@@ -83,9 +97,9 @@ async function syncCloud(){
 }
 function setSync(s){
   const el=document.getElementById('syncStatus');
-  if(s==='ok'){el.className='nav-sync ok';el.innerHTML='<i class="bi bi-cloud-check-fill"></i> Sincronizado';}
+  if(s==='ok'){el.className='nav-sync ok';el.innerHTML='<i class="bi bi-cloud-check"></i> Sincronizado';}
   else if(s==='sync'){el.className='nav-sync sync';el.innerHTML='<i class="bi bi-arrow-repeat"></i> Sincronizando…';}
-  else{el.className='nav-sync off';el.innerHTML='<i class="bi bi-cloud-slash-fill"></i> Offline';}
+  else{el.className='nav-sync off';el.innerHTML='<i class="bi bi-cloud-slash"></i> Offline';}
 }
 
 // ══════════════════════════════════════════
@@ -95,8 +109,8 @@ function toggleTheme(){appTheme=appTheme==='light'?'dark':'light';applyTheme(app
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);appTheme=t;
   const btn=document.getElementById('themeBtn'),logo=document.getElementById('navLogo');
-  if(t==='dark'){btn.innerHTML='<i class="bi bi-sun-fill" style="color:#fbbf24"></i>';if(logo)logo.src='https://i.postimg.cc/vZmmNLjj/LOGO-NOVA-black.png';}
-  else{btn.innerHTML='<i class="bi bi-moon-stars-fill"></i>';if(logo)logo.src='LOGO NOVA.png';}
+  if(t==='dark'){btn.innerHTML='<i class="bi bi-sun" style="color:#fbbf24"></i>';if(logo)logo.src='https://i.postimg.cc/vZmmNLjj/LOGO-NOVA-black.png';}
+  else{btn.innerHTML='<i class="bi bi-moon-stars"></i>';if(logo)logo.src='LOGO NOVA.png';}
 }
 function setView(v){
   currentView=v;
@@ -111,7 +125,7 @@ function setView(v){
 //  TOAST
 // ══════════════════════════════════════════
 function showToast(msg,type='success'){
-  const ic={success:'bi-check-circle-fill',warning:'bi-exclamation-circle-fill',error:'bi-x-circle-fill',info:'bi-info-circle-fill'};
+  const ic={success:'bi-check-circle',warning:'bi-exclamation-circle',error:'bi-x-circle',info:'bi-info-circle'};
   const cl={success:'var(--green)',warning:'var(--yellow)',error:'var(--red)',info:'var(--blue)'};
   const t=document.createElement('div');t.className='toast';
   t.innerHTML=`<i class="bi ${ic[type]||ic.success}" style="color:${cl[type]||cl.success}"></i><span>${msg}</span>`;
@@ -146,13 +160,13 @@ function renderBoard(){
     const el=document.createElement('div');
     if(isMin){
       el.className='kcol-mini';el.onclick=()=>toggleMinimize(col.id);
-      el.innerHTML=`<i class="bi bi-arrows-angle-expand" style="color:var(--text3);font-size:12px"></i><span class="mc">${colProjs.length}</span><div class="ml">${col.icon} ${col.id}</div>`;
+      el.innerHTML=`<i class="bi bi-arrows-angle-expand" style="color:var(--text3);font-size:12px"></i><span class="mc">${colProjs.length}</span><div class="ml"><i class="bi ${col.icon||DEFAULT_COL_ICON}" style="color:${col.color||DEFAULT_COL_COLOR}"></i> ${col.id}</div>`;
     }else{
       const cur=colSorts[col.id]||'default';
       const sortLabels={default:'Padrão',priority:'Prioridade',deadline:'Prazo',value:'Valor',name:'Nome'};
       el.className='kcol';
       el.innerHTML=`<div class="kcol-hdr">
-        <div class="kcol-title">${col.icon} ${col.id} <span class="kcol-cnt">${colProjs.length}</span></div>
+        <div class="kcol-title"><i class="bi ${col.icon||DEFAULT_COL_ICON}" style="color:${col.color||DEFAULT_COL_COLOR}"></i> ${col.id} <span class="kcol-cnt">${colProjs.length}</span></div>
         <div class="kcol-acts">
           <div style="position:relative">
             <button class="cbtn" title="Ordenar" onclick="toggleSortMenu('${col.id}');event.stopPropagation()"><i class="bi bi-sort-down-alt"></i></button>
@@ -250,7 +264,7 @@ function createCardHTML(p, cardIdx=0){
         <button class="cbtn" onclick="editProject(${p.id});event.stopPropagation()" title="Editar"><i class="bi bi-pencil"></i></button>
         <button class="cbtn arc" onclick="archiveProject(${p.id});event.stopPropagation()" title="Arquivar"><i class="bi bi-archive"></i></button>
         <button class="cbtn del" onclick="deleteProject(${p.id});event.stopPropagation()" title="Excluir"><i class="bi bi-trash3"></i></button>
-        <button class="cbtn" style="margin-left:auto;color:var(--accent)" onclick="moveNext(${p.id});event.stopPropagation()" title="Avançar etapa"><i class="bi bi-arrow-right-circle-fill"></i></button>
+        <button class="cbtn" style="margin-left:auto;color:var(--accent)" onclick="moveNext(${p.id});event.stopPropagation()" title="Avançar etapa"><i class="bi bi-arrow-right-circle"></i></button>
       </div>
     </div>
   </div>`;
@@ -345,7 +359,7 @@ function setupTouchDrag(){
 function toggleColsMenu(){const m=document.getElementById('colsMenu');m.classList.toggle('open');renderColMenu();}
 function closeColsMenu(){document.getElementById('colsMenu').classList.remove('open');}
 function renderColMenu(){
-  document.getElementById('colMenuItems').innerHTML=appColumns.map(c=>`<button onclick="toggleVisible('${c.id}');event.stopPropagation()" style="${visibleColumns.includes(c.id)?'font-weight:600':''}">${visibleColumns.includes(c.id)?'<i class="bi bi-check2"></i>':'<i class="bi bi-dash" style="opacity:.3"></i>'} ${c.icon} ${c.id}</button>`).join('');
+  document.getElementById('colMenuItems').innerHTML=appColumns.map(c=>`<button onclick="toggleVisible('${c.id}');event.stopPropagation()" style="${visibleColumns.includes(c.id)?'font-weight:600':''}">${visibleColumns.includes(c.id)?'<i class="bi bi-check2"></i>':'<i class="bi bi-dash" style="opacity:.3"></i>'} <i class="bi ${c.icon||DEFAULT_COL_ICON}" style="color:${c.color||DEFAULT_COL_COLOR}"></i> ${c.id}</button>`).join('');
 }
 function toggleVisible(id){
   if(visibleColumns.includes(id)){if(visibleColumns.length<=1)return showToast('Ao menos uma coluna!','warning');visibleColumns=visibleColumns.filter(x=>x!==id);minimizedColumns=minimizedColumns.filter(x=>x!==id);}
@@ -378,13 +392,13 @@ async function handleImageUpload(input){
     const{data:urlData}=sb.storage.from('mavic-images').getPublicUrl(path);
     document.getElementById('projImage').value=urlData.publicUrl;
     setImagePreview(urlData.publicUrl,false);
-    status.innerHTML='<i class="bi bi-check-circle-fill" style="color:var(--green)"></i> Imagem enviada!';
+    status.innerHTML='<i class="bi bi-check-circle" style="color:var(--green)"></i> Imagem enviada!';
     status.style.color='var(--green)';
     setTimeout(()=>{status.style.display='none';},2500);
     showToast('Imagem enviada!','success');
   }catch(e){
     console.error(e);
-    status.innerHTML='<i class="bi bi-x-circle-fill" style="color:var(--red)"></i> Erro: '+e.message;
+    status.innerHTML='<i class="bi bi-x-circle" style="color:var(--red)"></i> Erro: '+e.message;
     status.style.color='var(--red)';
     showToast('Erro no upload','error');
   }
@@ -511,7 +525,7 @@ function deleteProject(id,fromArch=false){
 function renderSubsList(){
   const c=document.getElementById('subsContainer');const done=tempSubs.filter(s=>s.done).length;
   document.getElementById('subProgress').textContent=`${done}/${tempSubs.length}`;
-  if(!tempSubs.length){c.innerHTML='<div style="padding:12px;text-align:center;color:var(--text3);font-size:12px">Nenhuma tarefa</div>';return;}
+  if(!tempSubs.length){c.innerHTML='<div class="empty-state" style="padding:16px"><i class="bi bi-list-check"></i><span>Nenhuma tarefa</span></div>';return;}
   c.innerHTML=tempSubs.map(s=>`<div class="sub-row"><input type="checkbox" ${s.done?'checked':''} onchange="toggleTmpSub(${s.id})"><span class="${s.done?'sub-done':''}" style="flex:1;font-size:12.5px">${s.text}</span><button class="prod-del" onclick="delSub(${s.id})"><i class="bi bi-x"></i></button></div>`).join('');
 }
 function addSubtask(){const inp=document.getElementById('newSub');const t=inp.value.trim();if(!t)return;tempSubs.push({id:Date.now(),text:t,done:false});inp.value='';renderSubsList();}
@@ -527,7 +541,7 @@ function renderPaymentsModal(){
   const paid=tempPayments.reduce((s,x)=>s+parseFloat(x.amount||0),0);const rest=total-paid;
   document.getElementById('pagoLbl').textContent=`Pago: ${fmt(paid)}`;
   const rl=document.getElementById('restLbl');rl.textContent=`Restante: ${fmt(rest)}`;rl.style.color=rest>0?'var(--red)':'var(--green)';
-  if(!tempPayments.length){c.innerHTML='<div style="padding:12px;text-align:center;color:var(--text3);font-size:12px">Nenhum pagamento</div>';return;}
+  if(!tempPayments.length){c.innerHTML='<div class="empty-state" style="padding:16px"><i class="bi bi-cash"></i><span>Nenhum pagamento</span></div>';return;}
   c.innerHTML=[...tempPayments].reverse().map(pg=>`<div class="pay-row"><span class="pay-dt"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</span><span class="pay-val">+${fmt(pg.amount)}</span><button class="pay-del" onclick="delPayment(${pg.id})"><i class="bi bi-x-lg"></i></button></div>`).join('');
 }
 function addPayment(){
@@ -545,7 +559,7 @@ function openClientsModal(){renderCliList();document.getElementById('cliDetail')
 function closeClientsModal(){document.getElementById('clientsOverlay').classList.remove('open');}
 function renderCliList(){
   const el=document.getElementById('cliList');
-  if(!clients.length){el.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px">Nenhum cliente</div>';return;}
+  if(!clients.length){el.innerHTML='<div class="empty-state"><i class="bi bi-people"></i><span>Nenhum cliente cadastrado</span></div>';return;}
   el.innerHTML=clients.map(c=>`<div class="cli-item ${currentCliId===c.id?'on':''}" onclick="selectClient(${c.id})"><span><i class="bi bi-person"></i> ${c.name}</span><span style="font-size:11px;color:var(--text3)">${c.products?.length||0} itens</span></div>`).join('');
 }
 function createClient(){
@@ -595,7 +609,7 @@ function copyCliLink(){copyText(document.getElementById('cliLinkBox').textConten
 function buildLink(name,token){return `${window.CLIENT_PANEL_URL}?nome=${encodeURIComponent(name)}&token=${token}`;}
 function renderCliProductsTable(cl,editingId=null){
   const tb=document.getElementById('cliProdTable');
-  if(!cl.products?.length){tb.innerHTML='<tr><td colspan="4" style="padding:14px;text-align:center;color:var(--text3);font-size:13px">Tabela vazia</td></tr>';return;}
+  if(!cl.products?.length){tb.innerHTML='<tr><td colspan="4"><div class="empty-state" style="padding:16px"><i class="bi bi-table"></i><span>Tabela vazia</span></div></td></tr>';return;}
   tb.innerHTML=cl.products.map(p=>{
     if(p.id===editingId){
       return `<tr style="background:var(--accent-bg)">
@@ -612,7 +626,7 @@ function renderCliProductsTable(cl,editingId=null){
       <td style="padding:7px 10px;font-family:'Courier New',monospace;font-weight:700;color:var(--green)">${fmt(p.price)}</td>
       <td style="padding:7px 10px;text-align:right;white-space:nowrap">
         <button class="prod-del" onclick="editProdCli(${p.id})" title="Editar"><i class="bi bi-pencil" style="font-size:12px"></i></button>
-        <button class="prod-del" onclick="removeProdFromCli(${p.id})" title="Excluir"><i class="bi bi-trash" style="font-size:12px"></i></button>
+        <button class="prod-del" onclick="removeProdFromCli(${p.id})" title="Excluir"><i class="bi bi-trash3" style="font-size:12px"></i></button>
       </td>
     </tr>`;
   }).join('');
@@ -649,22 +663,23 @@ function openArchiveModal(){renderArchived();document.getElementById('archiveOve
 function closeArchiveModal(){document.getElementById('archiveOverlay').classList.remove('open');}
 function renderArchived(){
   const el=document.getElementById('archiveList'),arch=projects.filter(p=>p.archived);
-  if(!arch.length){el.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3)">Nenhum projeto arquivado</div>';return;}
+  if(!arch.length){el.innerHTML='<div class="empty-state"><i class="bi bi-archive"></i><span>Nenhum projeto arquivado</span></div>';return;}
   el.innerHTML=arch.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)"><div><div style="font-weight:600;font-size:13.5px">${p.name}</div><div style="font-size:12px;color:var(--text2)">${p.client} · ${p.column}</div></div><div style="display:flex;gap:7px"><button class="btn btn-ghost btn-sm" onclick="restoreProject(${p.id})"><i class="bi bi-arrow-counterclockwise"></i></button><button class="btn btn-danger btn-sm" onclick="deleteProject(${p.id},true)"><i class="bi bi-trash3"></i></button></div></div>`).join('');
 }
 
 // ══════════════════════════════════════════
 //  MANAGE COLUMNS
 // ══════════════════════════════════════════
+function colIconOptions(sel){return COL_ICONS.map(o=>`<option value="${o.v}" ${o.v===sel?'selected':''}>${o.l}</option>`).join('');}
 function openManageColumnsModal(){
-  document.getElementById('colManagerList').innerHTML=appColumns.map(c=>`<div class="cm-row" data-orig="${c.id}"><input class="inp inp-sm" value="${c.icon}" style="width:44px;text-align:center"><input class="inp inp-sm" value="${c.id}" style="flex:1"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="bi bi-trash"></i></button></div>`).join('');
+  document.getElementById('colManagerList').innerHTML=appColumns.map(c=>`<div class="cm-row" data-orig="${c.id}"><select class="inp inp-sm cm-icon">${colIconOptions(c.icon)}</select><input type="color" class="cm-color" value="${c.color||DEFAULT_COL_COLOR}" title="Cor da coluna"><input class="inp inp-sm" value="${c.id}" style="flex:1"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="bi bi-trash3"></i></button></div>`).join('');
   document.getElementById('colsOverlay').classList.add('open');
 }
 function closeManageColumnsModal(){document.getElementById('colsOverlay').classList.remove('open');}
-function addColInput(){document.getElementById('colManagerList').innerHTML+=`<div class="cm-row" data-orig=""><input class="inp inp-sm" value="📁" style="width:44px;text-align:center"><input class="inp inp-sm" placeholder="Nome da coluna" style="flex:1"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="bi bi-trash"></i></button></div>`;}
+function addColInput(){document.getElementById('colManagerList').innerHTML+=`<div class="cm-row" data-orig=""><select class="inp inp-sm cm-icon">${colIconOptions()}</select><input type="color" class="cm-color" value="${DEFAULT_COL_COLOR}" title="Cor da coluna"><input class="inp inp-sm" placeholder="Nome da coluna" style="flex:1"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="bi bi-trash3"></i></button></div>`;}
 function saveColumnsConfig(){
   const rows=document.querySelectorAll('.cm-row'),newCols=[],map={};
-  rows.forEach(r=>{const orig=r.dataset.orig,icon=r.querySelectorAll('input')[0].value.trim(),name=r.querySelectorAll('input')[1].value.trim();if(name){newCols.push({id:name,icon});if(orig&&orig!==name)map[orig]=name;}});
+  rows.forEach(r=>{const orig=r.dataset.orig,icon=r.querySelector('select').value,color=r.querySelectorAll('input')[0].value,name=r.querySelectorAll('input')[1].value.trim();if(name){newCols.push({id:name,icon,color});if(orig&&orig!==name)map[orig]=name;}});
   if(!newCols.length)return showToast('Ao menos uma coluna!','warning');
   projects.forEach(p=>{if(map[p.column])p.column=map[p.column];if(!newCols.find(c=>c.id===p.column))p.column=newCols[0].id;});
   appColumns=newCols;visibleColumns=appColumns.map(c=>c.id);minimizedColumns=[];
@@ -716,6 +731,9 @@ function openWhatsApp(projId){
   const link=cli?.token?buildLink(cli.name,cli.token):'';
   const dl=p.date?new Date(p.date+'T12:00:00').toLocaleDateString('pt-BR'):'';
   const firstName=p.client.split(' ')[0];
+  const pixKey=(localStorage.getItem('mavic_pixKey')||'').trim();
+  const pixName=(localStorage.getItem('mavic_pixName')||'').trim();
+  const pixBank=(localStorage.getItem('mavic_pixBank')||'').trim();
 
   let msg=`Olá, *${firstName}*!\n`;
   msg+=`\n`;
@@ -730,13 +748,48 @@ function openWhatsApp(projId){
     else msg+=`*Pendente:* ${fmt(rest)}\n`;
   }
   if(p.note)msg+=`\n_${p.note}_\n`;
-  if(link)msg+=`\n*Seu painel:*\n${link}\n`;
   msg+=`\n`;
   msg+=`_Equipe MAVIC Projetos_`;
 
+  waLinkBlock=link?`\n*Seu painel:*\n${link}\n`:'';
+  waPixBlock=pixKey?`\n*Dados para PIX:*\n*Chave:* ${pixKey}\n*Titular:* ${pixName}\n*Banco:* ${pixBank}\n`:'';
+
+  const linkWrap=document.getElementById('waLinkWrap');
+  const linkBox=document.getElementById('waIncludeLink');
+  if(link){linkWrap.style.display='';linkBox.checked=false;}
+  else{linkWrap.style.display='none';linkBox.checked=false;}
+
+  const pixWrap=document.getElementById('waPixWrap');
+  const pixBox=document.getElementById('waIncludePix');
+  if(pixKey){pixWrap.style.display='';pixBox.checked=true;}
+  else{pixWrap.style.display='none';pixBox.checked=false;}
+
   document.getElementById('waPhone').value=cli?.phone||'';
   document.getElementById('waMsg').value=msg;
+  if(linkBox.checked)insertBlock(waLinkBlock);
+  if(pixBox.checked)insertBlock(waPixBlock);
   document.getElementById('waOverlay').classList.add('open');
+}
+function insertBlock(block){
+  const ta=document.getElementById('waMsg');
+  if(!block||ta.value.includes(block))return;
+  const marker='_Equipe MAVIC Projetos_';
+  const idx=ta.value.indexOf(marker);
+  if(idx>=0)ta.value=ta.value.slice(0,idx)+block+'\n'+ta.value.slice(idx);
+  else ta.value+=block;
+}
+function removeBlock(block){
+  const ta=document.getElementById('waMsg');
+  if(!block)return;
+  ta.value=ta.value.split(block+'\n').join('').split(block).join('');
+}
+function toggleWaPix(){
+  const box=document.getElementById('waIncludePix');
+  if(box.checked)insertBlock(waPixBlock);else removeBlock(waPixBlock);
+}
+function toggleWaLink(){
+  const box=document.getElementById('waIncludeLink');
+  if(box.checked)insertBlock(waLinkBlock);else removeBlock(waLinkBlock);
 }
 function closeWaModal(){document.getElementById('waOverlay').classList.remove('open');}
 function sendWhatsApp(){
@@ -778,12 +831,12 @@ function renderDashboard(){
   const venc=active.filter(p=>{if(!p.date||p.column==='Concluído')return false;return new Date(p.date+'T12:00:00')<new Date().setHours(0,0,0,0);}).length;
   const pendingProjs=active.filter(p=>{const t=parseFloat(p.value||0);const pg=(p.payments||[]).reduce((s,x)=>s+parseFloat(x.amount||0),0);return t>0&&pg<t;});
   document.getElementById('dashCards').innerHTML=`
-    <div class="dash-card dc-accent"><div class="dc-lbl">Faturamento Total</div><div class="dc-val">${fmt(totalVal)}</div><div class="dc-sub">${active.length} projetos ativos</div></div>
-    <div class="dash-card dc-green"><div class="dc-lbl">Total Recebido</div><div class="dc-val">${fmt(totalPaid)}</div><div class="dc-sub">${Math.round(totalVal?totalPaid/totalVal*100:0)}% do total</div></div>
-    <div class="dash-card dc-red"><div class="dc-lbl">A Receber</div><div class="dc-val">${fmt(totalPend)}</div><div class="dc-sub">${pendingProjs.length} projetos pendentes</div></div>
-    <div class="dash-card"><div class="dc-lbl">Concluídos</div><div class="dc-val" style="color:var(--green)">${concl}</div><div class="dc-sub">de ${active.length} ativos</div></div>
-    <div class="dash-card"><div class="dc-lbl">Vencidos</div><div class="dc-val" style="color:${venc>0?'var(--red)':'var(--text3)'}">${venc}</div><div class="dc-sub">projetos com prazo vencido</div></div>
-    <div class="dash-card"><div class="dc-lbl">Clientes</div><div class="dc-val" style="color:var(--accent)">${clients.length}</div><div class="dc-sub">no CRM</div></div>`;
+    <div class="dash-card dc-accent"><div class="dc-top"><div class="dc-lbl">Faturamento Total</div><div class="dc-icon" style="background:var(--accent-bg);color:var(--accent)"><i class="bi bi-cash-stack"></i></div></div><div class="dc-val">${fmt(totalVal)}</div><div class="dc-sub">${active.length} projetos ativos</div></div>
+    <div class="dash-card dc-green"><div class="dc-top"><div class="dc-lbl">Total Recebido</div><div class="dc-icon" style="background:var(--green-bg);color:var(--green)"><i class="bi bi-check-circle"></i></div></div><div class="dc-val">${fmt(totalPaid)}</div><div class="dc-sub">${Math.round(totalVal?totalPaid/totalVal*100:0)}% do total</div></div>
+    <div class="dash-card dc-red"><div class="dc-top"><div class="dc-lbl">A Receber</div><div class="dc-icon" style="background:var(--red-bg);color:var(--red)"><i class="bi bi-hourglass-split"></i></div></div><div class="dc-val">${fmt(totalPend)}</div><div class="dc-sub">${pendingProjs.length} projetos pendentes</div></div>
+    <div class="dash-card"><div class="dc-top"><div class="dc-lbl">Concluídos</div><div class="dc-icon" style="background:var(--green-bg);color:var(--green)"><i class="bi bi-flag"></i></div></div><div class="dc-val" style="color:var(--green)">${concl}</div><div class="dc-sub">de ${active.length} ativos</div></div>
+    <div class="dash-card"><div class="dc-top"><div class="dc-lbl">Vencidos</div><div class="dc-icon" style="background:${venc>0?'var(--red-bg)':'var(--surface2)'};color:${venc>0?'var(--red)':'var(--text3)'}"><i class="bi bi-exclamation-triangle"></i></div></div><div class="dc-val" style="color:${venc>0?'var(--red)':'var(--text3)'}">${venc}</div><div class="dc-sub">projetos com prazo vencido</div></div>
+    <div class="dash-card"><div class="dc-top"><div class="dc-lbl">Clientes</div><div class="dc-icon" style="background:var(--accent-bg);color:var(--accent)"><i class="bi bi-people"></i></div></div><div class="dc-val" style="color:var(--accent)">${clients.length}</div><div class="dc-sub">no CRM</div></div>`;
   const sorted=pendingProjs.sort((a,b)=>{const ra=parseFloat(a.value||0)-(a.payments||[]).reduce((s,x)=>s+parseFloat(x.amount||0),0);const rb=parseFloat(b.value||0)-(b.payments||[]).reduce((s,x)=>s+parseFloat(x.amount||0),0);return rb-ra;});
   if(!sorted.length){document.getElementById('dashTable').innerHTML='<div style="padding:24px;text-align:center;color:var(--text3)">Nenhum saldo pendente! ✅</div>';return;}
   document.getElementById('dashTable').innerHTML=`<table><thead><tr><th>Projeto</th><th>Cliente</th><th>Etapa</th><th>Total</th><th>Recebido</th><th>Saldo</th><th>Prazo</th></tr></thead><tbody>${sorted.map(p=>{
@@ -859,7 +912,7 @@ function renderGnList(){
     .filter(gn => gn && gn.message && gn.message.trim() !== '')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  if(!combined.length){el.innerHTML='<div style="text-align:center;color:var(--text3);font-size:13px;padding:28px">Nenhum aviso enviado ainda</div>';return;}
+  if(!combined.length){el.innerHTML='<div class="empty-state"><i class="bi bi-megaphone"></i><span>Nenhum aviso enviado ainda</span></div>';return;}
   
   el.innerHTML=combined.map(gn=>{
     const total = gn.targetedNames.length;
@@ -879,7 +932,7 @@ function renderGnList(){
     return `<div class="gn-accordion ${isOpen ? 'open' : ''}">
       <div class="gn-header" onclick="toggleGnAccordion(${gn.id})">
         <div class="gn-header-title">
-          <i class="bi ${gn.type==='global'?'bi-megaphone-fill':'bi-folder-fill'}" style="color:${gn.type==='global'?'var(--accent)':'var(--green)'};flex-shrink:0"></i>
+          <i class="bi ${gn.type==='global'?'bi-megaphone':'bi-folder'}" style="color:${gn.type==='global'?'var(--accent)':'var(--green)'};flex-shrink:0"></i>
           <span>${gn.title||'Aviso'}</span>
           ${!isOpen?`<span class="gn-header-preview">— ${preview}</span>`:''}
         </div>
@@ -996,39 +1049,4 @@ function moveNext(id){
   renderBoard();scheduleSync();showToast(`➡ ${p.column}`,'info');
 }
 
-// ══════════════════════════════════════════
-//  SETTINGS
-// ══════════════════════════════════════════
-function openSettings(){
-  document.getElementById('clientUrl').value=localStorage.getItem('mavic_clientUrl')||'cliente.html';
-  document.getElementById('stProjCnt').textContent=projects.length;
-  document.getElementById('stCliCnt').textContent=clients.length;
-  document.getElementById('settingsOverlay').classList.add('open');
-}
-function closeSettings(){document.getElementById('settingsOverlay').classList.remove('open');}
-function saveSettings(){
-  const cUrl=document.getElementById('clientUrl').value.trim()||'cliente.html';
-  localStorage.setItem('mavic_clientUrl',cUrl);window.CLIENT_PANEL_URL=cUrl;
-  closeSettings();showToast('Configurações salvas!','success');
-}
-
-// ══════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════
-// Ping a cada 30 min para evitar hibernação do Supabase
-setInterval(async()=>{
-  if(!sb)return;
-  try{await sb.from('mavic_store').select('key').limit(1);}catch(e){}
-},30*60*1000);
-
-document.addEventListener('DOMContentLoaded',async()=>{
-  await loadData();
-  updateProjColSelect();updateProjClientSelect();updateClientFilter();
-  updateGnNavBtn();
-  renderBoard();
-  document.getElementById('loading').style.display='none';
-  document.addEventListener('click',e=>{
-    if(!e.target.closest('.kcol-acts'))document.querySelectorAll('.sort-menu:not(#colsMenu)').forEach(m=>m.classList.remove('open'));
-    if(!e.target.closest('[onclick*="toggleColsMenu"]')&&!e.target.closest('#colsMenu'))closeColsMenu();
-  });
-});
+// ═════�

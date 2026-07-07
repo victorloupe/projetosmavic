@@ -1,7 +1,9 @@
 // URL da Edge Function — ajuste se o projeto Supabase mudar
 const EDGE_FN = 'https://ygwrpwkkriaeqaeuuxan.supabase.co/functions/v1/cliente-data';
 
-let projects=[],clients=[],globalNotices=[],appColumns=[{id:'Briefing',icon:'📋'},{id:'Desenvolvimento',icon:'✏️'},{id:'Revisão',icon:'🔍'},{id:'Obra',icon:'🏗️'},{id:'Concluído',icon:'✅'}];
+let projects=[],clients=[],globalNotices=[],appColumns=[{id:'Briefing',icon:'bi-clipboard',color:'#92623a'},{id:'Desenvolvimento',icon:'bi-pencil',color:'#ea580c'},{id:'Revisão',icon:'bi-search',color:'#2563eb'},{id:'Obra',icon:'bi-hammer',color:'#d97706'},{id:'Concluído',icon:'bi-check-circle',color:'#16a34a'}];
+const DEFAULT_COL_COLOR='#92623a';
+const DEFAULT_COL_ICON='bi-folder';
 let notifications=[],appTheme='light';
 let clientName='',clientToken='';
 let pinnedCards=new Set(),expandedFin=new Set();
@@ -103,8 +105,8 @@ function toggleTheme(){appTheme=appTheme==='light'?'dark':'light';applyTheme(app
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);appTheme=t;
   const btn=document.getElementById('themeBtn'),logo=document.getElementById('navLogo');
-  if(t==='dark'){btn.innerHTML='<i class="bi bi-sun-fill" style="color:#fbbf24"></i>';if(logo)logo.src='https://i.postimg.cc/vZmmNLjj/LOGO-NOVA-black.png';}
-  else{btn.innerHTML='<i class="bi bi-moon-stars-fill"></i>';if(logo)logo.src='LOGO NOVA.png';}
+  if(t==='dark'){btn.innerHTML='<i class="bi bi-sun" style="color:#fbbf24"></i>';if(logo)logo.src='https://i.postimg.cc/vZmmNLjj/LOGO-NOVA-black.png';}
+  else{btn.innerHTML='<i class="bi bi-moon-stars"></i>';if(logo)logo.src='LOGO NOVA.png';}
 }
 
 // ══════════════════════════════════════════
@@ -188,7 +190,7 @@ function renderNotifications(){
   const unreadCount = allNotices.filter(n => !n.read).length;
 
   let html = `<div class="notif-title">
-    <i class="bi bi-bell-fill"></i> Central de Avisos
+    <i class="bi bi-bell"></i> Central de Avisos
     ${unreadCount > 0 ? `<span style="background:var(--accent);color:#fff;padding:1px 7px;border-radius:20px;font-size:11px;margin-left:6px">${unreadCount} novo(s)</span>` : ''}
   </div>`;
 
@@ -201,7 +203,7 @@ function renderNotifications(){
     return `<div class="notif-accordion ${borderClass} ${isOpen ? 'open' : ''}">
       <div class="notif-header" onclick="toggleAccordion(${n.id})">
         <div class="notif-header-title">
-          <i class="bi ${n.type === 'global' ? 'bi-megaphone-fill' : 'bi-folder-fill'}" style="color:${isUnread ? (n.type === 'global' ? 'var(--yellow)' : 'var(--green)') : 'var(--text3)'}"></i>
+          <i class="bi ${n.type === 'global' ? 'bi-megaphone' : 'bi-folder'}" style="color:${isUnread ? (n.type === 'global' ? 'var(--yellow)' : 'var(--green)') : 'var(--text3)'}"></i>
           <span>${n.title}</span>
           ${isUnread ? `<span class="badge ${n.type==='global' ? 'b-urg' : 'b-baixa'}" style="font-size:9px;padding:1px 5px">Novo</span>` : ''}
         </div>
@@ -222,7 +224,7 @@ function renderNotifications(){
               <span style="font-size:11px;color:var(--text3);font-weight:500;margin-right:6px"><i class="bi bi-check2-all"></i> Lido</span>
             `}
             <button onclick="deleteNotice(${n.id}, '${n.type}')" style="background:var(--red-bg);border:1px solid var(--red);color:var(--red);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px" title="Excluir aviso do painel">
-              <i class="bi bi-trash"></i> Excluir
+              <i class="bi bi-trash3"></i> Excluir
             </button>
           </div>
         </div>
@@ -251,7 +253,7 @@ function renderBoard(){
     const el=document.createElement('div');el.className='kcol';
     el.innerHTML=`
       <div class="kcol-hdr">
-        <div class="kcol-title">${col.icon} ${col.id} <span class="kcol-cnt">${colProjs.length}</span></div>
+        <div class="kcol-title"><i class="bi ${col.icon||DEFAULT_COL_ICON}" style="color:${col.color||DEFAULT_COL_COLOR}"></i> ${col.id} <span class="kcol-cnt">${colProjs.length}</span></div>
       </div>
       <div class="kdrop">
         ${colProjs.map((p,i)=>createCardHTML(p,i)).join('')}
@@ -314,7 +316,7 @@ function createCardHTML(p, cardIdx=0){
   let prodsHtml='';
   if(prods.length){
     prodsHtml=`<div style="margin-top:8px">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);margin-bottom:4px"><i class="bi bi-tags-fill"></i> Serviços Contratados</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);margin-bottom:4px"><i class="bi bi-tags"></i> Serviços Contratados</div>
       <table class="prod-table"><thead><tr><th>Serviço</th><th>Valor</th></tr></thead><tbody>
         ${prods.map(pd=>`<tr><td style="font-weight:500">${pd.name}</td><td style="font-family:'Courier New',monospace;font-weight:700;color:var(--green)">${fmt(pd.price)}</td></tr>`).join('')}
       </tbody></table></div>`;
@@ -347,7 +349,7 @@ function createCardHTML(p, cardIdx=0){
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
         <div class="kcard-name" style="flex:1">${p.name}</div>
         ${hasBell?`<button onclick="scrollToNotif(event,'${p.name}')" title="${unreadNotifs.length} aviso${unreadNotifs.length>1?'s':''} não lido${unreadNotifs.length>1?'s':''}" style="flex-shrink:0;position:relative;background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--yellow)">
-          <i class="bi bi-bell-fill" style="font-size:16px"></i>
+          <i class="bi bi-bell" style="font-size:16px"></i>
           <span style="position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:9px;font-weight:700;border-radius:50%;width:14px;height:14px;display:flex;align-items:center;justify-content:center;line-height:1">${unreadNotifs.length}</span>
         </button>`:''}
       </div>
@@ -384,9 +386,4 @@ function scrollToNotif(e,projectName){
 function togglePin(e,id){
   if(e.target.closest('button')||e.target.closest('input'))return;
   const card=e.currentTarget;
-  if(pinnedCards.has(id)){pinnedCards.delete(id);card.classList.remove('pinned');}
-  else{pinnedCards.add(id);card.classList.add('pinned');}
-}
-function toggleFin(id){if(expandedFin.has(id))expandedFin.delete(id);else expandedFin.add(id);renderBoard();}
-
-document.addEventListener('DOMContentLoaded',loadData);
+  if(pinnedCards.has(id)){pinnedCards.delete(id);card.classList.remove('pinned')

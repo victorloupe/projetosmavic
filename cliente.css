@@ -84,6 +84,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sa
 .prog-fill.done{background:var(--green)}
 .sub-row{display:flex;align-items:center;gap:6px;padding:4px 7px;border-top:1px solid var(--border);font-size:12px}
 .sub-row:first-child{border-top:none}
+.sub-row.sub-in-progress{background:var(--accent-bg);font-weight:600}
 .sub-done{text-decoration:line-through;color:var(--text3)}
 .notif-wrap{flex-shrink:0;padding:10px 14px 0}
 .notif-banner{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
@@ -134,3 +135,112 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sa
 .notif-unread{border-left:3.5px solid var(--green)}
 .notif-global-unread{border-left:3.5px solid var(--yellow)}
 .notif-read{border-left:3.5px solid var(--border);opacity:0.85}
+
+/* Timeline de Progresso Linear */
+.project-timeline {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.timeline-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.timeline-title strong {
+  color: var(--accent);
+}
+.timeline-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+}
+.timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  gap: 6px;
+  flex: 1;
+}
+.step-icon-wrap {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  transition: all .2s ease;
+}
+.step-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text2);
+  text-align: center;
+  max-width: 65px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  margin-top: -30px; /* align with center of 24px icon + label offset */
+  z-index: 1;
+}
+.step-completed .step-icon-wrap {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+.step-completed .step-label {
+  color: var(--green);
+}
+.step-active .step-icon-wrap {
+  animation: pulseActive 2s infinite;
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+.step-active .step-label {
+  color: var(--text);
+  font-weight: 700;
+}
+@keyframes pulseActive {
+  0% { box-shadow: 0 0 0 0px var(--accent-bg); }
+  70% { box-shadow: 0 0 0 5px rgba(146,98,58,0); }
+  100% { box-shadow: 0 0 0 0px rgba(146,98,58,0); }
+}
+
+@media(max-width:480px) {
+  .step-label {
+    display: none; /* hide label on very small screens to fit horizontal timeline */
+  }
+  .timeline-line {
+    margin-top: -10px; /* adjust line offset if label is hidden */
+  }
+}
+
+.client-current-task span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.client-current-task i {
+  flex-shrink: 0;
+}
+

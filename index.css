@@ -79,6 +79,9 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:68px}
 .kcard-body{padding:9px 9px 8px 13px}
 .kcard-name{font-weight:600;font-size:13.5px;line-height:1.3;margin-bottom:3px}
 .kcard-client{font-size:12px;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.kcard-current-task{font-size:11.5px;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:5px;background:var(--yellow-bg);padding:3px 7px;border-radius:6px;border:1px solid rgba(217,119,6,.15);font-weight:500;width:fit-content;max-width:100%}
+.kcard-current-task span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kcard-current-task i{font-size:11px;flex-shrink:0}
 .kcard-tags{display:flex;flex-wrap:wrap;gap:4px}
 .kcard-exp{max-height:0;opacity:0;overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1),opacity .3s ease;padding:0 9px 0 13px}
 .kcard:hover .kcard-exp,.kcard.pinned .kcard-exp{max-height:700px;opacity:1;padding-bottom:9px}
@@ -108,6 +111,7 @@ select.inp{cursor:pointer}textarea.inp{resize:vertical;min-height:68px}
 .prog-fill.done{background:var(--green)}
 .sub-row{display:flex;align-items:center;gap:6px;padding:4px 7px;border-top:1px solid var(--border);font-size:12px}
 .sub-row:first-child{border-top:none}
+.sub-row.sub-in-progress{background:var(--accent-bg);font-weight:600}
 .sub-row input[type=checkbox]{accent-color:var(--accent);width:13px;height:13px;cursor:pointer;flex-shrink:0}
 .sub-done{text-decoration:line-through;color:var(--text3)}
 .dash-view{flex:1;overflow-y:auto;padding:18px;display:none;flex-direction:column;gap:16px}

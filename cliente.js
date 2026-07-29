@@ -286,6 +286,30 @@ function createCardHTML(p, cardIdx=0){
   const subDone=subs.filter(s=>s.done).length;
   const subPct=subs.length?Math.round((subDone/subs.length)*100):0;
   const progColor=subPct===100?'var(--green)':subPct>0?'var(--accent)':'transparent';
+  const currSub = subs.find(s => !s.done);
+
+  // Timeline
+  const currentIdx = appColumns.findIndex(c => c.id === p.column);
+  const stepsHtml = appColumns.map((col, idx) => {
+    let stepCls = 'step-pending';
+    let stepIcon = `<span class="step-num">${idx + 1}</span>`;
+    if (idx < currentIdx) {
+      stepCls = 'step-completed';
+      stepIcon = '<i class="bi bi-check-lg"></i>';
+    } else if (idx === currentIdx) {
+      stepCls = 'step-active';
+      stepIcon = `<i class="bi ${col.icon || DEFAULT_COL_ICON}"></i>`;
+    }
+    return `<div class="timeline-step ${stepCls}" title="${col.id}">
+      <div class="step-icon-wrap" style="${idx === currentIdx ? `background:${col.color||DEFAULT_COL_COLOR};color:#fff;border-color:${col.color||DEFAULT_COL_COLOR}` : ''}">${stepIcon}</div>
+      <span class="step-label">${col.id}</span>
+    </div>`;
+  }).join('<div class="timeline-line"></div>');
+
+  const timelineHtml = `<div class="project-timeline">
+    <div class="timeline-title"><i class="bi bi-compass" style="color:var(--accent)"></i> Etapa do Projeto: <strong>${p.column}</strong></div>
+    <div class="timeline-stepper">${stepsHtml}</div>
+  </div>`;
 
   // Finance block
   const isExp=expandedFin.has(p.id);
@@ -331,7 +355,10 @@ function createCardHTML(p, cardIdx=0){
         <span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span>
       </div>
       <div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>
-      ${subs.map(s=>`<div class="sub-row"><input type="checkbox" disabled ${s.done?'checked':''}><span class="${s.done?'sub-done':''}">${s.text}</span></div>`).join('')}
+      ${subs.map(s=>{
+        const isCurrent = currSub && s.id === currSub.id;
+        return `<div class="sub-row ${isCurrent?'sub-in-progress':''}"><input type="checkbox" disabled ${s.done?'checked':''}><span class="${s.done?'sub-done':''}">${isCurrent?'<i class="bi bi-play-fill" style="color:var(--accent);font-size:10px;margin-right:2px"></i>':''}${s.text}</span></div>`;
+      }).join('')}
     </div>`;
   }
 
@@ -362,6 +389,8 @@ function createCardHTML(p, cardIdx=0){
       </div>
     </div>
     <div class="kcard-exp">
+      ${timelineHtml}
+      ${currSub?`<div class="client-current-task" style="margin-top:10px;font-size:12px;background:var(--yellow-bg);padding:6px 10px;border-radius:8px;border:1px solid rgba(217,119,6,.15);display:flex;align-items:center;gap:6px;font-weight:500"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow);font-size:13px"></i> <span><strong>Trabalhando em:</strong> ${currSub.text}</span></div>`:''}
       ${finHtml}${prodsHtml}${checkHtml}${noteHtml}
     </div>
   </div>`;

@@ -17,6 +17,22 @@ const QUICK_MSGS=[
   { title: "Pagamento Confirmado", msg: "Pagamento confirmado. Obrigado!" },
   { title: "Prazo Atualizado", msg: "Prazo atualizado. Verifique as datas no painel." }
 ];
+const DEFAULT_WA_TEMPLATE = `Olá, *{Cliente}*!
+
+*{Projeto}*
+
+*Etapa:* {Etapa}
+*Prazo:* {Prazo}
+*Valor contratado:* {ValorTotal}
+*Pago:* {ValorPago} | *Pendente:* {SaldoPendente}
+{TarefaAtual}
+{Observacao}
+
+_Equipe MAVIC Projetos_`;
+
+if (localStorage.getItem('mavic_waTemplate') === null) {
+  localStorage.setItem('mavic_waTemplate', DEFAULT_WA_TEMPLATE);
+}
 let openGnIds = new Set();
 
 let sb=null,projects=[],clients=[],appColumns=[...INIT_COLS];
@@ -61,6 +77,7 @@ async function loadData(){
     visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
     minimizedColumns=cfg.minimizedColumns||[];
     appTheme=cfg.theme||localStorage.getItem('mavic_theme')||'light';
+    if(cfg.waTemplate!==undefined) localStorage.setItem('mavic_waTemplate',cfg.waTemplate);
     applyTheme(appTheme);syncLocal();
   }catch(e){console.warn('Supabase load failed',e);loadLocal();showToast('Modo offline — dados locais','warning');}
 }
@@ -73,6 +90,7 @@ function loadLocal(){
   appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
   visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
   minimizedColumns=cfg.minimizedColumns||[];
+  if(cfg.waTemplate!==undefined) localStorage.setItem('mavic_waTemplate',cfg.waTemplate);
   applyTheme(localStorage.getItem('mavic_theme')||'light');
 }
 function syncLocal(){
@@ -80,7 +98,7 @@ function syncLocal(){
   localStorage.setItem('mavic_clients',JSON.stringify(clients));
   localStorage.setItem('mavic_notifications',JSON.stringify(notifications));
   localStorage.setItem('mavic_global_notices',JSON.stringify(globalNotices));
-  localStorage.setItem('mavic_config',JSON.stringify({columns:appColumns,visibleColumns,minimizedColumns}));
+  localStorage.setItem('mavic_config',JSON.stringify({columns:appColumns,visibleColumns,minimizedColumns,waTemplate:localStorage.getItem('mavic_waTemplate')||''}));
   localStorage.setItem('mavic_theme',appTheme);
 }
 function scheduleSync(){clearTimeout(syncTimer);syncTimer=setTimeout(syncCloud,900);}
@@ -92,7 +110,7 @@ async function syncCloud(){
       {key:'projects',data:projects},{key:'clients',data:clients},
       {key:'notifications',data:notifications},
       {key:'global_notices',data:globalNotices},
-      {key:'config',data:{columns:appColumns,visibleColumns,minimizedColumns,theme:appTheme}}
+      {key:'config',data:{columns:appColumns,visibleColumns,minimizedColumns,theme:appTheme,waTemplate:localStorage.getItem('mavic_waTemplate')||''}}
     ],{onConflict:'key'});
     setSync('ok');
   }catch(e){setSync('off');}
@@ -233,6 +251,7 @@ function createCardHTML(p, cardIdx=0){
   const subPct=subs.length?Math.round((subDone/subs.length)*100):0;
   const progColor=subPct===100?'var(--green)':subPct>0?'var(--accent)':'transparent';
   const isExp=expandedFin.has(p.id);
+  const currSub = subs.find(s => s.current && !s.done) || subs.find(s => !s.done);
   let finHtml='';
   if(total>0){
     const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</span><span class="fv">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
@@ -240,7 +259,11 @@ function createCardHTML(p, cardIdx=0){
   }
   let checkHtml='';
   if(subs.length){
-    const rows=subs.map(s=>`<div class="sub-row"><input type="checkbox" ${s.done?'checked':''} onclick="toggleSub(${p.id},${s.id});event.stopPropagation()"><span class="${s.done?'sub-done':''}">${s.text}</span></div>`).join('');
+    const rows=subs.map(s=>{
+      const isCurrent = currSub && s.id === currSub.id;
+      const playIcon = s.done ? '' : `<i class="bi ${s.current?'bi-play-circle-fill':'bi-play-circle'}" style="cursor:pointer;color:${s.current?'var(--accent)':'var(--text3)'};font-size:13px;margin-right:2px" onclick="toggleSubActive(${p.id},${s.id});event.stopPropagation()" title="Definir foco atual"></i>`;
+      return `<div class="sub-row ${isCurrent?'sub-in-progress':''}">${playIcon}<input type="checkbox" ${s.done?'checked':''} onclick="toggleSub(${p.id},${s.id});event.stopPropagation()"><span class="${s.done?'sub-done':''}">${s.text}</span></div>`;
+    }).join('');
     checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px"><div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span><i class="bi bi-ui-checks"></i> Andamento</span><span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span></div><div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>${rows}</div>`;
   }
   const noteHtml=p.note?`<p style="font-size:12px;color:var(--text2);margin-top:7px;line-height:1.5;background:var(--surface2);padding:6px 8px;border-radius:6px">${p.note}</p>`:'';
@@ -250,6 +273,7 @@ function createCardHTML(p, cardIdx=0){
     <div class="kcard-body">
       <div class="kcard-name">${p.name}</div>
       ${p.client?`<div class="kcard-client"><span class="kcard-avatar" style="background:${avatarColor}">${initials}</span>${p.client}</div>`:''}
+      ${currSub?`<div class="kcard-current-task" title="Foco atual"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow)"></i> <span>${currSub.text}</span></div>`:''}
       <div class="kcard-tags">
         ${p.column!=='Concluído'?`<span class="badge ${pMap[p.priority]||'b-baixa'}">${pIcon[p.priority]||'🟢'} ${p.priority}</span>`:''}
         <span class="badge b-t${p.type}">${p.type}</span>
@@ -283,7 +307,29 @@ function togglePin(e,id){
   else{pinnedCards.add(id);card.classList.add('pinned');}
 }
 function toggleFinHist(id){if(expandedFin.has(id))expandedFin.delete(id);else expandedFin.add(id);renderBoard();}
-function toggleSub(pId,sId){const p=projects.find(x=>x.id===pId);if(!p)return;const s=p.subtasks?.find(x=>x.id===sId);if(s){s.done=!s.done;renderBoard();scheduleSync();}}
+function toggleSub(pId,sId){
+  const p=projects.find(x=>x.id===pId);if(!p)return;
+  const s=p.subtasks?.find(x=>x.id===sId);
+  if(s){
+    s.done=!s.done;
+    if(s.done) s.current=false;
+    renderBoard();
+    scheduleSync();
+  }
+}
+function toggleSubActive(pId,sId){
+  const p=projects.find(x=>x.id===pId);if(!p)return;
+  p.subtasks?.forEach(s=>{
+    if(s.id===sId){
+      s.current = !s.current;
+      if(s.current) s.done = false;
+    } else {
+      s.current = false;
+    }
+  });
+  renderBoard();
+  scheduleSync();
+}
 
 // ══════════════════════════════════════════
 //  DRAG & DROP (MOUSE)
@@ -528,10 +574,33 @@ function renderSubsList(){
   const c=document.getElementById('subsContainer');const done=tempSubs.filter(s=>s.done).length;
   document.getElementById('subProgress').textContent=`${done}/${tempSubs.length}`;
   if(!tempSubs.length){c.innerHTML='<div class="empty-state" style="padding:16px"><i class="bi bi-list-check"></i><span>Nenhuma tarefa</span></div>';return;}
-  c.innerHTML=tempSubs.map(s=>`<div class="sub-row"><input type="checkbox" ${s.done?'checked':''} onchange="toggleTmpSub(${s.id})"><span class="${s.done?'sub-done':''}" style="flex:1;font-size:12.5px">${s.text}</span><button class="prod-del" onclick="delSub(${s.id})"><i class="bi bi-x"></i></button></div>`).join('');
+  const currSub = tempSubs.find(s => s.current && !s.done) || tempSubs.find(s => !s.done);
+  c.innerHTML=tempSubs.map(s=>{
+    const isCurrent = currSub && s.id === currSub.id;
+    const playIcon = s.done ? '' : `<i class="bi ${s.current?'bi-play-circle-fill':'bi-play-circle'}" style="cursor:pointer;color:${s.current?'var(--accent)':'var(--text3)'};font-size:13.5px;margin-right:4px" onclick="toggleTmpSubActive(${s.id})" title="Definir foco atual"></i>`;
+    return `<div class="sub-row ${isCurrent?'sub-in-progress':''}">${playIcon}<input type="checkbox" ${s.done?'checked':''} onchange="toggleTmpSub(${s.id})"><span class="${s.done?'sub-done':''}" style="flex:1;font-size:12.5px">${s.text}</span><button class="prod-del" onclick="delSub(${s.id})"><i class="bi bi-x"></i></button></div>`;
+  }).join('');
 }
 function addSubtask(){const inp=document.getElementById('newSub');const t=inp.value.trim();if(!t)return;tempSubs.push({id:Date.now(),text:t,done:false});inp.value='';renderSubsList();}
-function toggleTmpSub(id){const s=tempSubs.find(x=>x.id===id);if(s){s.done=!s.done;renderSubsList();}}
+function toggleTmpSub(id){
+  const s=tempSubs.find(x=>x.id===id);
+  if(s){
+    s.done=!s.done;
+    if(s.done) s.current=false;
+    renderSubsList();
+  }
+}
+function toggleTmpSubActive(id){
+  tempSubs.forEach(s=>{
+    if(s.id===id){
+      s.current = !s.current;
+      if(s.current) s.done = false;
+    } else {
+      s.current = false;
+    }
+  });
+  renderSubsList();
+}
 function delSub(id){tempSubs=tempSubs.filter(x=>x.id!==id);renderSubsList();}
 
 // ══════════════════════════════════════════
@@ -723,38 +792,61 @@ function sendNotification(){
 // ══════════════════════════════════════════
 //  WHATSAPP
 // ══════════════════════════════════════════
-function openWhatsApp(projId){
-  const p=projects.find(x=>x.id===projId);if(!p)return;
+function buildWhatsAppMsg(projId){
+  const p=projects.find(x=>x.id===projId);if(!p)return {msg:'',waLinkBlock:'',waPixBlock:'',hasLinkTag:false,hasPixTag:false};
   const cli=clients.find(c=>c.name===p.client);
   const pays=p.payments||[];
   const total=parseFloat(p.value||0);
   const paid=pays.reduce((s,x)=>s+parseFloat(x.amount||0),0);
   const rest=total-paid;
   const link=cli?.token?buildLink(cli.name,cli.token):'';
-  const dl=p.date?new Date(p.date+'T12:00:00').toLocaleDateString('pt-BR'):'';
+  const dl=p.date?new Date(p.date+'T12:00:00').toLocaleDateString('pt-BR'):'Sem prazo';
   const firstName=p.client.split(' ')[0];
   const pixKey=(localStorage.getItem('mavic_pixKey')||'').trim();
   const pixName=(localStorage.getItem('mavic_pixName')||'').trim();
   const pixBank=(localStorage.getItem('mavic_pixBank')||'').trim();
 
-  let msg=`Olá, *${firstName}*!\n`;
-  msg+=`\n`;
-  msg+=`*${p.name}*\n`;
-  msg+=`\n`;
-  msg+=`*Etapa:* ${p.column}\n`;
-  if(dl)msg+=`*Prazo:* ${dl}\n`;
-  if(total>0){
-    msg+=`*Valor contratado:* ${fmt(total)}\n`;
-    if(rest<=0) msg+=`*Pagamento:* Quitado\n`;
-    else if(paid>0) msg+=`*Pago:* ${fmt(paid)} | *Pendente:* ${fmt(rest)}\n`;
-    else msg+=`*Pendente:* ${fmt(rest)}\n`;
-  }
-  if(p.note)msg+=`\n_${p.note}_\n`;
-  msg+=`\n`;
-  msg+=`_Equipe MAVIC Projetos_`;
+  const currSub = (p.subtasks || []).find(s => s.current && !s.done) || (p.subtasks || []).find(s => !s.done);
+  const subtaskText = currSub ? currSub.text : '';
 
-  waLinkBlock=link?`\n*Seu painel:*\n${link}\n`:'';
-  waPixBlock=pixKey?`\n*Dados para PIX:*\n*Chave:* ${pixKey}\n*Titular:* ${pixName}\n*Banco:* ${pixBank}\n`:'';
+  const waLinkBlock=link?`\n*Seu painel:*\n${link}\n`:'';
+  const waPixBlock=pixKey?`\n*Dados para PIX:*\n*Chave:* ${pixKey}\n*Titular:* ${pixName}\n*Banco:* ${pixBank}\n`:'';
+
+  const linkBox=document.getElementById('waIncludeLink');
+  const pixBox=document.getElementById('waIncludePix');
+
+  let template = localStorage.getItem('mavic_waTemplate') || DEFAULT_WA_TEMPLATE;
+  let msg = template
+    .replace(/{Cliente}/g, firstName)
+    .replace(/{ClienteCompleto}/g, p.client || '')
+    .replace(/{Projeto}/g, p.name || '')
+    .replace(/{Etapa}/g, p.column || '')
+    .replace(/{Prazo}/g, dl)
+    .replace(/{ValorTotal}/g, fmt(total))
+    .replace(/{ValorPago}/g, fmt(paid))
+    .replace(/{SaldoPendente}/g, rest <= 0 ? 'Quitado' : fmt(rest))
+    .replace(/{Observacao}/g, p.note ? `_${p.note}_` : '')
+    .replace(/{TarefaAtual}/g, subtaskText ? `*Foco atual:* ${subtaskText}` : '');
+
+  const hasLinkTag = template.includes('{LinkPainel}');
+  const hasPixTag = template.includes('{DadosPix}');
+
+  if (hasLinkTag) {
+    msg = msg.replace(/{LinkPainel}/g, (linkBox && linkBox.checked) ? waLinkBlock : '');
+  }
+  if (hasPixTag) {
+    msg = msg.replace(/{DadosPix}/g, (pixBox && pixBox.checked) ? waPixBlock : '');
+  }
+
+  return { msg, waLinkBlock, waPixBlock, hasLinkTag, hasPixTag };
+}
+
+function openWhatsApp(projId){
+  document.getElementById('waOverlay').dataset.projId = projId;
+  const p=projects.find(x=>x.id===projId);if(!p)return;
+  const cli=clients.find(c=>c.name===p.client);
+  const link=cli?.token?buildLink(cli.name,cli.token):'';
+  const pixKey=(localStorage.getItem('mavic_pixKey')||'').trim();
 
   const linkWrap=document.getElementById('waLinkWrap');
   const linkBox=document.getElementById('waIncludeLink');
@@ -767,11 +859,26 @@ function openWhatsApp(projId){
   else{pixWrap.style.display='none';pixBox.checked=false;}
 
   document.getElementById('waPhone').value=cli?.phone||'';
-  document.getElementById('waMsg').value=msg;
-  if(linkBox.checked)insertBlock(waLinkBlock);
-  if(pixBox.checked)insertBlock(waPixBlock);
+
+  const res = buildWhatsAppMsg(projId);
+  document.getElementById('waMsg').value=cleanNewlines(res.msg);
+
+  if (!res.hasLinkTag && linkBox.checked) insertBlock(res.waLinkBlock);
+  if (!res.hasPixTag && pixBox.checked) insertBlock(res.waPixBlock);
+
+  document.getElementById('waMsg').value=cleanNewlines(document.getElementById('waMsg').value);
+
   document.getElementById('waOverlay').classList.add('open');
 }
+
+function cleanNewlines(text) {
+  if (!text) return '';
+  return text
+    .replace(/\r/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function insertBlock(block){
   const ta=document.getElementById('waMsg');
   if(!block||ta.value.includes(block))return;
@@ -779,19 +886,35 @@ function insertBlock(block){
   const idx=ta.value.indexOf(marker);
   if(idx>=0)ta.value=ta.value.slice(0,idx)+block+'\n'+ta.value.slice(idx);
   else ta.value+=block;
+  ta.value = cleanNewlines(ta.value);
 }
 function removeBlock(block){
   const ta=document.getElementById('waMsg');
   if(!block)return;
   ta.value=ta.value.split(block+'\n').join('').split(block).join('');
+  ta.value = cleanNewlines(ta.value);
 }
 function toggleWaPix(){
+  const projId = parseInt(document.getElementById('waOverlay').dataset.projId);
   const box=document.getElementById('waIncludePix');
-  if(box.checked)insertBlock(waPixBlock);else removeBlock(waPixBlock);
+  const res = buildWhatsAppMsg(projId);
+  if (res.hasPixTag) {
+    document.getElementById('waMsg').value = cleanNewlines(res.msg);
+  } else {
+    if(box.checked)insertBlock(res.waPixBlock);else removeBlock(res.waPixBlock);
+    document.getElementById('waMsg').value = cleanNewlines(document.getElementById('waMsg').value);
+  }
 }
 function toggleWaLink(){
+  const projId = parseInt(document.getElementById('waOverlay').dataset.projId);
   const box=document.getElementById('waIncludeLink');
-  if(box.checked)insertBlock(waLinkBlock);else removeBlock(waLinkBlock);
+  const res = buildWhatsAppMsg(projId);
+  if (res.hasLinkTag) {
+    document.getElementById('waMsg').value = cleanNewlines(res.msg);
+  } else {
+    if(box.checked)insertBlock(res.waLinkBlock);else removeBlock(res.waLinkBlock);
+    document.getElementById('waMsg').value = cleanNewlines(document.getElementById('waMsg').value);
+  }
 }
 function closeWaModal(){document.getElementById('waOverlay').classList.remove('open');}
 function sendWhatsApp(){
@@ -1059,6 +1182,7 @@ function openSettings(){
   document.getElementById('pixKey').value=localStorage.getItem('mavic_pixKey')||'';
   document.getElementById('pixName').value=localStorage.getItem('mavic_pixName')||'';
   document.getElementById('pixBank').value=localStorage.getItem('mavic_pixBank')||'';
+  document.getElementById('waTemplate').value=localStorage.getItem('mavic_waTemplate')||'';
   document.getElementById('stProjCnt').textContent=projects.length;
   document.getElementById('stCliCnt').textContent=clients.length;
   document.getElementById('settingsOverlay').classList.add('open');
@@ -1070,7 +1194,8 @@ function saveSettings(){
   localStorage.setItem('mavic_pixKey',document.getElementById('pixKey').value.trim());
   localStorage.setItem('mavic_pixName',document.getElementById('pixName').value.trim());
   localStorage.setItem('mavic_pixBank',document.getElementById('pixBank').value.trim());
-  closeSettings();showToast('Configurações salvas!','success');
+  localStorage.setItem('mavic_waTemplate',document.getElementById('waTemplate').value.trim());
+  closeSettings();scheduleSync();showToast('Configurações salvas!','success');
 }
 
 // ══════════════════════════════════════════

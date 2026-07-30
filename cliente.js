@@ -20,11 +20,13 @@ clientToken=(params.get('token')||'').trim();
 //  LOAD DATA — via Edge Function (server-side auth)
 // ══════════════════════════════════════════
 async function loadData(){
+  const rIcon = document.getElementById('refreshIcon');
+  if(rIcon) rIcon.classList.add('spinning');
   document.getElementById('loading').style.display='flex';
   document.getElementById('errorScreen').classList.add('d-none');
   document.getElementById('boardView').style.display='flex';
 
-  if(!clientName){showError('bi-link-45deg','Link inválido','Nenhum cliente especificado na URL.');return;}
+  if(!clientName){showError('bi-link-45deg','Link inválido','Nenhum cliente especificado na URL.');if(rIcon)rIcon.classList.remove('spinning');return;}
   document.getElementById('clientLabel').textContent=clientName;
   document.getElementById('loadingText').textContent=`Carregando projetos de ${clientName}`;
 
@@ -40,6 +42,7 @@ async function loadData(){
         showError('bi-person-x','Cliente não encontrado','Verifique o link recebido ou entre em contato com o escritório.');
       else
         showError('bi-exclamation-triangle','Erro ao carregar','Não foi possível conectar ao servidor. Tente novamente.');
+      if(rIcon)rIcon.classList.remove('spinning');
       return;
     }
 
@@ -60,6 +63,7 @@ async function loadData(){
   }
 
   document.getElementById('loading').style.display='none';
+  if(rIcon) rIcon.classList.remove('spinning');
   calcFinance();renderNotifications();renderBoard();
 }
 
@@ -116,36 +120,40 @@ function getNotifDismissed(){return JSON.parse(localStorage.getItem('mavic_notif
 function getNotifDeleted(){return JSON.parse(localStorage.getItem('mavic_notif_deleted_'+clientName)||'[]');}
 
 async function confirmNotice(id, type) {
+  const key = isNaN(id) ? id : Number(id);
   if (type === 'individual') {
     const d = getNotifDismissed();
-    if (!d.includes(id)) d.push(id);
+    if (!d.includes(key)) d.push(key);
     localStorage.setItem('mavic_notif_read_' + clientName, JSON.stringify(d));
     // Sincronizar com o servidor via Edge Function
-    await postEdgeFn({ action: 'mark_read', notifId: id });
-    notifications = notifications.map(n => n.id===id ? {...n, read:true} : n);
+    await postEdgeFn({ action: 'mark_read', notifId: key });
+    notifications = notifications.map(n => n.id===key ? {...n, read:true} : n);
     renderNotifications();renderBoard();
   } else if (type === 'global') {
-    dismissGlobalNotice(id);
+    dismissGlobalNotice(key);
   }
 }
 
 function deleteNotice(id, type) {
+  const key = isNaN(id) ? id : Number(id);
   if (!confirm("Excluir este aviso permanentemente do seu painel?")) return;
   const del = getNotifDeleted();
-  if (!del.includes(id)) del.push(id);
+  if (!del.includes(key)) del.push(key);
   localStorage.setItem('mavic_notif_deleted_' + clientName, JSON.stringify(del));
   renderNotifications();
 }
 
 async function dismissGlobalNotice(id) {
-  localStorage.setItem('mavic_notice_read_' + id, '1');
-  await postEdgeFn({ action: 'mark_global_read', noticeId: id });
+  const key = isNaN(id) ? id : Number(id);
+  localStorage.setItem('mavic_notice_read_' + key, '1');
+  await postEdgeFn({ action: 'mark_global_read', noticeId: key });
   renderNotifications();
 }
 
 function toggleAccordion(id) {
-  if (openNotifIds.has(id)) openNotifIds.delete(id);
-  else openNotifIds.add(id);
+  const key = isNaN(id) ? id : Number(id);
+  if (openNotifIds.has(key)) openNotifIds.delete(key);
+  else openNotifIds.add(key);
   renderNotifications();
 }
 
@@ -201,7 +209,7 @@ function renderNotifications(){
     const isOpen      = openNotifIds.has(n.id);
 
     return `<div class="notif-accordion ${borderClass} ${isOpen ? 'open' : ''}">
-      <div class="notif-header" onclick="toggleAccordion(${n.id})">
+      <div class="notif-header" onclick="toggleAccordion('${n.id}')">
         <div class="notif-header-title">
           <i class="bi ${n.type === 'global' ? 'bi-megaphone' : 'bi-folder'}" style="color:${isUnread ? (n.type === 'global' ? 'var(--yellow)' : 'var(--green)') : 'var(--text3)'}"></i>
           <span>${n.title}</span>
@@ -217,13 +225,13 @@ function renderNotifications(){
           </span>
           <div style="display:flex;align-items:center;gap:6px">
             ${isUnread ? `
-              <button onclick="confirmNotice(${n.id}, '${n.type}')" style="background:var(--green-bg);border:1px solid var(--green);color:var(--green);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px">
+              <button onclick="confirmNotice('${n.id}', '${n.type}')" style="background:var(--green-bg);border:1px solid var(--green);color:var(--green);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px">
                 <i class="bi bi-check2"></i> Confirmar leitura
               </button>
             ` : `
               <span style="font-size:11px;color:var(--text3);font-weight:500;margin-right:6px"><i class="bi bi-check2-all"></i> Lido</span>
             `}
-            <button onclick="deleteNotice(${n.id}, '${n.type}')" style="background:var(--red-bg);border:1px solid var(--red);color:var(--red);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px" title="Excluir aviso do painel">
+            <button onclick="deleteNotice('${n.id}', '${n.type}')" style="background:var(--red-bg);border:1px solid var(--red);color:var(--red);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px" title="Excluir aviso do painel">
               <i class="bi bi-trash3"></i> Excluir
             </button>
           </div>
@@ -245,24 +253,15 @@ function renderBoard(){
   const myProjs=projects.filter(p=>!p.archived
     &&(!fType||p.type===fType)
     &&(!srch||p.name?.toLowerCase().includes(srch)));
-  let total=0;
-  appColumns.forEach(col=>{
-    const colProjs=myProjs.filter(p=>p.column===col.id);
-    if(!colProjs.length&&window.innerWidth<=768)return;
-    total+=colProjs.length;
-    const el=document.createElement('div');el.className='kcol';
-    el.innerHTML=`
-      <div class="kcol-hdr">
-        <div class="kcol-title"><i class="bi ${col.icon||DEFAULT_COL_ICON}" style="color:${col.color||DEFAULT_COL_COLOR}"></i> ${col.id} <span class="kcol-cnt">${colProjs.length}</span></div>
-      </div>
-      <div class="kdrop">
-        ${colProjs.map((p,i)=>createCardHTML(p,i)).join('')}
-        ${!colProjs.length?'<div class="kempty">Nenhum projeto nesta etapa</div>':''}
-      </div>`;
-    board.appendChild(el);
-  });
-  document.getElementById('boardCount').textContent=`${total} projeto${total!==1?'s':''}`;
-  pinnedCards.forEach(id=>{const el=board.querySelector(`.kcard[data-id="${id}"]`);if(el)el.classList.add('pinned');});
+  
+  document.getElementById('boardCount').textContent=`${myProjs.length} projeto${myProjs.length!==1?'s':''}`;
+  
+  if(!myProjs.length){
+    board.innerHTML='<div class="empty-state" style="padding:40px;text-align:center;width:100%"><i class="bi bi-folder-x" style="font-size:48px;color:var(--text3)"></i><p style="margin-top:10px;color:var(--text2)">Nenhum projeto encontrado</p></div>';
+    return;
+  }
+  
+  board.innerHTML=myProjs.map((p,i)=>createCardHTML(p,i)).join('');
 }
 
 // ══════════════════════════════════════════
@@ -304,7 +303,6 @@ function createCardHTML(p, cardIdx=0){
     }
     return `<div class="timeline-step ${stepCls}" title="${col.id}">
       <div class="step-icon-wrap" style="${idx === currentIdx ? `background:${col.color||DEFAULT_COL_COLOR};color:#fff;border-color:${col.color||DEFAULT_COL_COLOR}` : ''}">${stepIcon}</div>
-      <span class="step-label">${col.id}</span>
     </div>`;
   }).join('<div class="timeline-line"></div>');
 
@@ -370,10 +368,12 @@ function createCardHTML(p, cardIdx=0){
         <span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span>
       </div>
       <div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>
-      ${subs.map(s=>{
-        const sIsCurrent = isCurrent(s.id);
-        return `<div class="sub-row ${sIsCurrent?'sub-in-progress':''}"><input type="checkbox" disabled ${s.done?'checked':''}><span class="${s.done?'sub-done':''}">${sIsCurrent?'<i class="bi bi-play-fill" style="color:var(--accent);font-size:10px;margin-right:2px"></i>':''}${s.text}</span></div>`;
-      }).join('')}
+      <div style="max-height:130px;overflow-y:auto">
+        ${subs.map(s=>{
+          const sIsCurrent = isCurrent(s.id);
+          return `<div class="sub-row ${sIsCurrent?'sub-in-progress':''}"><input type="checkbox" disabled ${s.done?'checked':''}><span class="${s.done?'sub-done':''}">${sIsCurrent?'<i class="bi bi-play-fill" style="color:var(--accent);font-size:10px;margin-right:2px"></i>':''}${s.text}</span></div>`;
+        }).join('')}
+      </div>
     </div>`;
   }
 
@@ -384,7 +384,7 @@ function createCardHTML(p, cardIdx=0){
   const unreadNotifs=notifications.filter(n=>n.projectName===p.name&&!dismissed.includes(n.id)&&!n.read);
   const hasBell=unreadNotifs.length>0;
 
-  return `<div class="kcard t-${p.type} ${dlClass}" data-id="${p.id}" onclick="togglePin(event,${p.id})" style="animation-delay:${cardIdx*0.04}s">
+  return `<div class="kcard t-${p.type} ${dlClass}" data-id="${p.id}" style="animation-delay:${cardIdx*0.04}s">
     ${subs.length?`<div class="kcard-prog-bar"><div class="kcard-prog-fill" style="width:${subPct}%;background:${progColor}"></div></div>`:''}
     ${p.image?`<img src="${p.image}" class="kcard-cover" onerror="this.style.display='none'">`:''}
     <div class="kcard-body">
@@ -434,5 +434,79 @@ function togglePin(e,id){
   else{pinnedCards.add(id);card.classList.add('pinned');}
 }
 function toggleFin(id){if(expandedFin.has(id))expandedFin.delete(id);else expandedFin.add(id);renderBoard();}
+
+function showFinModal(type){
+  const modal = document.getElementById('finModal');
+  const title = document.getElementById('finModalTitle');
+  const body = document.getElementById('finModalBody');
+  
+  const myProjs = projects.filter(p => !p.archived);
+  let filtered = [];
+  
+  if (type === 'pago') {
+    title.textContent = 'Resumo — Projetos Pagos';
+    filtered = myProjs.filter(p => {
+      const pg = (p.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+      return pg > 0;
+    });
+  } else {
+    title.textContent = 'Resumo — Projetos A Pagar';
+    filtered = myProjs.filter(p => {
+      const t = parseFloat(p.value || 0);
+      const pg = (p.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+      return (t - pg) > 0;
+    });
+  }
+  
+  if (!filtered.length) {
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3)"><i class="bi bi-cash" style="font-size:32px"></i><p style="margin-top:6px;font-size:13px">Nenhum projeto encontrado</p></div>';
+  } else {
+    body.innerHTML = filtered.map(p => {
+      const pays = p.payments || [];
+      const total = parseFloat(p.value || 0);
+      const paid = pays.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+      const rest = total - paid;
+      
+      const restCls = rest <= 0 ? 'b-pago' : (paid > 0 ? 'b-parcial' : 'b-pendente');
+      const restLbl = rest <= 0 ? 'Pago' : (paid > 0 ? 'Parcial' : 'Pendente');
+      const paysHtml = pays.map(py => `<div class="fin-hist-item"><span>${new Date(py.date).toLocaleDateString('pt-BR')} via ${py.method || 'N/A'}</span><span class="fv">${fmt(py.amount)}</span></div>`).join('');
+      
+      return `<div>
+        <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
+          <span>${p.name}</span>
+          <span class="badge b-t${p.type}" style="font-size:10px">${p.type}</span>
+        </div>
+        <div class="fin-blk" style="margin-top:0">
+          <div class="fin-sum">
+            <div class="fin-row"><span class="lbl">Total do contrato</span><span class="val" style="color:var(--text)">${fmt(total)}</span></div>
+            <div class="fin-row"><span class="lbl">Valor pago</span><span class="val" style="color:var(--green)">${fmt(paid)}</span></div>
+            <div class="fin-row" style="margin-top:4px;border-top:1px dashed var(--border);padding-top:4px"><span class="lbl">Saldo restante</span><span class="val rest">${fmt(rest)} <span class="badge ${restCls}" style="font-size:9px;padding:1px 5px;margin-left:4px">${restLbl}</span></span></div>
+          </div>
+          <button class="fin-hist-btn" onclick="toggleFinModal(${p.id})"><i class="bi bi-clock-history"></i> ${pays.length} pagamento${pays.length !== 1 ? 's' : ''}</button>
+          <div class="fin-hist-rows d-none" id="finHistModal-${p.id}">
+            ${paysHtml || '<div style="padding:6px;text-align:center;font-size:11px;color:var(--text3)">Nenhum pagamento</div>'}
+          </div>
+        </div>
+      </div>`;
+    }).join('<div style="height:1px;background:var(--border);margin:15px 0"></div>');
+  }
+  
+  modal.classList.remove('d-none');
+}
+
+function toggleFinModal(pId) {
+  const el = document.getElementById(`finHistModal-${pId}`);
+  if (el) {
+    if (el.classList.contains('d-none')) {
+      el.classList.remove('d-none');
+    } else {
+      el.classList.add('d-none');
+    }
+  }
+}
+
+function closeFinModal() {
+  document.getElementById('finModal').classList.add('d-none');
+}
 
 document.addEventListener('DOMContentLoaded',loadData);

@@ -253,6 +253,7 @@ function createCardHTML(p, cardIdx=0){
   const activeSubs = subs.filter(s => s.current && !s.done);
   const currSubs = activeSubs.length ? activeSubs : (subs.find(s => !s.done) ? [subs.find(s => !s.done)] : []);
   const isCurrent = (sId) => currSubs.some(cs => cs.id === sId);
+  const isExp=expandedFin.has(p.id);
   let finHtml='';
   if(total>0){
     const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</span><span class="fv">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
@@ -265,7 +266,7 @@ function createCardHTML(p, cardIdx=0){
       const playIcon = s.done ? '' : `<i class="bi ${s.current?'bi-play-circle-fill':'bi-play-circle'}" style="cursor:pointer;color:${s.current?'var(--accent)':'var(--text3)'};font-size:13px;margin-right:2px" onclick="toggleSubActive(${p.id},${s.id});event.stopPropagation()" title="Definir foco atual"></i>`;
       return `<div class="sub-row ${sIsCurrent?'sub-in-progress':''}">${playIcon}<input type="checkbox" ${s.done?'checked':''} onclick="toggleSub(${p.id},${s.id});event.stopPropagation()"><span class="${s.done?'sub-done':''}">${s.text}</span></div>`;
     }).join('');
-    checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px"><div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span><i class="bi bi-ui-checks"></i> Andamento</span><span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span></div><div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>${rows}</div>`;
+    checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px"><div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span><i class="bi bi-ui-checks"></i> Andamento</span><span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span></div><div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div><div style="max-height:130px;overflow-y:auto">${rows}</div></div>`;
   }
   const noteHtml=p.note?`<p style="font-size:12px;color:var(--text2);margin-top:7px;line-height:1.5;background:var(--surface2);padding:6px 8px;border-radius:6px">${p.note}</p>`:'';
   return `<div class="kcard t-${p.type} ${dlClass}" data-id="${p.id}" draggable="true" onclick="togglePin(event,${p.id})" style="animation-delay:${cardIdx*0.04}s">
@@ -923,13 +924,27 @@ function toggleWaLink(){
   }
 }
 function closeWaModal(){document.getElementById('waOverlay').classList.remove('open');}
+function copyWhatsAppMsg(){
+  const msg=document.getElementById('waMsg').value.trim();
+  copyText(msg, 'Mensagem copiada para a área de transferência! 📋');
+}
 function sendWhatsApp(){
   const msg=document.getElementById('waMsg').value.trim();
   const rawPhone=document.getElementById('waPhone').value.replace(/\D/g,'');
   const waUrl=rawPhone
     ?`https://wa.me/55${rawPhone}?text=${encodeURIComponent(msg)}`
     :`https://wa.me/?text=${encodeURIComponent(msg)}`;
-  window.open(waUrl,'_blank');
+  
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(msg).then(()=>{
+      showToast('Mensagem copiada e abrindo WhatsApp! 📱', 'success');
+      setTimeout(()=>window.open(waUrl,'_blank'), 200);
+    }).catch(()=>{
+      window.open(waUrl,'_blank');
+    });
+  } else {
+    window.open(waUrl,'_blank');
+  }
   closeWaModal();
 }
 

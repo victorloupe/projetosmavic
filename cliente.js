@@ -286,7 +286,9 @@ function createCardHTML(p, cardIdx=0){
   const subDone=subs.filter(s=>s.done).length;
   const subPct=subs.length?Math.round((subDone/subs.length)*100):0;
   const progColor=subPct===100?'var(--green)':subPct>0?'var(--accent)':'transparent';
-  const currSub = subs.find(s => !s.done);
+  const activeSubs = subs.filter(s => s.current && !s.done);
+  const currSubs = activeSubs.length ? activeSubs : (subs.find(s => !s.done) ? [subs.find(s => !s.done)] : []);
+  const isCurrent = (sId) => currSubs.some(cs => cs.id === sId);
 
   // Timeline
   const currentIdx = appColumns.findIndex(c => c.id === p.column);
@@ -310,6 +312,19 @@ function createCardHTML(p, cardIdx=0){
     <div class="timeline-title"><i class="bi bi-compass" style="color:var(--accent)"></i> Etapa do Projeto: <strong>${p.column}</strong></div>
     <div class="timeline-stepper">${stepsHtml}</div>
   </div>`;
+
+  // Subtask Text HTML
+  let subtaskTextHtml = '';
+  if (currSubs.length === 1) {
+    subtaskTextHtml = `<div class="client-current-task" style="margin-top:10px;font-size:12px;background:var(--yellow-bg);padding:6px 10px;border-radius:8px;border:1px solid rgba(217,119,6,.15);display:flex;align-items:center;gap:6px;font-weight:500"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow);font-size:13px"></i> <span><strong>Trabalhando em:</strong> ${currSubs[0].text}</span></div>`;
+  } else if (currSubs.length > 1) {
+    subtaskTextHtml = `<div class="client-current-task" style="margin-top:10px;font-size:12px;background:var(--yellow-bg);padding:6px 10px;border-radius:8px;border:1px solid rgba(217,119,6,.15);display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-weight:500">
+      <div style="display:flex;align-items:center;gap:6px"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow);font-size:13px"></i> <span><strong>Trabalhando em:</strong></span></div>
+      <ul style="margin:5px 0 0 20px;list-style-type:disc;line-height:1.4">
+        ${currSubs.map(cs => `<li>${cs.text}</li>`).join('')}
+      </ul>
+    </div>`;
+  }
 
   // Finance block
   const isExp=expandedFin.has(p.id);
@@ -356,8 +371,8 @@ function createCardHTML(p, cardIdx=0){
       </div>
       <div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>
       ${subs.map(s=>{
-        const isCurrent = currSub && s.id === currSub.id;
-        return `<div class="sub-row ${isCurrent?'sub-in-progress':''}"><input type="checkbox" disabled ${s.done?'checked':''}><span class="${s.done?'sub-done':''}">${isCurrent?'<i class="bi bi-play-fill" style="color:var(--accent);font-size:10px;margin-right:2px"></i>':''}${s.text}</span></div>`;
+        const sIsCurrent = isCurrent(s.id);
+        return `<div class="sub-row ${sIsCurrent?'sub-in-progress':''}"><input type="checkbox" disabled ${s.done?'checked':''}><span class="${s.done?'sub-done':''}">${sIsCurrent?'<i class="bi bi-play-fill" style="color:var(--accent);font-size:10px;margin-right:2px"></i>':''}${s.text}</span></div>`;
       }).join('')}
     </div>`;
   }
@@ -390,7 +405,7 @@ function createCardHTML(p, cardIdx=0){
     </div>
     <div class="kcard-exp">
       ${timelineHtml}
-      ${currSub?`<div class="client-current-task" style="margin-top:10px;font-size:12px;background:var(--yellow-bg);padding:6px 10px;border-radius:8px;border:1px solid rgba(217,119,6,.15);display:flex;align-items:center;gap:6px;font-weight:500"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow);font-size:13px"></i> <span><strong>Trabalhando em:</strong> ${currSub.text}</span></div>`:''}
+      ${subtaskTextHtml}
       ${finHtml}${prodsHtml}${checkHtml}${noteHtml}
     </div>
   </div>`;

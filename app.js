@@ -250,8 +250,9 @@ function createCardHTML(p, cardIdx=0){
   const subDone=subs.filter(s=>s.done).length;
   const subPct=subs.length?Math.round((subDone/subs.length)*100):0;
   const progColor=subPct===100?'var(--green)':subPct>0?'var(--accent)':'transparent';
-  const isExp=expandedFin.has(p.id);
-  const currSub = subs.find(s => s.current && !s.done) || subs.find(s => !s.done);
+  const activeSubs = subs.filter(s => s.current && !s.done);
+  const currSubs = activeSubs.length ? activeSubs : (subs.find(s => !s.done) ? [subs.find(s => !s.done)] : []);
+  const isCurrent = (sId) => currSubs.some(cs => cs.id === sId);
   let finHtml='';
   if(total>0){
     const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'}</span><span class="fv">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
@@ -260,9 +261,9 @@ function createCardHTML(p, cardIdx=0){
   let checkHtml='';
   if(subs.length){
     const rows=subs.map(s=>{
-      const isCurrent = currSub && s.id === currSub.id;
+      const sIsCurrent = isCurrent(s.id);
       const playIcon = s.done ? '' : `<i class="bi ${s.current?'bi-play-circle-fill':'bi-play-circle'}" style="cursor:pointer;color:${s.current?'var(--accent)':'var(--text3)'};font-size:13px;margin-right:2px" onclick="toggleSubActive(${p.id},${s.id});event.stopPropagation()" title="Definir foco atual"></i>`;
-      return `<div class="sub-row ${isCurrent?'sub-in-progress':''}">${playIcon}<input type="checkbox" ${s.done?'checked':''} onclick="toggleSub(${p.id},${s.id});event.stopPropagation()"><span class="${s.done?'sub-done':''}">${s.text}</span></div>`;
+      return `<div class="sub-row ${sIsCurrent?'sub-in-progress':''}">${playIcon}<input type="checkbox" ${s.done?'checked':''} onclick="toggleSub(${p.id},${s.id});event.stopPropagation()"><span class="${s.done?'sub-done':''}">${s.text}</span></div>`;
     }).join('');
     checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px"><div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span><i class="bi bi-ui-checks"></i> Andamento</span><span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span></div><div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>${rows}</div>`;
   }
@@ -273,7 +274,7 @@ function createCardHTML(p, cardIdx=0){
     <div class="kcard-body">
       <div class="kcard-name">${p.name}</div>
       ${p.client?`<div class="kcard-client"><span class="kcard-avatar" style="background:${avatarColor}">${initials}</span>${p.client}</div>`:''}
-      ${currSub?`<div class="kcard-current-task" title="Foco atual"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow)"></i> <span>${currSub.text}</span></div>`:''}
+      ${currSubs.length?`<div class="kcard-current-task" title="Foco atual"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow)"></i> <span>${currSubs.map(cs => cs.text).join(', ')}</span></div>`:''}
       <div class="kcard-tags">
         ${p.column!=='Concluído'?`<span class="badge ${pMap[p.priority]||'b-baixa'}">${pIcon[p.priority]||'🟢'} ${p.priority}</span>`:''}
         <span class="badge b-t${p.type}">${p.type}</span>
@@ -323,8 +324,6 @@ function toggleSubActive(pId,sId){
     if(s.id===sId){
       s.current = !s.current;
       if(s.current) s.done = false;
-    } else {
-      s.current = false;
     }
   });
   renderBoard();
@@ -574,11 +573,13 @@ function renderSubsList(){
   const c=document.getElementById('subsContainer');const done=tempSubs.filter(s=>s.done).length;
   document.getElementById('subProgress').textContent=`${done}/${tempSubs.length}`;
   if(!tempSubs.length){c.innerHTML='<div class="empty-state" style="padding:16px"><i class="bi bi-list-check"></i><span>Nenhuma tarefa</span></div>';return;}
-  const currSub = tempSubs.find(s => s.current && !s.done) || tempSubs.find(s => !s.done);
+  const activeSubs = tempSubs.filter(s => s.current && !s.done);
+  const currSubs = activeSubs.length ? activeSubs : (tempSubs.find(s => !s.done) ? [tempSubs.find(s => !s.done)] : []);
+  const isCurrent = (sId) => currSubs.some(cs => cs.id === sId);
   c.innerHTML=tempSubs.map(s=>{
-    const isCurrent = currSub && s.id === currSub.id;
+    const sIsCurrent = isCurrent(s.id);
     const playIcon = s.done ? '' : `<i class="bi ${s.current?'bi-play-circle-fill':'bi-play-circle'}" style="cursor:pointer;color:${s.current?'var(--accent)':'var(--text3)'};font-size:13.5px;margin-right:4px" onclick="toggleTmpSubActive(${s.id})" title="Definir foco atual"></i>`;
-    return `<div class="sub-row ${isCurrent?'sub-in-progress':''}">${playIcon}<input type="checkbox" ${s.done?'checked':''} onchange="toggleTmpSub(${s.id})"><span class="${s.done?'sub-done':''}" style="flex:1;font-size:12.5px">${s.text}</span><button class="prod-del" onclick="delSub(${s.id})"><i class="bi bi-x"></i></button></div>`;
+    return `<div class="sub-row ${sIsCurrent?'sub-in-progress':''}">${playIcon}<input type="checkbox" ${s.done?'checked':''} onchange="toggleTmpSub(${s.id})"><span class="${s.done?'sub-done':''}" style="flex:1;font-size:12.5px">${s.text}</span><button class="prod-del" onclick="delSub(${s.id})"><i class="bi bi-x"></i></button></div>`;
   }).join('');
 }
 function addSubtask(){const inp=document.getElementById('newSub');const t=inp.value.trim();if(!t)return;tempSubs.push({id:Date.now(),text:t,done:false});inp.value='';renderSubsList();}
@@ -595,8 +596,6 @@ function toggleTmpSubActive(id){
     if(s.id===id){
       s.current = !s.current;
       if(s.current) s.done = false;
-    } else {
-      s.current = false;
     }
   });
   renderSubsList();
@@ -806,8 +805,15 @@ function buildWhatsAppMsg(projId){
   const pixName=(localStorage.getItem('mavic_pixName')||'').trim();
   const pixBank=(localStorage.getItem('mavic_pixBank')||'').trim();
 
-  const currSub = (p.subtasks || []).find(s => s.current && !s.done) || (p.subtasks || []).find(s => !s.done);
-  const subtaskText = currSub ? currSub.text : '';
+  const activeSubs = (p.subtasks || []).filter(s => s.current && !s.done);
+  const currSubs = activeSubs.length ? activeSubs : ((p.subtasks || []).find(s => !s.done) ? [(p.subtasks || []).find(s => !s.done)] : []);
+
+  let subtaskText = '';
+  if (currSubs.length === 1) {
+    subtaskText = `*Foco atual:* ${currSubs[0].text}`;
+  } else if (currSubs.length > 1) {
+    subtaskText = `*Foco atual:*\n` + currSubs.map(cs => `• ${cs.text}`).join('\n');
+  }
 
   const waLinkBlock=link?`\n*Seu painel:*\n${link}\n`:'';
   const waPixBlock=pixKey?`\n*Dados para PIX:*\n*Chave:* ${pixKey}\n*Titular:* ${pixName}\n*Banco:* ${pixBank}\n`:'';
@@ -826,7 +832,7 @@ function buildWhatsAppMsg(projId){
     .replace(/{ValorPago}/g, fmt(paid))
     .replace(/{SaldoPendente}/g, rest <= 0 ? 'Quitado' : fmt(rest))
     .replace(/{Observacao}/g, p.note ? `_${p.note}_` : '')
-    .replace(/{TarefaAtual}/g, subtaskText ? `*Foco atual:* ${subtaskText}` : '');
+    .replace(/{TarefaAtual}/g, subtaskText);
 
   const hasLinkTag = template.includes('{LinkPainel}');
   const hasPixTag = template.includes('{DadosPix}');

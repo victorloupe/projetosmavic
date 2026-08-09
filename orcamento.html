@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAVIC Projetos - Orçamentos</title>
+<link rel="icon" type="image/x-icon" href="icon.ico">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#92623a">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="index.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+</head>
+<body class="preload">
+
+<div class="loading" id="loading">
+  <div class="spin"></div>
+  <div style="font-weight:600;font-size:14px">Carregando MAVIC…</div>
+  <div style="font-size:12px;color:var(--text3)">Conectando ao banco de dados</div>
+</div>
+
+<nav class="nav">
+  <div class="nav-brand">
+    <img id="navLogo" src="LOGO NOVA.png" alt="MAVIC" class="nav-logo" onerror="this.style.display='none'">
+    <div>
+      <div class="nav-name">MAVIC Projetos</div>
+      <div class="nav-sync ok" id="syncStatus"><i class="bi bi-cloud-check"></i> Sincronizado</div>
+    </div>
+  </div>
+  <div class="nav-sep"></div>
+  <div class="nav-tabs">
+    <a class="nav-tab" href="index.html"><i class="bi bi-kanban"></i> Board</a>
+    <a class="nav-tab" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <a class="nav-tab on" href="orcamento.html"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamentos</a>
+    <a class="nav-tab" href="pagamentos.html"><i class="bi bi-credit-card"></i> Pagamentos</a>
+    <a class="nav-tab" href="relatorio.html"><i class="bi bi-graph-up-arrow"></i> Relatórios</a>
+    <a class="nav-tab" href="clientes.html"><i class="bi bi-people"></i> Clientes</a>
+  </div>
+  <div class="nav-spacer"></div>
+  <button class="btn-icon" id="gnNavBtn" onclick="openGlobalNoticeModal()" title="Central de Avisos"><i class="bi bi-megaphone"></i></button>
+  <button class="btn-icon" onclick="openArchiveModal()" title="Arquivados"><i class="bi bi-archive"></i></button>
+  <button class="btn-icon" onclick="openSettings()" title="Configurações"><i class="bi bi-gear"></i></button>
+  <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Tema"><i class="bi bi-moon-stars"></i></button>
+</nav>
+
+<!-- ORÇAMENTOS VIEW -->
+<div class="dash-view" id="orcamentosView" style="display:block">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <h4 style="font-weight:700;color:var(--accent);margin:0">Orçamentos</h4>
+    <button class="btn btn-primary btn-sm" onclick="openOrcamentoModal()"><i class="bi bi-plus-lg"></i> Novo Orçamento</button>
+  </div>
+  
+  <div class="toolbar" style="padding:10px 0;background:transparent;border:none;display:flex;gap:10px">
+    <input type="text" class="inp inp-sm" id="fOrcSearch" placeholder="Buscar orçamento…" oninput="pgReset('orcamentos');renderOrcamentos()" style="max-width:250px">
+    <select class="inp inp-sm" id="fOrcClient" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
+      <option value="">Todos os Clientes</option>
+    </select>
+    <select class="inp inp-sm" id="fOrcStatus" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
+      <option value="">Todos os Status</option>
+      <option value="Pendente">Pendente</option>
+      <option value="Aprovado">Aprovado</option>
+      <option value="Recusado">Recusado</option>
+      <option value="Convertido">Convertido</option>
+    </select>
+    <select class="inp inp-sm" id="fOrcYear" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
+      <option value="">Todos os Anos</option>
+      <option>2026</option>
+      <option>2025</option>
+      <option>2024</option>
+    </select>
+  </div>
+  
+  <div class="dash-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Orçamento</th>
+          <th>Cliente</th>
+          <th>Data</th>
+          <th>Validade</th>
+          <th>Valor Total</th>
+          <th>Status</th>
+          <th style="width:270px;text-align:right">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="orcTableBody">
+        <tr>
+          <td colspan="7" style="text-align:center;color:var(--text3);padding:20px">Nenhum orçamento cadastrado</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="orcPagination"></div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ══ ORÇAMENTO MODAL ══ -->
+<div class="overlay" id="orcamentoOverlay" onclick="if(event.target===this)closeOrcamentoModal()">
+<div class="mbox mlg">
+  <div class="mhdr no-print">
+    <h5 id="orcModalTitle" style="color:var(--accent)">Novo Orçamento</h5>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm" id="btnPdfOrc" onclick="downloadOrcamentoPDFModal()" style="display:none; color:var(--red)"><i class="bi bi-file-pdf"></i> Visualizar PDF</button>
+      <button class="btn btn-primary btn-sm" id="btnPrnOrc" onclick="printOrcamento()" style="display:none"><i class="bi bi-printer"></i> Imprimir</button>
+      <button class="btn-icon btn-sm" onclick="closeOrcamentoModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+  </div>
+  <div class="mbody print-area proposal-sheet">
+    
+    <!-- HEADER DA PROPOSTA (Estilo PDF MAVIC) -->
+    <div class="proposal-header">
+      <div class="proposal-brand">
+        <img src="LOGO NOVA.png" alt="MAVIC" class="proposal-logo" onerror="this.style.display='none'">
+        <div class="proposal-brand-details">
+          <div class="proposal-brand-name" id="lblOrcProviderHeaderName">MAVIC Arquitetura e Engenharia</div>
+          <div class="proposal-brand-sub" id="lblOrcProviderHeaderContact">projetos.mavic@hotmail.com | @mavic.arquitetuta</div>
+          <div class="proposal-brand-sub" id="lblOrcProviderHeaderDoc">CPF: 35060501841</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- CLIENTE E NÚMERO DO DOCUMENTO -->
+    <div class="proposal-title-section">
+      <div>
+        <div class="client-lbl">Cliente:</div>
+        <div class="client-name" id="lblOrcClientName">—</div>
+        <div class="client-phone" id="lblOrcClientPhone">Não informado</div>
+      </div>
+      <div class="proposal-meta-card">
+        <div class="proposal-number" id="lblProposalNum">Novo Orçamento</div>
+        <div class="proposal-date" id="lblOrcDatePreview">—</div>
+      </div>
+    </div>
+
+    <!-- CONFIGURAÇÕES DE FORMULÁRIO (OCULTAS NA IMPRESSÃO) -->
+    <div class="no-print" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:15px;margin-bottom:20px;">
+      <input type="hidden" id="orcId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:15px">
+        <div>
+          <div class="fld" style="position:relative">
+            <label class="flbl">Cliente *</label>
+            <input class="inp inp-sm" id="orcClient" placeholder="Digite para buscar ou criar um cliente…" autocomplete="off" oninput="handleOrcClientInput(); updateOrcPreviewLabels()" onfocus="handleOrcClientInput()" onblur="handleOrcClientBlur()">
+            <div class="ac-dropdown d-none" id="orcClientSuggest"></div>
+          </div>
+          <div class="row2" style="grid-template-columns:1fr 80px">
+            <div class="fld"><label class="flbl">Título / Nome do Orçamento *</label><input class="inp inp-sm" id="orcTitle" placeholder="Ex: Projeto Residencial" oninput="updateOrcPreviewLabels()"></div>
+            <div class="fld"><label class="flbl">Número</label><input type="number" class="inp inp-sm" id="orcNumber" min="1" oninput="updateOrcPreviewLabels()"></div>
+          </div>
+          <div class="fld"><div style="display:flex;align-items:center;justify-content:space-between;gap:6px"><label class="flbl" style="margin:0">Tipo de Projeto</label><button class="btn-icon btn-sm" onclick="openManageProjectTypesModal()" title="Gerenciar tipos de projeto" type="button"><i class="bi bi-tags"></i></button></div><select class="inp inp-sm project-type-select" id="orcProjectType"></select></div>
+        </div>
+        <div>
+          <div class="row2">
+            <div class="fld"><label class="flbl">Data de Emissão</label><input type="date" class="inp inp-sm" id="orcDate" onchange="updateOrcPreviewLabels()"></div>
+            <div class="fld"><label class="flbl">Validade</label><input type="date" class="inp inp-sm" id="orcValidUntil" onchange="updateOrcPreviewLabels()"></div>
+          </div>
+          <div class="row2">
+            <div class="fld"><label class="flbl">Desconto (R$)</label><input type="text" inputmode="decimal" class="inp inp-sm" id="orcDiscount" value="0,00" oninput="maskCurrencyInput(this);updateOrcPreviewLabels()"></div>
+            <div class="fld"><label class="flbl">Status</label><select class="inp inp-sm" id="orcStatus"><option value="Pendente">Pendente</option><option value="Aprovado">Aprovado</option><option value="Recusado">Recusado</option><option value="Convertido" disabled>Convertido</option></select></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="proposal-table-title no-print">Detalhamento dos Serviços</div>
+    
+    <!-- TABELA DE ITENS -->
+    <div class="proposal-table-wrapper">
+      <table class="proposal-table">
+        <thead>
+          <tr>
+            <th style="text-align: left;">Produtos</th>
+            <th style="width: 100px; text-align: right;">Valor</th>
+            <th style="width: 100px; text-align: right;">Total</th>
+            <th style="width: 50px; text-align: center;" class="no-print"></th>
+          </tr>
+        </thead>
+        <tbody id="orcItemsTableBody">
+          <!-- Rendered dynamically -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ÁREA DE ADICIONAR ITENS (OCULTA NA IMPRESSÃO) -->
+    <div class="no-print" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:15px">
+      <div class="sec" style="margin-bottom:6px" id="orcItemFormLabel">Adicionar Item à Proposta</div>
+      <div class="orc-item-grid">
+        <div style="position:relative">
+          <input class="inp inp-sm" id="newOrcItemDesc" placeholder="Nome do produto/serviço (ex: Projeto Elétrico)" autocomplete="off" oninput="handleOrcItemDescInput()" onfocus="handleOrcItemDescInput()">
+          <div class="ac-dropdown d-none" id="orcItemSuggest"></div>
+        </div>
+        <div><input type="text" inputmode="decimal" class="inp inp-sm" id="newOrcItemPrice" placeholder="Valor (R$)" oninput="maskCurrencyInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();addOrcItem();}"></div>
+        <div><input type="number" class="inp inp-sm" id="newOrcItemQty" value="1" min="1"></div>
+        <div><button class="btn btn-primary btn-sm" id="btnOrcItemSubmit" onclick="addOrcItem()" style="padding:5px;width:100%" title="Adicionar">+</button></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 40px;gap:8px;margin-top:8px">
+        <div><input class="inp inp-sm" id="newOrcItemNote" placeholder="Descrição do item (opcional) — ex: inclui planta baixa e detalhamento"></div>
+        <div><button class="btn btn-ghost btn-sm" id="btnOrcItemCancel" onclick="cancelOrcItemEdit()" style="padding:5px;width:100%;display:none" title="Cancelar edição"><i class="bi bi-x-lg"></i></button></div>
+      </div>
+      <div class="fld" style="margin-top:6px;margin-bottom:0">
+        <input type="hidden" id="orcTotalVal">
+      </div>
+    </div>
+
+    <!-- SUBTOTAL -->
+    <div class="proposal-mid-bar">
+      <div class="subtotal-bar">
+        <span>Subtotal</span>
+        <span id="lblOrcSubtotalPreview">R$ 0,00</span>
+      </div>
+    </div>
+
+    <!-- GRADE DE OBSERVAÇÕES E TOTAIS FINAIS -->
+    <div class="proposal-bottom-layout">
+      <!-- Observações -->
+      <div class="proposal-notes-panel">
+        <div class="notes-title">Observações</div>
+        <div class="notes-content" id="lblOrcNotesPreview">Nenhuma observação informada.</div>
+
+        <!-- Seletor de Observações Prontas -->
+        <div class="no-print" style="margin-top:15px; border-top:1px dashed var(--border); padding-top:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+            <label class="flbl" style="color:var(--accent);margin:0"><i class="bi bi-card-list"></i> Observação Padrão</label>
+            <button class="btn-icon btn-sm" onclick="openManageNotesModal()" title="Gerenciar observações padrão"><i class="bi bi-sliders"></i></button>
+          </div>
+          <select class="inp inp-sm" id="orcNotesTemplate" onchange="applyOrcNotesTemplate()">
+            <option value="">Selecione uma observação padrão...</option>
+          </select>
+        </div>
+        <textarea class="inp no-print" id="orcNotes" rows="5" placeholder="Digite termos ou prazos aqui..." oninput="updateOrcPreviewLabels()" style="margin-top: 8px;"></textarea>
+      </div>
+      
+      <!-- Totais e Assinatura -->
+      <div class="proposal-totals-panel">
+        <div class="totals-block">
+          <div class="totals-row">
+            <span>(-) Desconto</span>
+            <span id="lblOrcDiscountPreview">R$ 0,00</span>
+          </div>
+          <div class="totals-row main-total-row">
+            <span>Total geral</span>
+            <strong id="lblOrcTotalGeralPreview">R$ 0,00</strong>
+          </div>
+        </div>
+        
+        <div class="signature-block">
+          <div class="signature-name" id="lblSigProviderName">Victor Lourenço Pereira</div>
+          <div class="signature-title">Assinatura</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="mftr no-print">
+    <button class="btn btn-ghost" onclick="closeOrcamentoModal()">Cancelar</button>
+    <button class="btn btn-ghost" style="color:var(--red)" onclick="saveOrcamentoAndDownloadPdf()"><i class="bi bi-file-pdf"></i> Salvar e Baixar PDF</button>
+    <button class="btn btn-primary" onclick="saveOrcamento()"><i class="bi bi-check2"></i> Salvar Orçamento</button>
+  </div>
+</div>
+</div>
+
+<div class="overlay" id="faturarOverlay" onclick="if(event.target===this)closeFaturarModal()">
+<div class="mbox msm">
+  <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-arrow-right-circle"></i> Faturar Orçamento</h5><button class="btn-icon btn-sm" onclick="closeFaturarModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody">
+    <input type="hidden" id="fatOrcId">
+    <div class="fld"><label class="flbl">Orçamento</label><div id="fatOrcInfo" style="font-size:14px;font-weight:600;padding:8px 10px;background:var(--surface2);border-radius:8px"></div></div>
+    <div class="row2">
+      <div class="fld"><label class="flbl">Prioridade</label><select class="inp inp-sm" id="fatPriority"><option value="Alta">&#128308; Alta</option><option value="Média" selected>&#128993; Média</option><option value="Baixa">&#128994; Baixa</option></select></div>
+      <div class="fld"><label class="flbl">Prazo de Entrega *</label><input type="date" class="inp inp-sm" id="fatDeadline"></div>
+    </div>
+    <p style="font-size:12px;color:var(--text3);margin:4px 0 0"><i class="bi bi-info-circle"></i> O projeto sera criado na coluna "Briefing" com os itens da proposta como tarefas.</p>
+  </div>
+  <div class="mftr">
+    <button class="btn btn-ghost" onclick="closeFaturarModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="confirmFaturarOrcamento()"><i class="bi bi-check2"></i> Confirmar Faturamento</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ GERENCIAR OBSERVAÇÕES PADRÃO ══ -->
+<div class="overlay" id="notesOverlay" onclick="if(event.target===this)closeManageNotesModal()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-card-list"></i> Observações Padrão</h5><button class="btn-icon btn-sm" onclick="closeManageNotesModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody">
+    <div style="display:flex;flex-direction:column;gap:10px" id="notesManagerList"></div>
+    <button class="btn btn-ghost btn-sm mt-3" onclick="addNoteTemplateInput()"><i class="bi bi-plus-lg"></i> Nova Observação Padrão</button>
+  </div>
+  <div class="mftr">
+    <button class="btn btn-ghost" onclick="closeManageNotesModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveNoteTemplates()"><i class="bi bi-check2"></i> Salvar Alterações</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-gear"></i> Configurações</h5><button class="btn-icon btn-sm" onclick="closeSettings()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody">
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-window"></i> Painel do Cliente</div>
+      <div class="fld"><label class="flbl">URL do cliente.html</label><input class="inp inp-sm" id="clientUrl" placeholder="cliente.html ou https://seusite.com/cliente.html"></div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-qr-code" style="color:var(--accent)"></i> Pagamento (PIX)</div>
+      <div class="fld"><label class="flbl">Chave PIX (CPF/CNPJ/e-mail/telefone)</label><input class="inp inp-sm" id="pixKey" placeholder="Ex: 350.605.018-41"></div>
+      <div class="row2">
+        <div class="fld"><label class="flbl">Titular</label><input class="inp inp-sm" id="pixName" placeholder="Nome do titular"></div>
+        <div class="fld"><label class="flbl">Banco / Instituição</label><input class="inp inp-sm" id="pixBank" placeholder="Ex: Nu Pagamentos"></div>
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
+      <div class="fld">
+        <label class="flbl">Template de Mensagem</label>
+        <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-building"></i> Dados do Emissor (para Recibos e Orçamentos)</div>
+      <div class="fld">
+        <label class="flbl">Nome / Razão Social</label>
+        <input class="inp inp-sm" id="companyName" placeholder="Ex: Victor Lourenço Pereira Ltda">
+      </div>
+      <div class="fld">
+        <label class="flbl">CPF / CNPJ do Emissor</label>
+        <input class="inp inp-sm" id="companyDoc" placeholder="Ex: 350.605.018-41">
+      </div>
+      <div class="fld">
+        <label class="flbl">E-mail do Emissor</label>
+        <input class="inp inp-sm" id="companyEmail" placeholder="Ex: projetos.mavic@hotmail.com">
+      </div>
+      <div class="fld">
+        <label class="flbl">Instagram do Emissor</label>
+        <input class="inp inp-sm" id="companyInsta" placeholder="Ex: @mavic.arquitetuta">
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec">Sistema</div>
+      <div class="st-row"><span style="color:var(--text2)">Projetos</span><strong id="stProjCnt">—</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Clientes</span><strong id="stCliCnt">—</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Banco de dados</span><strong style="color:var(--green)"><i class="bi bi-cloud-check"></i> Supabase conectado</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Versão</span><strong style="color:var(--accent)">MAVIC v3.1</strong></div>
+    </div>
+  </div>
+  <div class="mftr"><button class="btn btn-ghost" onclick="closeSettings()">Cancelar</button><button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>
+</div>
+</div>
+
+<!-- ══ GLOBAL NOTICES MODAL ══ -->
+<div class="overlay" id="globalNoticeOverlay" onclick="if(event.target===this)closeGlobalNoticeModal()">
+<div class="mbox mxl">
+  <div class="mhdr">
+    <h5 style="color:var(--accent)"><i class="bi bi-megaphone"></i> Central de Avisos</h5>
+    <button class="btn-icon btn-sm" onclick="closeGlobalNoticeModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div style="display:flex;flex-direction:column">
+      <div class="sec" style="margin-bottom:10px">Avisos enviados</div>
+      <div id="gnList" style="display:flex;flex-direction:column;gap:6px;height:460px;overflow-y:auto;padding-right:6px"></div>
+    </div>
+    <div style="border-left:1px solid var(--border);padding-left:20px">
+      <div class="sec" style="margin-bottom:10px">Novo Aviso</div>
+      <div class="fld" style="display:flex;align-items:center;justify-content:space-between">
+        <label class="flbl" style="margin-bottom:0">Ativo ao publicar</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="gnActive" checked onchange="updateGnPreview()" style="accent-color:var(--accent);width:15px;height:15px">
+          <span id="gnStatusLabel" style="font-size:13px;font-weight:600;color:var(--green)">Ativo</span>
+        </label>
+      </div>
+      <div class="fld">
+        <label class="flbl">Título *</label>
+        <input class="inp inp-sm" id="gnTitle" oninput="updateGnPreview()" placeholder="Ex: Recesso de Fim de Ano">
+      </div>
+      <div class="fld">
+        <label class="flbl">Mensagem *</label>
+        <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')"><b>N</b></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')"><i>I</i></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n')">↵ Linha</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')">• Tópico</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n\n')">¶ Parágrafo</button>
+        </div>
+        <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Use os botões acima para formatar."></textarea>
+      </div>
+      <div class="fld">
+        <label class="flbl">Destinatários</label>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:6px">
+            <input type="checkbox" id="gnAllClients" checked onchange="toggleGnAllClients()">
+            <span>Todos os clientes</span>
+          </label>
+          <div id="gnClientsContainer" style="display:none;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div id="gnPreview" style="display:none;background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:10px;padding:11px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--yellow);margin-bottom:4px"><i class="bi bi-megaphone"></i> Prévia:</div>
+        <div id="gnPreviewText" style="font-size:13px;font-weight:500;color:var(--text);line-height:1.6"></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="saveGlobalNotice()"><i class="bi bi-megaphone"></i> Publicar Aviso</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ ARCHIVE MODAL ══ -->
+<div class="overlay" id="archiveOverlay" onclick="if(event.target===this)closeArchiveModal()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5><i class="bi bi-archive"></i> Projetos Arquivados</h5><button class="btn-icon btn-sm" onclick="closeArchiveModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody" id="archiveList" style="max-height:400px;overflow-y:auto"></div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<nav class="mtab-bar" id="mtabBar">
+  <a class="mtab-item" href="index.html" title="Board" aria-label="Board"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
+  <a class="mtab-item" href="dashboard.html" title="Dashboard" aria-label="Dashboard"><span class="mtab-bubble"><i class="bi bi-speedometer2"></i></span></a>
+  <a class="mtab-item active" href="orcamento.html" title="Orçamentos" aria-label="Orçamentos"><span class="mtab-bubble"><i class="bi bi-file-earmark-spreadsheet"></i></span></a>
+  <a class="mtab-item" href="pagamentos.html" title="Pagamentos" aria-label="Pagamentos"><span class="mtab-bubble"><i class="bi bi-credit-card"></i></span></a>
+  <a class="mtab-item" href="relatorio.html" title="Relatórios" aria-label="Relatórios"><span class="mtab-bubble"><i class="bi bi-graph-up-arrow"></i></span></a>
+  <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
+</nav>
+
+<script src="common.js"></script>
+<script src="orcamento.js"></script>
+</body>
+</html>

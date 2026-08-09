@@ -1,10 +1,21 @@
-const CACHE = 'mavic-v25';
+const CACHE = 'mavic-v77';
 
 const STATIC = [
   './',
   './index.html',
   './index.css',
-  './app.js',
+  './common.js',
+  './board.js',
+  './dashboard.html',
+  './dashboard.js',
+  './orcamento.html',
+  './orcamento.js',
+  './pagamentos.html',
+  './pagamentos.js',
+  './relatorio.html',
+  './relatorio.js',
+  './clientes.html',
+  './clientes.js',
   './config.js',
   './cliente.html',
   './cliente.css',
@@ -17,6 +28,7 @@ const STATIC = [
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
 ];
 
 // Instala e cacheia os arquivos estáticos

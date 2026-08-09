@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
         products:  p.products,
         note:      p.note,
         image:     p.image,
+        driveLink: p.driveLink,
         archived:  p.archived,
       }))
 
@@ -86,8 +87,12 @@ Deno.serve(async (req) => {
       projects:      myProjects,
       notifications: myNotifications,
       globalNotices: myGlobalNotices,
-      config:        { columns: cfg.columns, theme: cfg.theme },
+      // companyName/companyDoc são dados públicos do emissor (usados no recibo em PDF do cliente).
+      config:        { columns: cfg.columns, theme: cfg.theme, companyName: cfg.companyName, companyDoc: cfg.companyDoc, projectTypes: cfg.projectTypes, pixKey: cfg.pixKey, pixName: cfg.pixName, pixBank: cfg.pixBank },
       clientName:    cli.name,
+      // Dados do próprio cliente devolvidos a ele mesmo — usados só pra montar o recibo em PDF.
+      clientDoc:     cli.doc || '',
+      clientAddress: cli.address || '',
       hasToken:      !!cli.token,
     })
   }
@@ -123,6 +128,10 @@ Deno.serve(async (req) => {
     if (body.action === 'mark_read' && body.notifId !== undefined) {
       type Notification = Record<string, unknown>
       const notifications: Notification[] = (store['notifications'] ?? []) as Notification[]
+      // Só pode marcar como lida uma notificação que pertence a este cliente (mesmo token)
+      const target = notifications.find(n => n.id === body.notifId)
+      if (!target) return json({ error: 'notification_not_found' }, 404)
+      if (target.clientToken !== cli.token) return json({ error: 'forbidden' }, 403)
       const updated = notifications.map(n => n.id === body.notifId ? { ...n, read: true } : n)
       await supabase.from('mavic_store').upsert([{ key: 'notifications', data: updated }], { onConflict: 'key' })
       return json({ ok: true })
@@ -132,6 +141,12 @@ Deno.serve(async (req) => {
     if (body.action === 'mark_global_read' && body.noticeId !== undefined) {
       type GlobalNotice = Record<string, unknown>
       const globalNotices: GlobalNotice[] = (store['global_notices'] ?? []) as GlobalNotice[]
+      // Só pode marcar como lido um aviso que era realmente destinado a este cliente
+      const target = globalNotices.find(gn => gn.id === body.noticeId)
+      if (!target) return json({ error: 'notice_not_found' }, 404)
+      const targetedAtMe = !!target.targetAll ||
+        ((target.targetClients as string[] | undefined)?.some(n => n.toLowerCase() === nome))
+      if (!targetedAtMe) return json({ error: 'forbidden' }, 403)
       const updated = globalNotices.map(gn => {
         if (gn.id !== body.noticeId) return gn
         const readBy: string[] = Array.isArray(gn.readBy) ? [...gn.readBy as string[]] : []

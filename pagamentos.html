@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAVIC Projetos - Pagamentos</title>
+<link rel="icon" type="image/x-icon" href="icon.ico">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#92623a">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="index.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+</head>
+<body class="preload">
+
+<div class="loading" id="loading">
+  <div class="spin"></div>
+  <div style="font-weight:600;font-size:14px">Carregando MAVIC…</div>
+  <div style="font-size:12px;color:var(--text3)">Conectando ao banco de dados</div>
+</div>
+
+<nav class="nav">
+  <div class="nav-brand">
+    <img id="navLogo" src="LOGO NOVA.png" alt="MAVIC" class="nav-logo" onerror="this.style.display='none'">
+    <div>
+      <div class="nav-name">MAVIC Projetos</div>
+      <div class="nav-sync ok" id="syncStatus"><i class="bi bi-cloud-check"></i> Sincronizado</div>
+    </div>
+  </div>
+  <div class="nav-sep"></div>
+  <div class="nav-tabs">
+    <a class="nav-tab" href="index.html"><i class="bi bi-kanban"></i> Board</a>
+    <a class="nav-tab" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <a class="nav-tab" href="orcamento.html"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamentos</a>
+    <a class="nav-tab on" href="pagamentos.html"><i class="bi bi-credit-card"></i> Pagamentos</a>
+    <a class="nav-tab" href="relatorio.html"><i class="bi bi-graph-up-arrow"></i> Relatórios</a>
+    <a class="nav-tab" href="clientes.html"><i class="bi bi-people"></i> Clientes</a>
+  </div>
+  <div class="nav-spacer"></div>
+  <button class="btn-icon" id="gnNavBtn" onclick="openGlobalNoticeModal()" title="Central de Avisos"><i class="bi bi-megaphone"></i></button>
+  <button class="btn-icon" onclick="openArchiveModal()" title="Arquivados"><i class="bi bi-archive"></i></button>
+  <button class="btn-icon" onclick="openSettings()" title="Configurações"><i class="bi bi-gear"></i></button>
+  <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Tema"><i class="bi bi-moon-stars"></i></button>
+</nav>
+
+<!-- PAGAMENTOS VIEW -->
+<div class="dash-view" id="pagamentosView" style="display:block">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <h4 style="font-weight:700;color:var(--accent);margin:0">Controle de Pagamentos</h4>
+    <button class="btn btn-primary btn-sm" onclick="openAddPaymentDirectModal()"><i class="bi bi-plus-lg"></i> Registrar Pagamento</button>
+  </div>
+  
+  <div class="toolbar" style="padding:10px 0;background:transparent;border:none;display:flex;gap:10px">
+    <input type="text" class="inp inp-sm" id="fPaySearch" placeholder="Buscar pagamento…" oninput="pgReset('pagamentos');renderPagamentos()" style="max-width:250px">
+    <select class="inp inp-sm" id="fPayClient" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
+      <option value="">Todos os Clientes</option>
+    </select>
+    <select class="inp inp-sm" id="fPayYear" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
+      <option value="">Todos os Anos</option>
+      <option>2026</option>
+      <option>2025</option>
+      <option>2024</option>
+    </select>
+    <select class="inp inp-sm" id="fPayMonth" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
+      <option value="">Todos os Meses</option>
+      <option value="01">Janeiro</option>
+      <option value="02">Fevereiro</option>
+      <option value="03">Março</option>
+      <option value="04">Abril</option>
+      <option value="05">Maio</option>
+      <option value="06">Junho</option>
+      <option value="07">Julho</option>
+      <option value="08">Agosto</option>
+      <option value="09">Setembro</option>
+      <option value="10">Outubro</option>
+      <option value="11">Novembro</option>
+      <option value="12">Dezembro</option>
+    </select>
+  </div>
+  
+  <div class="dash-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Cliente</th>
+          <th>Projeto</th>
+          <th>Data</th>
+          <th>Forma</th>
+          <th>Valor Recebido</th>
+          <th style="width:240px;text-align:right">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="payTableBody">
+        <tr>
+          <td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Nenhum pagamento registrado</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="payPagination"></div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ══ REGISTRAR PAGAMENTO DIRETO MODAL ══ -->
+<div class="overlay" id="addPaymentDirectOverlay" onclick="if(event.target===this)closeAddPaymentDirectModal()">
+<div class="mbox mmd">
+  <div class="mhdr">
+    <h5>Registrar Pagamento</h5>
+    <button class="btn-icon btn-sm" onclick="closeAddPaymentDirectModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody">
+    <div class="fld" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:2px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;margin:0">
+        <input type="checkbox" id="directPayNewMode" onchange="toggleDirectPayMode()" style="accent-color:var(--accent);width:15px;height:15px">
+        Cliente/projeto novos (já finalizado e pago)
+      </label>
+    </div>
+    <div id="directPayExistingWrap">
+      <div class="fld">
+        <label class="flbl">Cliente *</label>
+        <select class="inp inp-sm" id="directPayClient" onchange="handleDirectPayClientChange()"></select>
+      </div>
+      <div class="fld">
+        <label class="flbl">Projeto *</label>
+        <select class="inp inp-sm" id="directPayProject"></select>
+      </div>
+    </div>
+    <div id="directPayNewWrap" style="display:none">
+      <div class="fld" style="position:relative">
+        <label class="flbl">Nome do Cliente *</label>
+        <input class="inp inp-sm" id="directPayNewClient" placeholder="Ex: Manuel" autocomplete="off" oninput="handleDirectPayNewClientInput()" onfocus="handleDirectPayNewClientInput()" onblur="hideDirectPayNewClientSuggestions()">
+        <div class="ac-dropdown d-none" id="directPayNewClientSuggest"></div>
+      </div>
+      <div class="fld">
+        <label class="flbl">Nome do Projeto *</label>
+        <input class="inp inp-sm" id="directPayNewProject" placeholder="Ex: Fachada da Casa 56">
+      </div>
+      <div style="font-size:11.5px;color:var(--text3);margin:-4px 0 8px"><i class="bi bi-info-circle"></i> Cria o cliente e o projeto (com o valor abaixo como contrato quitado) já na etapa "<span id="directPayFinalColHint">Finalizado</span>"</div>
+    </div>
+    <div class="row2">
+      <div class="fld">
+        <label class="flbl">Valor (R$) *</label>
+        <input type="number" class="inp inp-sm" id="directPayAmount" step="0.01" placeholder="0.00">
+      </div>
+      <div class="fld">
+        <label class="flbl">Data *</label>
+        <input type="date" class="inp inp-sm" id="directPayDate">
+      </div>
+    </div>
+    <div class="fld">
+      <label class="flbl">Forma de Pagamento</label>
+      <select class="inp inp-sm" id="directPayMethod">
+        <option value="Pix">Pix</option>
+        <option value="Dinheiro">Dinheiro</option>
+        <option value="Cartão">Cartão</option>
+        <option value="Transferência">Transferência</option>
+        <option value="Boleto">Boleto</option>
+        <option value="Outro">Outro</option>
+      </select>
+    </div>
+  </div>
+  <div class="mftr">
+    <button class="btn btn-ghost" onclick="closeAddPaymentDirectModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveDirectPayment()"><i class="bi bi-check2"></i> Confirmar Recebimento</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ RECIBO MODAL ══ -->
+<div class="overlay" id="reciboOverlay" onclick="if(event.target===this)closeReciboModal()">
+<div class="mbox mmd print-receipt-box">
+  <div class="mhdr no-print">
+    <h5>Visualização do Recibo</h5>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm" onclick="downloadReceiptPDFModal()" style="color:var(--red)"><i class="bi bi-file-pdf"></i> PDF</button>
+      <button class="btn btn-primary btn-sm" onclick="printReceipt()"><i class="bi bi-printer"></i> Imprimir</button>
+      <button class="btn-icon btn-sm" onclick="closeReciboModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+  </div>
+  <div class="mbody print-area">
+    <!-- Timbre / Header -->
+    <div class="receipt-header">
+      <div class="receipt-logo-area">
+        <img src="LOGO NOVA.png" alt="MAVIC" class="receipt-logo" onerror="this.style.display='none'">
+        <span class="receipt-brand-text">MAVIC Projetos</span>
+      </div>
+      <div class="receipt-title-box">
+        <h2 class="receipt-title">RECIBO</h2>
+        <div class="receipt-number" id="recNum">Nº REC-1700000000000</div>
+      </div>
+    </div>
+    
+    <div class="receipt-value-box">
+      <span class="receipt-val-lbl">VALOR:</span>
+      <span class="receipt-val-num" id="recValNum">R$ 0,00</span>
+    </div>
+    
+    <div class="receipt-body">
+      <p style="text-align:justify;line-height:2">
+        Recebemos de <strong id="recClientName">—</strong>, 
+        inscrito(a) no CPF/CNPJ sob o nº <strong id="recClientDoc">—</strong>, 
+        residente em <strong id="recClientAddress">—</strong>, 
+        a importância de <strong id="recValWords">—</strong>, 
+        referente aos serviços prestados no projeto <strong id="recProjectName">—</strong>.
+      </p>
+      <p style="margin-top:35px;text-align:right" id="recDateAndLocation">
+        São José do Rio Preto, 08 de agosto de 2026.
+      </p>
+    </div>
+    
+    <!-- Signature / Emissor Details -->
+    <div class="receipt-footer">
+      <div class="receipt-signature-line"></div>
+      <div class="receipt-emissor-name" id="recEmissorName">Victor Lourenço Pereira</div>
+      <div class="receipt-emissor-doc" id="recEmissorDoc">CPF/CNPJ: 350.605.018-41</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-gear"></i> Configurações</h5><button class="btn-icon btn-sm" onclick="closeSettings()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody">
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-window"></i> Painel do Cliente</div>
+      <div class="fld"><label class="flbl">URL do cliente.html</label><input class="inp inp-sm" id="clientUrl" placeholder="cliente.html ou https://seusite.com/cliente.html"></div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-qr-code" style="color:var(--accent)"></i> Pagamento (PIX)</div>
+      <div class="fld"><label class="flbl">Chave PIX (CPF/CNPJ/e-mail/telefone)</label><input class="inp inp-sm" id="pixKey" placeholder="Ex: 350.605.018-41"></div>
+      <div class="row2">
+        <div class="fld"><label class="flbl">Titular</label><input class="inp inp-sm" id="pixName" placeholder="Nome do titular"></div>
+        <div class="fld"><label class="flbl">Banco / Instituição</label><input class="inp inp-sm" id="pixBank" placeholder="Ex: Nu Pagamentos"></div>
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
+      <div class="fld">
+        <label class="flbl">Template de Mensagem</label>
+        <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-building"></i> Dados do Emissor (para Recibos e Orçamentos)</div>
+      <div class="fld">
+        <label class="flbl">Nome / Razão Social</label>
+        <input class="inp inp-sm" id="companyName" placeholder="Ex: Victor Lourenço Pereira Ltda">
+      </div>
+      <div class="fld">
+        <label class="flbl">CPF / CNPJ do Emissor</label>
+        <input class="inp inp-sm" id="companyDoc" placeholder="Ex: 350.605.018-41">
+      </div>
+      <div class="fld">
+        <label class="flbl">E-mail do Emissor</label>
+        <input class="inp inp-sm" id="companyEmail" placeholder="Ex: projetos.mavic@hotmail.com">
+      </div>
+      <div class="fld">
+        <label class="flbl">Instagram do Emissor</label>
+        <input class="inp inp-sm" id="companyInsta" placeholder="Ex: @mavic.arquitetuta">
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec">Sistema</div>
+      <div class="st-row"><span style="color:var(--text2)">Projetos</span><strong id="stProjCnt">—</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Clientes</span><strong id="stCliCnt">—</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Banco de dados</span><strong style="color:var(--green)"><i class="bi bi-cloud-check"></i> Supabase conectado</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Versão</span><strong style="color:var(--accent)">MAVIC v3.1</strong></div>
+    </div>
+  </div>
+  <div class="mftr"><button class="btn btn-ghost" onclick="closeSettings()">Cancelar</button><button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>
+</div>
+</div>
+
+<!-- ══ GLOBAL NOTICES MODAL ══ -->
+<div class="overlay" id="globalNoticeOverlay" onclick="if(event.target===this)closeGlobalNoticeModal()">
+<div class="mbox mxl">
+  <div class="mhdr">
+    <h5 style="color:var(--accent)"><i class="bi bi-megaphone"></i> Central de Avisos</h5>
+    <button class="btn-icon btn-sm" onclick="closeGlobalNoticeModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div style="display:flex;flex-direction:column">
+      <div class="sec" style="margin-bottom:10px">Avisos enviados</div>
+      <div id="gnList" style="display:flex;flex-direction:column;gap:6px;height:460px;overflow-y:auto;padding-right:6px"></div>
+    </div>
+    <div style="border-left:1px solid var(--border);padding-left:20px">
+      <div class="sec" style="margin-bottom:10px">Novo Aviso</div>
+      <div class="fld" style="display:flex;align-items:center;justify-content:space-between">
+        <label class="flbl" style="margin-bottom:0">Ativo ao publicar</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="gnActive" checked onchange="updateGnPreview()" style="accent-color:var(--accent);width:15px;height:15px">
+          <span id="gnStatusLabel" style="font-size:13px;font-weight:600;color:var(--green)">Ativo</span>
+        </label>
+      </div>
+      <div class="fld">
+        <label class="flbl">Título *</label>
+        <input class="inp inp-sm" id="gnTitle" oninput="updateGnPreview()" placeholder="Ex: Recesso de Fim de Ano">
+      </div>
+      <div class="fld">
+        <label class="flbl">Mensagem *</label>
+        <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')"><b>N</b></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')"><i>I</i></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n')">↵ Linha</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')">• Tópico</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n\n')">¶ Parágrafo</button>
+        </div>
+        <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Use os botões acima para formatar."></textarea>
+      </div>
+      <div class="fld">
+        <label class="flbl">Destinatários</label>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:6px">
+            <input type="checkbox" id="gnAllClients" checked onchange="toggleGnAllClients()">
+            <span>Todos os clientes</span>
+          </label>
+          <div id="gnClientsContainer" style="display:none;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div id="gnPreview" style="display:none;background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:10px;padding:11px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--yellow);margin-bottom:4px"><i class="bi bi-megaphone"></i> Prévia:</div>
+        <div id="gnPreviewText" style="font-size:13px;font-weight:500;color:var(--text);line-height:1.6"></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="saveGlobalNotice()"><i class="bi bi-megaphone"></i> Publicar Aviso</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ ARCHIVE MODAL ══ -->
+<div class="overlay" id="archiveOverlay" onclick="if(event.target===this)closeArchiveModal()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5><i class="bi bi-archive"></i> Projetos Arquivados</h5><button class="btn-icon btn-sm" onclick="closeArchiveModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody" id="archiveList" style="max-height:400px;overflow-y:auto"></div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<nav class="mtab-bar" id="mtabBar">
+  <a class="mtab-item" href="index.html" title="Board" aria-label="Board"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
+  <a class="mtab-item" href="dashboard.html" title="Dashboard" aria-label="Dashboard"><span class="mtab-bubble"><i class="bi bi-speedometer2"></i></span></a>
+  <a class="mtab-item" href="orcamento.html" title="Orçamentos" aria-label="Orçamentos"><span class="mtab-bubble"><i class="bi bi-file-earmark-spreadsheet"></i></span></a>
+  <a class="mtab-item active" href="pagamentos.html" title="Pagamentos" aria-label="Pagamentos"><span class="mtab-bubble"><i class="bi bi-credit-card"></i></span></a>
+  <a class="mtab-item" href="relatorio.html" title="Relatórios" aria-label="Relatórios"><span class="mtab-bubble"><i class="bi bi-graph-up-arrow"></i></span></a>
+  <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
+</nav>
+
+<script src="common.js"></script>
+<script src="pagamentos.js"></script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAVIC Projetos - Relatórios</title>
+<link rel="icon" type="image/x-icon" href="icon.ico">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#92623a">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="index.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+</head>
+<body class="preload">
+
+<div class="loading" id="loading">
+  <div class="spin"></div>
+  <div style="font-weight:600;font-size:14px">Carregando MAVIC…</div>
+  <div style="font-size:12px;color:var(--text3)">Conectando ao banco de dados</div>
+</div>
+
+<nav class="nav">
+  <div class="nav-brand">
+    <img id="navLogo" src="LOGO NOVA.png" alt="MAVIC" class="nav-logo" onerror="this.style.display='none'">
+    <div>
+      <div class="nav-name">MAVIC Projetos</div>
+      <div class="nav-sync ok" id="syncStatus"><i class="bi bi-cloud-check"></i> Sincronizado</div>
+    </div>
+  </div>
+  <div class="nav-sep"></div>
+  <div class="nav-tabs">
+    <a class="nav-tab" href="index.html"><i class="bi bi-kanban"></i> Board</a>
+    <a class="nav-tab" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <a class="nav-tab" href="orcamento.html"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamentos</a>
+    <a class="nav-tab" href="pagamentos.html"><i class="bi bi-credit-card"></i> Pagamentos</a>
+    <a class="nav-tab on" href="relatorio.html"><i class="bi bi-graph-up-arrow"></i> Relatórios</a>
+    <a class="nav-tab" href="clientes.html"><i class="bi bi-people"></i> Clientes</a>
+  </div>
+  <div class="nav-spacer"></div>
+  <button class="btn-icon" id="gnNavBtn" onclick="openGlobalNoticeModal()" title="Central de Avisos"><i class="bi bi-megaphone"></i></button>
+  <button class="btn-icon" onclick="openArchiveModal()" title="Arquivados"><i class="bi bi-archive"></i></button>
+  <button class="btn-icon" onclick="openSettings()" title="Configurações"><i class="bi bi-gear"></i></button>
+  <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Tema"><i class="bi bi-moon-stars"></i></button>
+</nav>
+
+<!-- RELATÓRIOS VIEW -->
+<div class="dash-view" id="relatoriosView" style="display:block">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <h4 style="font-weight:700;color:var(--accent);margin:0">Relatórios Financeiros & Métricas</h4>
+  </div>
+  
+  <div class="toolbar" style="padding:10px 0;background:transparent;border:none;display:flex;gap:10px;flex-wrap:wrap">
+    <select class="inp inp-sm" id="fRepClient" onchange="renderRelatorios()" style="width:auto">
+      <option value="">Todos os Clientes</option>
+    </select>
+    <select class="inp inp-sm" id="fRepYear" onchange="renderRelatorios()" style="width:auto">
+      <option value="">Todos os Anos</option>
+      <option>2027</option>
+      <option>2026</option>
+      <option>2025</option>
+      <option>2024</option>
+    </select>
+    <select class="inp inp-sm" id="fRepMonth" onchange="renderRelatorios()" style="width:auto">
+      <option value="">Todos os Meses</option>
+      <option value="01">Janeiro</option>
+      <option value="02">Fevereiro</option>
+      <option value="03">Março</option>
+      <option value="04">Abril</option>
+      <option value="05">Maio</option>
+      <option value="06">Junho</option>
+      <option value="07">Julho</option>
+      <option value="08">Agosto</option>
+      <option value="09">Setembro</option>
+      <option value="10">Outubro</option>
+      <option value="11">Novembro</option>
+      <option value="12">Dezembro</option>
+    </select>
+    <select class="inp inp-sm project-type-select" id="fRepType" onchange="renderRelatorios()" style="width:auto">
+      <option value="">Todos os Tipos</option>
+    </select>
+    <select class="inp inp-sm" id="fRepStage" onchange="renderRelatorios()" style="width:auto">
+      <option value="">Todas as Etapas</option>
+    </select>
+    <select class="inp inp-sm" id="fRepPriority" onchange="renderRelatorios()" style="width:auto">
+      <option value="">Todas as Prioridades</option>
+      <option value="Alta">🔴 Alta</option>
+      <option value="Média">🟡 Média</option>
+      <option value="Baixa">🟢 Baixa</option>
+    </select>
+  </div>
+  
+  <div class="dash-grid">
+    <div class="dash-card dc-accent">
+      <div class="dc-top">
+        <div class="dc-lbl">Total Faturado</div>
+        <div class="dc-icon" style="background:var(--accent-bg);color:var(--accent)"><i class="bi bi-wallet2"></i></div>
+      </div>
+      <div class="dc-val" id="repTotalBilled">R$ 0,00</div>
+      <div class="dc-sub">Somatório de projetos ativos</div>
+    </div>
+    
+    <div class="dash-card dc-green">
+      <div class="dc-top">
+        <div class="dc-lbl">Total Recebido</div>
+        <div class="dc-icon" style="background:var(--green-bg);color:var(--green)"><i class="bi bi-cash-coin"></i></div>
+      </div>
+      <div class="dc-val" id="repTotalPaid">R$ 0,00</div>
+      <div class="dc-sub" id="repPaidPct">0% do faturamento</div>
+    </div>
+    
+    <div class="dash-card dc-red">
+      <div class="dc-top">
+        <div class="dc-lbl">Saldo a Receber</div>
+        <div class="dc-icon" style="background:var(--red-bg);color:var(--red)"><i class="bi bi-clock-history"></i></div>
+      </div>
+      <div class="dc-val" id="repTotalRest">R$ 0,00</div>
+      <div class="dc-sub" id="repRestPct">0% pendente</div>
+    </div>
+
+    <div class="dash-card dc-yellow">
+      <div class="dc-top">
+        <div class="dc-lbl">Orçamentos Pendentes</div>
+        <div class="dc-icon" style="background:var(--yellow-bg);color:var(--yellow)"><i class="bi bi-file-earmark-text"></i></div>
+      </div>
+      <div class="dc-val" id="repPendingOrcCount">0</div>
+      <div class="dc-sub" id="repPendingOrcValue">R$ 0,00 em negociação</div>
+    </div>
+  </div>
+  
+  <div class="reports-charts-container">
+    <div class="dash-card chart-wrapper">
+      <div class="sec" style="align-self:flex-start;width:100%">
+        <i class="bi bi-bar-chart"></i> Faturamento Mensal (Recebimentos)
+      </div>
+      <div class="chart-canvas-container">
+        <canvas id="chartMonthlyRevenue"></canvas>
+      </div>
+    </div>
+    <div class="dash-card chart-wrapper">
+      <div class="sec" style="align-self:flex-start;width:100%">
+        <i class="bi bi-pie-chart"></i> Status dos Projetos
+      </div>
+      <div class="chart-canvas-container container-pie">
+        <canvas id="chartProjectStatus"></canvas>
+      </div>
+    </div>
+    <div class="dash-card chart-wrapper">
+      <div class="sec" style="align-self:flex-start;width:100%">
+        <i class="bi bi-donut-chart"></i> Tipos de Projetos
+      </div>
+      <div class="chart-canvas-container container-pie">
+        <canvas id="chartProjectTypes"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ══ SETTINGS MODAL ══ -->
+<div class="overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-gear"></i> Configurações</h5><button class="btn-icon btn-sm" onclick="closeSettings()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody">
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-window"></i> Painel do Cliente</div>
+      <div class="fld"><label class="flbl">URL do cliente.html</label><input class="inp inp-sm" id="clientUrl" placeholder="cliente.html ou https://seusite.com/cliente.html"></div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-qr-code" style="color:var(--accent)"></i> Pagamento (PIX)</div>
+      <div class="fld"><label class="flbl">Chave PIX (CPF/CNPJ/e-mail/telefone)</label><input class="inp inp-sm" id="pixKey" placeholder="Ex: 350.605.018-41"></div>
+      <div class="row2">
+        <div class="fld"><label class="flbl">Titular</label><input class="inp inp-sm" id="pixName" placeholder="Nome do titular"></div>
+        <div class="fld"><label class="flbl">Banco / Instituição</label><input class="inp inp-sm" id="pixBank" placeholder="Ex: Nu Pagamentos"></div>
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
+      <div class="fld">
+        <label class="flbl">Template de Mensagem</label>
+        <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-building"></i> Dados do Emissor (para Recibos e Orçamentos)</div>
+      <div class="fld">
+        <label class="flbl">Nome / Razão Social</label>
+        <input class="inp inp-sm" id="companyName" placeholder="Ex: Victor Lourenço Pereira Ltda">
+      </div>
+      <div class="fld">
+        <label class="flbl">CPF / CNPJ do Emissor</label>
+        <input class="inp inp-sm" id="companyDoc" placeholder="Ex: 350.605.018-41">
+      </div>
+      <div class="fld">
+        <label class="flbl">E-mail do Emissor</label>
+        <input class="inp inp-sm" id="companyEmail" placeholder="Ex: projetos.mavic@hotmail.com">
+      </div>
+      <div class="fld">
+        <label class="flbl">Instagram do Emissor</label>
+        <input class="inp inp-sm" id="companyInsta" placeholder="Ex: @mavic.arquitetuta">
+      </div>
+    </div>
+    <div class="stgrp">
+      <div class="sec">Sistema</div>
+      <div class="st-row"><span style="color:var(--text2)">Projetos</span><strong id="stProjCnt">—</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Clientes</span><strong id="stCliCnt">—</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Banco de dados</span><strong style="color:var(--green)"><i class="bi bi-cloud-check"></i> Supabase conectado</strong></div>
+      <div class="st-row"><span style="color:var(--text2)">Versão</span><strong style="color:var(--accent)">MAVIC v3.1</strong></div>
+    </div>
+  </div>
+  <div class="mftr"><button class="btn btn-ghost" onclick="closeSettings()">Cancelar</button><button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>
+</div>
+</div>
+
+<!-- ══ GLOBAL NOTICES MODAL ══ -->
+<div class="overlay" id="globalNoticeOverlay" onclick="if(event.target===this)closeGlobalNoticeModal()">
+<div class="mbox mxl">
+  <div class="mhdr">
+    <h5 style="color:var(--accent)"><i class="bi bi-megaphone"></i> Central de Avisos</h5>
+    <button class="btn-icon btn-sm" onclick="closeGlobalNoticeModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div style="display:flex;flex-direction:column">
+      <div class="sec" style="margin-bottom:10px">Avisos enviados</div>
+      <div id="gnList" style="display:flex;flex-direction:column;gap:6px;height:460px;overflow-y:auto;padding-right:6px"></div>
+    </div>
+    <div style="border-left:1px solid var(--border);padding-left:20px">
+      <div class="sec" style="margin-bottom:10px">Novo Aviso</div>
+      <div class="fld" style="display:flex;align-items:center;justify-content:space-between">
+        <label class="flbl" style="margin-bottom:0">Ativo ao publicar</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="gnActive" checked onchange="updateGnPreview()" style="accent-color:var(--accent);width:15px;height:15px">
+          <span id="gnStatusLabel" style="font-size:13px;font-weight:600;color:var(--green)">Ativo</span>
+        </label>
+      </div>
+      <div class="fld">
+        <label class="flbl">Título *</label>
+        <input class="inp inp-sm" id="gnTitle" oninput="updateGnPreview()" placeholder="Ex: Recesso de Fim de Ano">
+      </div>
+      <div class="fld">
+        <label class="flbl">Mensagem *</label>
+        <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')"><b>N</b></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')"><i>I</i></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n')">↵ Linha</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')">• Tópico</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n\n')">¶ Parágrafo</button>
+        </div>
+        <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Use os botões acima para formatar."></textarea>
+      </div>
+      <div class="fld">
+        <label class="flbl">Destinatários</label>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:6px">
+            <input type="checkbox" id="gnAllClients" checked onchange="toggleGnAllClients()">
+            <span>Todos os clientes</span>
+          </label>
+          <div id="gnClientsContainer" style="display:none;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div id="gnPreview" style="display:none;background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:10px;padding:11px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--yellow);margin-bottom:4px"><i class="bi bi-megaphone"></i> Prévia:</div>
+        <div id="gnPreviewText" style="font-size:13px;font-weight:500;color:var(--text);line-height:1.6"></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="saveGlobalNotice()"><i class="bi bi-megaphone"></i> Publicar Aviso</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══ ARCHIVE MODAL ══ -->
+<div class="overlay" id="archiveOverlay" onclick="if(event.target===this)closeArchiveModal()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5><i class="bi bi-archive"></i> Projetos Arquivados</h5><button class="btn-icon btn-sm" onclick="closeArchiveModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody" id="archiveList" style="max-height:400px;overflow-y:auto"></div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<nav class="mtab-bar" id="mtabBar">
+  <a class="mtab-item" href="index.html" title="Board" aria-label="Board"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
+  <a class="mtab-item" href="dashboard.html" title="Dashboard" aria-label="Dashboard"><span class="mtab-bubble"><i class="bi bi-speedometer2"></i></span></a>
+  <a class="mtab-item" href="orcamento.html" title="Orçamentos" aria-label="Orçamentos"><span class="mtab-bubble"><i class="bi bi-file-earmark-spreadsheet"></i></span></a>
+  <a class="mtab-item" href="pagamentos.html" title="Pagamentos" aria-label="Pagamentos"><span class="mtab-bubble"><i class="bi bi-credit-card"></i></span></a>
+  <a class="mtab-item active" href="relatorio.html" title="Relatórios" aria-label="Relatórios"><span class="mtab-bubble"><i class="bi bi-graph-up-arrow"></i></span></a>
+  <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
+</nav>
+
+<script src="common.js"></script>
+<script src="relatorio.js"></script>
+</body>
+</html>

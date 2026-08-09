@@ -15,10 +15,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="index.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script src="config.js"></script>
 </head>
-<body>
+<body class="preload">
 
 <div class="loading" id="loading">
   <div class="spin"></div>
@@ -41,28 +40,33 @@
   </div>
   <div class="nav-sep"></div>
   <div class="nav-tabs">
-    <button class="nav-tab on" onclick="setView('board')"><i class="bi bi-kanban"></i> Board</button>
-    <button class="nav-tab" onclick="setView('dash')"><i class="bi bi-bar-chart-line"></i> Dashboard</button>
+    <a class="nav-tab on" href="index.html"><i class="bi bi-kanban"></i> Board</a>
+    <a class="nav-tab" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <a class="nav-tab" href="orcamento.html"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamentos</a>
+    <a class="nav-tab" href="pagamentos.html"><i class="bi bi-credit-card"></i> Pagamentos</a>
+    <a class="nav-tab" href="relatorio.html"><i class="bi bi-graph-up-arrow"></i> Relatórios</a>
+    <a class="nav-tab" href="clientes.html"><i class="bi bi-people"></i> Clientes</a>
   </div>
   <div class="nav-spacer"></div>
-  <div class="nav-search"><i class="bi bi-search"></i><input id="srch" placeholder="Buscar projeto ou cliente…" oninput="renderBoard()"></div>
-  <div class="nav-sep"></div>
-  <button class="btn btn-ghost btn-sm" onclick="openClientsModal()"><i class="bi bi-people" style="color:var(--accent)"></i> Clientes</button>
   <button class="btn-icon" id="gnNavBtn" onclick="openGlobalNoticeModal()" title="Central de Avisos"><i class="bi bi-megaphone"></i></button>
   <button class="btn-icon" onclick="openArchiveModal()" title="Arquivados"><i class="bi bi-archive"></i></button>
   <button class="btn-icon" onclick="openSettings()" title="Configurações"><i class="bi bi-gear"></i></button>
   <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Tema"><i class="bi bi-moon-stars"></i></button>
-  <button class="btn btn-primary btn-sm btn-novo-desktop" onclick="openProjectModal()"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
 </nav>
 <button class="fab" onclick="openProjectModal()" title="Novo Projeto"><i class="bi bi-plus-lg"></i></button>
 
 <!-- BOARD VIEW -->
 <div class="board-view" id="boardView">
-  <div class="toolbar">
-    <select class="inp inp-sm" id="fType" onchange="renderBoard()" style="width:auto">
+  <div class="board-header">
+    <h4 style="font-weight:700;color:var(--accent);margin:0">Quadro de Projetos</h4>
+    <button class="btn btn-primary btn-sm btn-novo-desktop" onclick="openProjectModal()"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
+  </div>
+  <div class="toolbar" style="background:transparent;border:none;padding:6px 14px 10px">
+    <input type="text" class="inp inp-sm" id="srch" placeholder="Buscar projeto ou cliente…" oninput="renderBoard()" style="max-width:220px">
+    <select class="inp inp-sm project-type-select" id="fType" onchange="renderBoard()" style="width:auto">
       <option value="">Todos os Tipos</option>
-      <option>Residencial</option><option>Comercial</option><option>Estrutural</option><option>Urbanismo</option><option>Outro</option>
     </select>
+    <button class="btn btn-ghost btn-sm" onclick="openManageProjectTypesModal()" title="Gerenciar tipos de projeto"><i class="bi bi-tags"></i></button>
     <select class="inp inp-sm" id="fPrio" onchange="renderBoard()" style="width:auto">
       <option value="">Prioridades</option>
       <option value="Alta">🔴 Alta</option><option value="Média">🟡 Média</option><option value="Baixa">🟢 Baixa</option>
@@ -84,12 +88,6 @@
   <div class="board-outer"><div class="board" id="board"></div></div>
 </div>
 
-<!-- DASHBOARD VIEW -->
-<div class="dash-view" id="dashView">
-  <div class="dash-grid" id="dashCards"></div>
-  <div class="dash-title">Projetos com saldo pendente</div>
-  <div class="dash-table" id="dashTable"></div>
-</div>
 
 <div class="toast-wrap" id="toastWrap"></div>
 
@@ -108,196 +106,134 @@
         <div class="sec">Detalhes</div>
         <div class="fld"><label class="flbl">Cliente *</label><select class="inp inp-sm" id="projClient" onchange="handleClientChange()"><option value="">Selecione…</option></select></div>
         <div class="fld"><label class="flbl">Nome *</label><input class="inp inp-sm" id="projName" oninput="document.getElementById('projModalTitle').textContent=this.value||'Novo Projeto'"></div>
-        <div class="fld d-none" id="clientProdWrap">
-          <label class="flbl" style="color:var(--accent)"><i class="bi bi-tags"></i> Tabela de Preços</label>
-          <select class="inp inp-sm" id="projClientProd" onchange="applyClientProd()"><option value="">Produto da tabela (opcional)…</option></select>
+        
+        <!-- SELETOR DE PRODUTOS CADASTRADOS DO CLIENTE (CRM) -->
+        <div class="fld d-none" id="projClientProdWrap">
+          <label class="flbl" style="color:var(--accent)"><i class="bi bi-tags"></i> Tabela de Preços do Cliente</label>
+          <select class="inp inp-sm" id="projClientProd" onchange="applyProjClientProd()"><option value="">Produto da tabela (opcional)…</option></select>
         </div>
-        <div class="fld d-none" id="custProdWrap">
-          <div class="row2">
-            <div><label class="flbl">Serviço</label><input class="inp inp-sm" id="custProdName" placeholder="Ex: Projeto Elétrico"></div>
-            <div><label class="flbl">Valor (R$)</label><input type="number" class="inp inp-sm" id="custProdPrice" placeholder="0.00" step="0.01"></div>
-          </div>
+        
+        <div class="row2">
+          <div class="fld"><label class="flbl">Tipo</label><select class="inp inp-sm project-type-select" id="projType"></select></div>
+          <div class="fld"><label class="flbl">Prioridade</label><select class="inp inp-sm" id="projPrio"><option value="Alta">🔴 Alta</option><option value="Média" selected>🟡 Média</option><option value="Baixa">🟢 Baixa</option></select></div>
         </div>
-        <div class="fld d-none" id="addProdWrap">
-          <button class="btn btn-ghost btn-sm" style="width:100%" onclick="addProdToProj()"><i class="bi bi-plus-circle"></i> Adicionar Serviço</button>
-          <div id="projProdsList" style="margin-top:6px;border:1px solid var(--border);border-radius:8px;overflow:hidden;display:none"></div>
+        <div class="row2">
+          <div class="fld"><label class="flbl">Etapa (Coluna)</label><select class="inp inp-sm" id="projCol"></select></div>
+          <div class="fld"><label class="flbl">Prazo de Entrega</label><input type="date" class="inp inp-sm" id="projDate"></div>
         </div>
-        <div class="fld"><label class="flbl">Valor Total (R$)</label><input type="number" class="inp inp-sm" id="projValue" step="0.01" oninput="renderPaymentsModal()"></div>
-        <div class="fld d-none" id="clientLinkWrap">
-          <label class="flbl">Link do Painel do Cliente</label>
-          <div class="link-box" id="clientLinkPreview" style="font-size:11px"></div>
-          <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:6px" onclick="copyClientLink()"><i class="bi bi-clipboard"></i> Copiar Link</button>
-        </div>
+        <div class="fld"><label class="flbl">Capa (URL da Imagem)</label><input class="inp inp-sm" id="projImage" placeholder="https://imagem.jpg"></div>
+        <div class="fld"><label class="flbl">Pasta de Arquivos (Link do Drive/Nuvem)</label><input class="inp inp-sm" id="projDriveLink" placeholder="https://drive.google.com/drive/folders/..."></div>
+        <div class="fld"><label class="flbl">Observações do Projeto</label><textarea class="inp" id="projNote" rows="3" placeholder="Dados técnicos, observações de obra..."></textarea></div>
       </div>
+      
       <!-- COL 2 -->
       <div style="border-right:1px solid var(--border);padding-right:18px">
-        <div class="sec">Configurações</div>
-        <div class="row2 fld">
-          <div><label class="flbl">Tipo</label><select class="inp inp-sm" id="projType"><option>Residencial</option><option>Comercial</option><option>Estrutural</option><option>Urbanismo</option><option>Outro</option></select></div>
-          <div><label class="flbl">Prioridade</label><select class="inp inp-sm" id="projPrio"><option value="Alta">🔴 Alta</option><option value="Média">🟡 Média</option><option value="Baixa">🟢 Baixa</option></select></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div class="sec" style="margin:0">Tarefas do Projeto</div>
+          <span class="badge" id="subProgress">0/0</span>
         </div>
-        <div class="row2 fld">
-          <div><label class="flbl">Coluna</label><select class="inp inp-sm" id="projCol"></select></div>
-          <div><label class="flbl">Prazo</label><div style="display:flex;gap:5px;align-items:center"><input type="date" class="inp inp-sm" id="projDate" style="flex:1"><button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('projDate').value=''" title="Remover prazo" style="padding:4px 7px;flex-shrink:0;color:var(--text3)"><i class="bi bi-x-lg"></i></button></div></div>
+        <div style="display:flex;gap:7px;margin-bottom:14px">
+          <input class="inp inp-sm" id="newSubTask" placeholder="Nova tarefa…">
+          <button class="btn btn-primary btn-sm" onclick="addSubtask()">+</button>
         </div>
-        <div class="fld">
-          <label class="flbl">Imagem da Capa</label>
-          <input type="hidden" id="projImage">
-          <div id="imgPreviewWrap" style="display:none;margin-bottom:7px;position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
-            <img id="imgPreview" style="width:100%;height:110px;object-fit:cover;display:block">
-            <button type="button" onclick="removeImage()" style="position:absolute;top:5px;right:5px;background:rgba(0,0,0,.55);border:none;color:#fff;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <label id="imgPickerLabel" style="display:flex;align-items:center;gap:7px;padding:6px 10px;border:1.5px dashed var(--border2);border-radius:var(--r);cursor:pointer;font-size:12.5px;color:var(--text2);transition:border-color .15s;background:var(--surface2)">
-            <i class="bi bi-image" style="font-size:15px;color:var(--accent)"></i>
-            <span id="imgPickerText">Clique para escolher uma imagem…</span>
-            <input type="file" id="projImageFile" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
-          </label>
-          <div id="imgUploadStatus" style="font-size:11.5px;margin-top:5px;display:none"></div>
-        </div>
-        <div class="fld"><label class="flbl">Observação</label><textarea class="inp inp-sm" id="projNote" rows="2"></textarea></div>
-        <div class="fld">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label class="flbl" style="margin-bottom:0">Checklist</label><span id="subProgress" style="font-size:11px;color:var(--text3)">0/0</span></div>
-          <div style="display:flex;gap:6px;margin-bottom:6px"><input class="inp inp-sm" id="newSub" placeholder="Nova tarefa…" onkeypress="if(event.key==='Enter'){event.preventDefault();addSubtask()}"><button class="btn btn-primary btn-sm" onclick="addSubtask()">+</button></div>
-          <div id="subsContainer" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:150px;overflow-y:auto"></div>
-        </div>
+        <div class="subs-box" id="subsContainer"></div>
       </div>
+      
       <!-- COL 3 -->
       <div>
-        <div class="sec">Pagamentos</div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:12.5px">
-          <span id="pagoLbl" style="color:var(--green);font-weight:700">Pago: R$ 0,00</span>
-          <span id="restLbl" style="color:var(--red);font-weight:700">Restante: R$ 0,00</span>
+        <div class="sec">Produtos Vinculados</div>
+        <div style="display:grid;grid-template-columns:1fr 90px 32px;gap:5px;margin-bottom:12px">
+          <input class="inp inp-sm" id="newProdName" placeholder="Serviço…">
+          <input type="number" class="inp inp-sm" id="newProdPrice" placeholder="Valor" step="0.01">
+          <button class="btn btn-primary btn-sm" onclick="addProdToProj()">+</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 40px;gap:6px;margin-bottom:8px">
-          <input type="number" class="inp inp-sm" id="pgVal" placeholder="Valor" step="0.01">
-          <input type="date" class="inp inp-sm" id="pgDate">
-          <button class="btn btn-primary btn-sm" onclick="addPayment()" style="padding:4px 8px">+</button>
+        <div style="border:1px solid var(--border);border-radius:8px;max-height:140px;overflow-y:auto;margin-bottom:18px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <tbody id="projProdsTable"></tbody>
+          </table>
         </div>
-        <div id="paymentsContainer" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:200px;overflow-y:auto">
-          <div style="padding:12px;text-align:center;color:var(--text3);font-size:12px">Nenhum pagamento</div>
+        
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div class="sec" style="margin:0">Financeiro (Pagamentos)</div>
+          <span class="badge b-pago" id="payProgress">R$ 0,00</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 82px 130px 32px;gap:5px;margin-bottom:12px">
+          <input type="number" class="inp inp-sm" id="newPayAmount" placeholder="R$ Recebido" step="0.01">
+          <select class="inp inp-sm" id="newPayMethod" title="Forma de pagamento">
+            <option value="Pix">Pix</option>
+            <option value="Dinheiro">Dinheiro</option>
+            <option value="Cartão">Cartão</option>
+            <option value="Transferência">Transf.</option>
+            <option value="Boleto">Boleto</option>
+            <option value="Outro">Outro</option>
+          </select>
+          <input type="date" class="inp inp-sm" id="newPayDate">
+          <button class="btn btn-primary btn-sm" onclick="addPayment()">+</button>
+        </div>
+        <div class="pays-box" id="paysContainer" style="max-height:120px;overflow-y:auto"></div>
+        <div class="fld" style="margin-top:14px;margin-bottom:0">
+          <label class="flbl">Valor total do contrato</label>
+          <input type="number" class="inp inp-sm" id="projValue" placeholder="0.00" step="0.01">
+          <div style="font-size:11px;color:var(--text3);margin-top:3px"><i class="bi bi-info-circle"></i> Preenchido automaticamente se você adicionar produtos vinculados, mas pode ser editado direto aqui</div>
         </div>
       </div>
     </div>
   </div>
-  <div class="mftr">
-    <button class="btn btn-ghost" onclick="closeProjectModal()">Cancelar</button>
-    <button class="btn btn-primary" onclick="saveProject()"><i class="bi bi-check2"></i> Salvar Projeto</button>
-  </div>
-</div>
-</div>
-
-<!-- ══ CLIENTS MODAL ══ -->
-<div class="overlay" id="clientsOverlay" onclick="if(event.target===this)closeClientsModal()">
-<div class="mbox mxl">
-  <div class="mhdr">
-    <h5 style="color:var(--accent)"><i class="bi bi-people"></i> CRM — Clientes</h5>
-    <button class="btn-icon btn-sm" onclick="closeClientsModal()"><i class="bi bi-x-lg"></i></button>
-  </div>
-  <div class="mbody" style="display:grid;grid-template-columns:250px 1fr;gap:18px">
-    <div>
-      <div class="sec">Novo Cliente</div>
-      <div style="display:flex;gap:7px;margin-bottom:14px"><input class="inp inp-sm" id="newCliName" placeholder="Nome completo"><button class="btn btn-primary btn-sm" onclick="createClient()"><i class="bi bi-person-plus"></i></button></div>
-      <div class="sec">Cadastrados</div>
-      <div id="cliList" style="display:flex;flex-direction:column;gap:3px;max-height:380px;overflow-y:auto"></div>
-    </div>
-    <div id="cliDetail" class="d-none" style="border-left:1px solid var(--border);padding-left:18px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <h6 id="cliDetailName" style="font-size:15px;font-weight:700;color:var(--accent)"></h6>
-        <button class="btn btn-danger btn-sm" id="cliDeleteBtn"><i class="bi bi-trash3"></i> Remover</button>
-      </div>
-      <!-- CONTATO -->
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px">
-        <div class="sec">Contato</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div>
-            <label class="flbl"><i class="bi bi-whatsapp" style="color:#25D366"></i> Telefone (WhatsApp)</label>
-            <input class="inp inp-sm" id="cliPhone" placeholder="(11) 99999-9999">
-          </div>
-          <div>
-            <label class="flbl"><i class="bi bi-geo-alt" style="color:var(--accent)"></i> Endereço</label>
-            <input class="inp inp-sm" id="cliAddress" placeholder="Rua, número, cidade">
-          </div>
-        </div>
-        <button class="btn btn-ghost btn-sm" style="width:100%" onclick="saveClientContact()"><i class="bi bi-check2"></i> Salvar Contato</button>
-        <div id="contactOkMsg" class="d-none" style="font-size:12px;color:var(--green);margin-top:6px;text-align:center"><i class="bi bi-check-circle"></i> Salvo!</div>
-      </div>
-      <!-- TOKEN -->
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px">
-        <div class="sec">🔑 Token de Acesso</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Senha do painel do cliente (sem espaços ou &amp;?#)</p>
-        <div style="display:grid;grid-template-columns:1fr auto auto;gap:7px">
-          <input class="inp inp-sm" id="cliToken" placeholder="Ex: joao2025" style="font-family:'Courier New',monospace;letter-spacing:1px">
-          <button class="btn btn-primary btn-sm" onclick="saveToken()"><i class="bi bi-check2-circle"></i> Salvar</button>
-          <button class="btn btn-ghost btn-sm" onclick="genToken()" title="Gerar aleatório"><i class="bi bi-arrow-clockwise"></i></button>
-        </div>
-        <div id="tokenOkMsg" class="d-none" style="font-size:12px;color:var(--green);margin-top:6px"><i class="bi bi-check-circle"></i> Token salvo!</div>
-      </div>
-      <div style="margin-bottom:14px">
-        <div class="sec">🔗 Link do Painel</div>
-        <div class="link-box" id="cliLinkBox"></div>
-        <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:7px" onclick="copyCliLink()"><i class="bi bi-clipboard"></i> Copiar Link</button>
-      </div>
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
-        <div class="sec">Adicionar Serviço</div>
-        <div style="display:grid;grid-template-columns:1fr 110px 36px;gap:6px">
-          <input class="inp inp-sm" id="newProdName" placeholder="Nome do serviço">
-          <input type="number" class="inp inp-sm" id="newProdPrice" placeholder="R$ Valor" step="0.01">
-          <button class="btn btn-primary btn-sm" onclick="addProdToCli()">+</button>
-        </div>
-      </div>
-      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr style="background:var(--surface2)">
-            <th style="padding:7px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);text-align:left">Serviço</th>
-            <th style="padding:7px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);text-align:left;width:120px">Preço</th>
-            <th style="width:70px"></th>
-          </tr></thead>
-          <tbody id="cliProdTable"></tbody>
-        </table>
-      </div>
-    </div>
-    <div id="cliPlaceholder" style="border-left:1px solid var(--border);padding-left:18px;display:flex;align-items:center;justify-content:center;color:var(--text3);flex-direction:column;gap:8px">
-      <i class="bi bi-arrow-left-circle" style="font-size:2rem"></i>
-      <span style="font-size:13px">Selecione um cliente</span>
+  <div class="mftr" style="display:flex;justify-content:space-between">
+    <button class="btn btn-danger" id="btnDelProj" onclick="deleteCurrentProject()" style="display:none">Excluir</button>
+    <div style="display:flex;gap:7px;margin-left:auto">
+      <button class="btn btn-ghost" id="btnArchProj" onclick="archiveCurrentProject()">Arquivar</button>
+      <button class="btn btn-ghost" onclick="closeProjectModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveProject()"><i class="bi bi-check2"></i> Salvar</button>
     </div>
   </div>
-</div>
-</div>
-
-<!-- ══ ARCHIVE MODAL ══ -->
-<div class="overlay" id="archiveOverlay" onclick="if(event.target===this)closeArchiveModal()">
-<div class="mbox mlg">
-  <div class="mhdr"><h5><i class="bi bi-archive"></i> Arquivados</h5><button class="btn-icon btn-sm" onclick="closeArchiveModal()"><i class="bi bi-x-lg"></i></button></div>
-  <div class="mbody" style="padding:0"><div id="archiveList"></div></div>
-</div>
-</div>
-
-<!-- ══ MANAGE COLUMNS ══ -->
-<div class="overlay" id="colsOverlay" onclick="if(event.target===this)closeManageColumnsModal()">
-<div class="mbox mmd">
-  <div class="mhdr"><h5><i class="bi bi-kanban"></i> Gerenciar Colunas</h5><button class="btn-icon btn-sm" onclick="closeManageColumnsModal()"><i class="bi bi-x-lg"></i></button></div>
-  <div class="mbody">
-    <div id="colManagerList" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
-    <button class="btn btn-ghost btn-sm" style="width:100%" onclick="addColInput()"><i class="bi bi-plus"></i> Nova Coluna</button>
-  </div>
-  <div class="mftr"><button class="btn btn-ghost" onclick="closeManageColumnsModal()">Cancelar</button><button class="btn btn-primary" onclick="saveColumnsConfig()">Salvar</button></div>
 </div>
 </div>
 
 <!-- ══ NOTIFY MODAL ══ -->
 <div class="overlay" id="notifyOverlay" onclick="if(event.target===this)closeNotifyModal()">
 <div class="mbox mmd">
-  <div class="mhdr"><h5 style="color:var(--green)"><i class="bi bi-bell"></i> Enviar Aviso ao Cliente</h5><button class="btn-icon btn-sm" onclick="closeNotifyModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mhdr"><h5><i class="bi bi-bell"></i> Enviar Aviso ao Painel</h5><button class="btn-icon btn-sm" onclick="closeNotifyModal()"><i class="bi bi-x-lg"></i></button></div>
   <div class="mbody">
     <div class="fld"><label class="flbl">Projeto / Cliente</label><div id="notifyInfo" style="font-size:14px;font-weight:600;padding:8px 10px;background:var(--surface2);border-radius:8px"></div></div>
     <div class="fld"><label class="flbl">Título do Aviso *</label><input class="inp inp-sm" id="notifyTitle" placeholder="Ex: Andamento do Projeto"></div>
     <div class="fld">
-      <label class="flbl">Mensagens rápidas</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <label class="flbl" style="margin:0">Mensagens rápidas</label>
+        <button class="btn-icon btn-sm" onclick="openManageQuickMsgsModal()" title="Gerenciar mensagens rápidas"><i class="bi bi-sliders"></i></button>
+      </div>
       <div style="display:flex;flex-wrap:wrap;gap:6px" id="quickMsgs"></div>
     </div>
     <div class="fld"><label class="flbl">Mensagem *</label><textarea class="inp" id="notifyMsg" rows="4" placeholder="Escreva o aviso que o cliente verá no painel…"></textarea></div>
   </div>
   <div class="mftr"><button class="btn btn-ghost" onclick="closeNotifyModal()">Cancelar</button><button class="btn btn-success" onclick="sendNotification()"><i class="bi bi-send"></i> Enviar Aviso</button></div>
+</div>
+</div>
+
+<!-- ══ GERENCIAR MENSAGENS RÁPIDAS ══ -->
+<div class="overlay" id="qmOverlay" onclick="if(event.target===this)closeManageQuickMsgsModal()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-chat-dots"></i> Mensagens Rápidas</h5><button class="btn-icon btn-sm" onclick="closeManageQuickMsgsModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody">
+    <div style="display:flex;flex-direction:column;gap:10px" id="qmManagerList"></div>
+    <button class="btn btn-ghost btn-sm mt-3" onclick="addQuickMsgInput()"><i class="bi bi-plus-lg"></i> Nova Mensagem Rápida</button>
+  </div>
+  <div class="mftr">
+    <button class="btn btn-ghost" onclick="closeManageQuickMsgsModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveQuickMsgs()"><i class="bi bi-check2"></i> Salvar Alterações</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ COLUMNS OVERLAY ══ -->
+<div class="overlay" id="colsOverlay" onclick="if(event.target===this)closeManageColumnsModal()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5><i class="bi bi-gear"></i> Configurar Colunas</h5><button class="btn-icon btn-sm" onclick="closeManageColumnsModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody">
+    <div style="display:flex;flex-direction:column;gap:8px" id="colManagerList"></div>
+    <button class="btn btn-ghost btn-sm mt-3" onclick="addColInput()"><i class="bi bi-plus-lg"></i> Nova Coluna</button>
+  </div>
+  <div class="mftr"><button class="btn btn-ghost" onclick="closeManageColumnsModal()">Cancelar</button><button class="btn btn-primary" onclick="saveColumnsConfig()">Salvar Alterações</button></div>
 </div>
 </div>
 
@@ -317,16 +253,31 @@
         <div class="fld"><label class="flbl">Titular</label><input class="inp inp-sm" id="pixName" placeholder="Nome do titular"></div>
         <div class="fld"><label class="flbl">Banco / Instituição</label><input class="inp inp-sm" id="pixBank" placeholder="Ex: Nu Pagamentos"></div>
       </div>
-      <div class="st-hint"><i class="bi bi-info-circle"></i> Usado ao incluir dados de PIX nas mensagens de WhatsApp</div>
     </div>
     <div class="stgrp">
       <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
       <div class="fld">
         <label class="flbl">Template de Mensagem</label>
-        <textarea class="inp" id="waTemplate" rows="5" placeholder="Digite o template..." style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
+        <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
       </div>
-      <div class="st-hint">
-        <i class="bi bi-info-circle"></i> <b>Tags:</b> {Cliente}, {Projeto}, {Etapa}, {Prazo}, {ValorTotal}, {ValorPago}, {SaldoPendente}, {Observacao}, {TarefaAtual}, {LinkPainel}, {DadosPix}
+    </div>
+    <div class="stgrp">
+      <div class="sec"><i class="bi bi-building"></i> Dados do Emissor (para Recibos e Orçamentos)</div>
+      <div class="fld">
+        <label class="flbl">Nome / Razão Social</label>
+        <input class="inp inp-sm" id="companyName" placeholder="Ex: Victor Lourenço Pereira Ltda">
+      </div>
+      <div class="fld">
+        <label class="flbl">CPF / CNPJ do Emissor</label>
+        <input class="inp inp-sm" id="companyDoc" placeholder="Ex: 350.605.018-41" oninput="maskDocInput(this)" onblur="checkDocValidity(this)">
+      </div>
+      <div class="fld">
+        <label class="flbl">E-mail do Emissor</label>
+        <input class="inp inp-sm" id="companyEmail" placeholder="Ex: projetos.mavic@hotmail.com">
+      </div>
+      <div class="fld">
+        <label class="flbl">Instagram do Emissor</label>
+        <input class="inp inp-sm" id="companyInsta" placeholder="Ex: @mavic.arquitetuta">
       </div>
     </div>
     <div class="stgrp">
@@ -337,7 +288,7 @@
       <div class="st-row"><span style="color:var(--text2)">Versão</span><strong style="color:var(--accent)">MAVIC v3.1</strong></div>
     </div>
   </div>
-  <div class="mftr"><button class="btn btn-ghost" onclick="closeSettings()">Cancelar</button><button class="btn btn-primary" onclick="saveSettings()"><i class="bi bi-check2"></i> Salvar</button></div>
+  <div class="mftr"><button class="btn btn-ghost" onclick="closeSettings()">Cancelar</button><button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>
 </div>
 </div>
 
@@ -349,12 +300,10 @@
     <button class="btn-icon btn-sm" onclick="closeGlobalNoticeModal()"><i class="bi bi-x-lg"></i></button>
   </div>
   <div class="mbody" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-    <!-- COL 1: Avisos existentes -->
     <div style="display:flex;flex-direction:column">
       <div class="sec" style="margin-bottom:10px">Avisos enviados</div>
       <div id="gnList" style="display:flex;flex-direction:column;gap:6px;height:460px;overflow-y:auto;padding-right:6px"></div>
     </div>
-    <!-- COL 2: Novo aviso -->
     <div style="border-left:1px solid var(--border);padding-left:20px">
       <div class="sec" style="margin-bottom:10px">Novo Aviso</div>
       <div class="fld" style="display:flex;align-items:center;justify-content:space-between">
@@ -371,32 +320,39 @@
       <div class="fld">
         <label class="flbl">Mensagem *</label>
         <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
-          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')" title="Negrito"><b>N</b></button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')" title="Itálico"><i>I</i></button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n')" title="Quebra de linha">↵ Linha</button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')" title="Tópico">• Tópico</button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n\n')" title="Parágrafo">¶ Parágrafo</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')"><b>N</b></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')"><i>I</i></button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n')">↵ Linha</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')">• Tópico</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\n\n')">¶ Parágrafo</button>
         </div>
-        <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Ex: Escritório em recesso de 20/12 a 05/01.&#10;&#10;Use os botões acima para formatar."></textarea>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px"><i class="bi bi-info-circle"></i> *negrito* · _itálico_ · Enter = nova linha</div>
+        <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Use os botões acima para formatar."></textarea>
       </div>
       <div class="fld">
         <label class="flbl">Destinatários</label>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:6px">
-            <input type="checkbox" id="gnAllClients" checked onchange="toggleGnAllClients()" style="accent-color:var(--accent);width:14px;height:14px">
+            <input type="checkbox" id="gnAllClients" checked onchange="toggleGnAllClients()">
             <span>Todos os clientes</span>
           </label>
           <div id="gnClientsContainer" style="display:none;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto"></div>
         </div>
       </div>
       <div id="gnPreview" style="display:none;background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:10px;padding:11px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--yellow);margin-bottom:4px"><i class="bi bi-megaphone"></i> Prévia:</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--yellow);margin-bottom:4px"><i class="bi bi-megaphone"></i> Prévia:</div>
         <div id="gnPreviewText" style="font-size:13px;font-weight:500;color:var(--text);line-height:1.6"></div>
       </div>
       <button class="btn btn-primary" style="width:100%" onclick="saveGlobalNotice()"><i class="bi bi-megaphone"></i> Publicar Aviso</button>
     </div>
   </div>
+</div>
+</div>
+
+<!-- ══ ARCHIVE MODAL ══ -->
+<div class="overlay" id="archiveOverlay" onclick="if(event.target===this)closeArchiveModal()">
+<div class="mbox mmd">
+  <div class="mhdr"><h5><i class="bi bi-archive"></i> Projetos Arquivados</h5><button class="btn-icon btn-sm" onclick="closeArchiveModal()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="mbody" id="archiveList" style="max-height:400px;overflow-y:auto"></div>
 </div>
 </div>
 
@@ -411,7 +367,7 @@
     <div class="fld">
       <label class="flbl"><i class="bi bi-telephone" style="color:#25D366"></i> Número do WhatsApp</label>
       <div style="display:flex;gap:7px;align-items:center">
-        <span style="padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);font-size:13px;color:var(--text2);white-space:nowrap">+55</span>
+        <span style="padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text2);white-space:nowrap">+55</span>
         <input class="inp inp-sm" id="waPhone" placeholder="(11) 99999-9999" style="flex:1">
       </div>
       <div style="font-size:11.5px;color:var(--text3);margin-top:4px"><i class="bi bi-info-circle"></i> Deixe vazio para escolher o contato no WhatsApp</div>
@@ -453,11 +409,49 @@
 </div>
 </div>
 
-<script src="app.js"></script>
+<nav class="mtab-bar" id="mtabBar">
+  <a class="mtab-item active" href="index.html" title="Board" aria-label="Board"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
+  <a class="mtab-item" href="dashboard.html" title="Dashboard" aria-label="Dashboard"><span class="mtab-bubble"><i class="bi bi-speedometer2"></i></span></a>
+  <a class="mtab-item" href="orcamento.html" title="Orçamentos" aria-label="Orçamentos"><span class="mtab-bubble"><i class="bi bi-file-earmark-spreadsheet"></i></span></a>
+  <a class="mtab-item" href="pagamentos.html" title="Pagamentos" aria-label="Pagamentos"><span class="mtab-bubble"><i class="bi bi-credit-card"></i></span></a>
+  <a class="mtab-item" href="relatorio.html" title="Relatórios" aria-label="Relatórios"><span class="mtab-bubble"><i class="bi bi-graph-up-arrow"></i></span></a>
+  <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
+</nav>
+
+<script src="common.js"></script>
+<script src="board.js"></script>
 <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+  // Board column popover selector helper
+  function toggleColsMenu() {
+    document.getElementById('colsMenu').classList.toggle('open');
+    renderColsMenu();
   }
+  function closeColsMenu() {
+    document.getElementById('colsMenu').classList.remove('open');
+  }
+  function renderColsMenu() {
+    const list = document.getElementById('colMenuItems');
+    list.innerHTML = appColumns.map(c => {
+      const active = visibleColumns.includes(c.id);
+      return `<button class="${active ? 'on' : ''}" onclick="toggleColVisibility('${c.id}'); event.stopPropagation()">${active ? '<i class="bi bi-check2 me-1"></i>' : ''} ${c.id}</button>`;
+    }).join('');
+  }
+  function toggleColVisibility(colId) {
+    if (visibleColumns.includes(colId)) {
+      if (visibleColumns.length <= 1) return showToast('Ao menos uma coluna deve estar visível!', 'warning');
+      visibleColumns = visibleColumns.filter(c => c !== colId);
+    } else {
+      visibleColumns.push(colId);
+    }
+    renderBoard();
+    renderColsMenu();
+    scheduleSync();
+  }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#colsMenu') && !e.target.closest('button[onclick="toggleColsMenu()"]')) {
+      closeColsMenu();
+    }
+  });
 </script>
 </body>
 </html>

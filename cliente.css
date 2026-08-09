@@ -43,9 +43,7 @@ html,body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-syst
 .kcard-avatar{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:.3px;box-shadow:0 0 0 2px var(--surface)}
 .kcard-prog-bar{height:3px;width:100%;background:var(--border)}
 .kcard-prog-fill{height:100%;transition:width .4s ease;border-radius:0}
-.kcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:14px 0 0 14px}
-.kcard.t-Residencial::before{background:var(--blue)}.kcard.t-Comercial::before{background:var(--purple)}
-.kcard.t-Estrutural::before{background:var(--yellow)}.kcard.t-Urbanismo::before{background:var(--teal)}.kcard.t-Outro::before{background:var(--text3)}
+.kcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:14px 0 0 14px;background:var(--type-color,var(--text3))}
 .kcard-cover{width:100%;height:120px;object-fit:cover;border-bottom:1px solid var(--border)}
 .kcard-body{padding:14px 14px 8px 18px}
 .kcard-name{font-weight:700;font-size:16px;line-height:1.3;margin-bottom:3px;color:var(--text)}
@@ -269,5 +267,97 @@ html,body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-syst
 .spinning {
   animation: spin360 0.8s linear infinite;
   display: inline-block;
+}
+
+.toast-wrap{position:fixed;bottom:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:7px}
+.toast{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-size:13px;font-weight:500;box-shadow:var(--sh3);display:flex;align-items:center;gap:8px;transform:translateX(110%);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);max-width:300px}
+.toast.show{transform:translateX(0);opacity:1}
+
+/* ==========================================
+   RECIBO (PDF) — mesmo layout usado no admin
+   ========================================== */
+.receipt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #222;
+  padding-bottom: 15px;
+  margin-bottom: 25px;
+}
+.receipt-logo-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.receipt-logo {
+  height: 40px;
+  object-fit: contain;
+}
+.receipt-brand-text {
+  font-size: 20px;
+  font-weight: 800;
+  color: #111;
+  letter-spacing: 0.5px;
+}
+.receipt-title-box {
+  text-align: right;
+}
+.receipt-title {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0;
+  color: #111;
+}
+.receipt-number {
+  font-size: 11px;
+  color: #555;
+  font-family: monospace;
+  margin-top: 2px;
+}
+.receipt-value-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin-bottom: 25px;
+}
+.receipt-val-lbl {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4b5563;
+}
+.receipt-val-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: #111;
+  font-family: 'Courier New', monospace;
+}
+.receipt-body {
+  font-size: 14.5px;
+  color: #1f2937;
+  margin-bottom: 40px;
+}
+.receipt-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 50px;
+}
+.receipt-signature-line {
+  width: 260px;
+  border-top: 1.5px solid #111;
+  margin-bottom: 8px;
+}
+.receipt-emissor-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #111;
+}
+.receipt-emissor-doc {
+  font-size: 11.5px;
+  color: #4b5563;
 }
 

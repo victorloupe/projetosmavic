@@ -23,6 +23,27 @@ function initPage() {
   renderRelatorios();
 }
 
+function filterProjectsByPeriod(projs, yearFilter, monthFilter) {
+  if (!yearFilter && !monthFilter) return projs;
+  return projs.filter(p => {
+    let pYear = '';
+    let pMonth = '';
+    if (p.createdAt) {
+      const d = new Date(p.createdAt);
+      pYear = String(d.getFullYear());
+      pMonth = String(d.getMonth() + 1).padStart(2, '0');
+    } else if (p.date) {
+      pYear = p.date.substring(0, 4);
+      pMonth = p.date.substring(5, 7);
+    } else {
+      return false;
+    }
+    const matchYear = !yearFilter || pYear === yearFilter;
+    const matchMonth = !monthFilter || pMonth === monthFilter;
+    return matchYear && matchMonth;
+  });
+}
+
 function renderRelatorios() {
   const clientFilter = document.getElementById('fRepClient').value;
   const yearFilter = document.getElementById('fRepYear').value;
@@ -51,15 +72,7 @@ function renderRelatorios() {
     filteredBudgets = [];
   }
   
-  let billingProjects = filteredProjects;
-  if (yearFilter || monthFilter) {
-    billingProjects = filteredProjects.filter(p => {
-      if (!p.date) return false;
-      const matchYear = !yearFilter || p.date.startsWith(yearFilter);
-      const matchMonth = !monthFilter || p.date.substring(5, 7) === monthFilter;
-      return matchYear && matchMonth;
-    });
-  }
+  let billingProjects = filterProjectsByPeriod(filteredProjects, yearFilter, monthFilter);
   const totalBilled = billingProjects.reduce((s, p) => s + parseFloat(p.value || 0), 0);
   
   // Received sum calculation
@@ -133,7 +146,6 @@ function initMonthlyRevenueChart(clientFilter, yearFilter, typeFilter, stageFilt
     const pays = Array.isArray(p.payments) ? p.payments : [];
     pays.forEach(pay => {
       if (pay.date) {
-        if (monthFilter && pay.date.substring(5, 7) !== monthFilter) return;
         const payMonthKey = pay.date.substring(0, 7);
         const found = last6Months.find(m => m.key === payMonthKey);
         if (found) {
@@ -204,12 +216,7 @@ function initProjectStatusChart(clientFilter, yearFilter, typeFilter, stageFilte
   if (clientFilter) {
     active = active.filter(p => p.client === clientFilter);
   }
-  if (yearFilter) {
-    active = active.filter(p => p.date && p.date.startsWith(yearFilter));
-  }
-  if (monthFilter) {
-    active = active.filter(p => p.date && p.date.substring(5, 7) === monthFilter);
-  }
+  active = filterProjectsByPeriod(active, yearFilter, monthFilter);
   if (typeFilter) {
     active = active.filter(p => p.type === typeFilter);
   }
@@ -277,12 +284,7 @@ function initProjectTypesChart(clientFilter, yearFilter, typeFilter, stageFilter
   if (clientFilter) {
     active = active.filter(p => p.client === clientFilter);
   }
-  if (yearFilter) {
-    active = active.filter(p => p.date && p.date.startsWith(yearFilter));
-  }
-  if (monthFilter) {
-    active = active.filter(p => p.date && p.date.substring(5, 7) === monthFilter);
-  }
+  active = filterProjectsByPeriod(active, yearFilter, monthFilter);
   if (typeFilter) {
     active = active.filter(p => p.type === typeFilter);
   }

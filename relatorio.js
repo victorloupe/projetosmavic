@@ -51,9 +51,21 @@ function renderRelatorios() {
   const typeFilter = document.getElementById('fRepType').value;
   const stageFilter = document.getElementById('fRepStage').value;
   const priorityFilter = document.getElementById('fRepPriority').value;
+  const srch = document.getElementById('srchRep')?.value.toLowerCase().trim() || '';
   
   let filteredProjects = projects.filter(p => !p.archived);
   let filteredBudgets = [...budgets];
+
+  if (srch) {
+    filteredProjects = filteredProjects.filter(p => 
+      (p.name && p.name.toLowerCase().includes(srch)) || 
+      (p.client && p.client.toLowerCase().includes(srch))
+    );
+    filteredBudgets = filteredBudgets.filter(b => 
+      (b.title && b.title.toLowerCase().includes(srch)) || 
+      (b.client && b.client.toLowerCase().includes(srch))
+    );
+  }
   
   if (clientFilter) {
     filteredProjects = filteredProjects.filter(p => p.client === clientFilter);

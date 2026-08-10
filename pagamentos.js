@@ -181,7 +181,7 @@ function handleDirectPayClientChange() {
 
 function saveDirectPayment() {
   const isNew = document.getElementById('directPayNewMode')?.checked;
-  const amount = parseFloat(document.getElementById('directPayAmount').value);
+  const amount = parseCurrencyInput(document.getElementById('directPayAmount').value);
   const date = document.getElementById('directPayDate').value;
   const method = document.getElementById('directPayMethod')?.value || 'Pix';
 

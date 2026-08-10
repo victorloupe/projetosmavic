@@ -171,10 +171,56 @@ function showToast(msg,type='success'){
   const ic={success:'bi-check-circle',warning:'bi-exclamation-circle',error:'bi-x-circle',info:'bi-info-circle'};
   const cl={success:'var(--green)',warning:'var(--yellow)',error:'var(--red)',info:'var(--blue)'};
   const t=document.createElement('div');t.className='toast';
-  t.innerHTML=`<i class="bi ${ic[type]||ic.success}" style="color:${cl[type]||cl.success}"></i><span>${msg}</span>`;
+  t.style.cursor = 'pointer';
+  t.style.position = 'relative';
+  t.style.overflow = 'hidden';
+  t.innerHTML=`<i class="bi ${ic[type]||ic.success}" style="color:${cl[type]||cl.success}"></i>
+               <span>${msg}</span>
+               <div class="toast-progress" style="position:absolute;bottom:0;left:0;height:3px;background:${cl[type]||cl.success};width:100%;transition:width 2.8s linear;"></div>`;
+  
+  let timer = setTimeout(()=>{
+    t.classList.remove('show');
+    setTimeout(()=>t.remove(),400);
+  }, 2800);
+
+  t.onclick=()=>{
+    clearTimeout(timer);
+    t.classList.remove('show');
+    setTimeout(()=>t.remove(),400);
+  };
+
+  t.onmouseenter=()=>{
+    clearTimeout(timer);
+    const prog = t.querySelector('.toast-progress');
+    if (prog) {
+      const curWidth = prog.getBoundingClientRect().width;
+      prog.style.transition = 'none';
+      prog.style.width = curWidth + 'px';
+    }
+  };
+
+  t.onmouseleave=()=>{
+    const prog = t.querySelector('.toast-progress');
+    if (prog) {
+      prog.style.transition = 'width 2.8s linear';
+      prog.style.width = '0%';
+    }
+    timer = setTimeout(()=>{
+      t.classList.remove('show');
+      setTimeout(()=>t.remove(),400);
+    }, 2800);
+  };
+
   wrap.appendChild(t);
-  requestAnimationFrame(()=>requestAnimationFrame(()=>t.classList.add('show')));
-  setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),400);},2800);
+  t.offsetHeight; 
+  
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    t.classList.add('show');
+    const prog = t.querySelector('.toast-progress');
+    if (prog) {
+      prog.style.width = '0%';
+    }
+  }));
 }
 
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
@@ -401,8 +447,9 @@ function createCardHTML(p, cardIdx=0){
   const isCurrent = (sId) => currSubs.some(cs => cs.id === sId);
 
   // Timeline
-  const currentIdx = appColumns.findIndex(c => c.id === p.column);
-  const stepsHtml = appColumns.map((col, idx) => {
+  const visibleCols = appColumns.filter(c => !isHiddenColumn(c.id));
+  const currentIdx = visibleCols.findIndex(c => c.id === p.column);
+  const stepsHtml = visibleCols.map((col, idx) => {
     let stepCls = 'step-pending';
     let stepIcon = `<span class="step-num">${idx + 1}</span>`;
     if (idx < currentIdx) {

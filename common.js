@@ -381,10 +381,56 @@ function showToast(msg,type='success'){
   const ic={success:'bi-check-circle',warning:'bi-exclamation-circle',error:'bi-x-circle',info:'bi-info-circle'};
   const cl={success:'var(--green)',warning:'var(--yellow)',error:'var(--red)',info:'var(--blue)'};
   const t=document.createElement('div');t.className='toast';
-  t.innerHTML=`<i class="bi ${ic[type]||ic.success}" style="color:${cl[type]||cl.success}"></i><span>${msg}</span>`;
+  t.style.cursor = 'pointer';
+  t.style.position = 'relative';
+  t.style.overflow = 'hidden';
+  t.innerHTML=`<i class="bi ${ic[type]||ic.success}" style="color:${cl[type]||cl.success}"></i>
+               <span>${msg}</span>
+               <div class="toast-progress" style="position:absolute;bottom:0;left:0;height:3px;background:${cl[type]||cl.success};width:100%;transition:width 2.8s linear;"></div>`;
+  
+  let timer = setTimeout(()=>{
+    t.classList.remove('show');
+    setTimeout(()=>t.remove(),400);
+  }, 2800);
+
+  t.onclick=()=>{
+    clearTimeout(timer);
+    t.classList.remove('show');
+    setTimeout(()=>t.remove(),400);
+  };
+
+  t.onmouseenter=()=>{
+    clearTimeout(timer);
+    const prog = t.querySelector('.toast-progress');
+    if (prog) {
+      const curWidth = prog.getBoundingClientRect().width;
+      prog.style.transition = 'none';
+      prog.style.width = curWidth + 'px';
+    }
+  };
+
+  t.onmouseleave=()=>{
+    const prog = t.querySelector('.toast-progress');
+    if (prog) {
+      prog.style.transition = 'width 2.8s linear';
+      prog.style.width = '0%';
+    }
+    timer = setTimeout(()=>{
+      t.classList.remove('show');
+      setTimeout(()=>t.remove(),400);
+    }, 2800);
+  };
+
   wrap.appendChild(t);
-  requestAnimationFrame(()=>requestAnimationFrame(()=>t.classList.add('show')));
-  setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),400);},2800);
+  t.offsetHeight; 
+  
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    t.classList.add('show');
+    const prog = t.querySelector('.toast-progress');
+    if (prog) {
+      prog.style.width = '0%';
+    }
+  }));
 }
 
 // ══════════════════════════════════════════
@@ -611,9 +657,38 @@ function openSettings(){
   document.getElementById('stCliCnt').textContent=clients.length;
   document.getElementById('settingsOverlay').classList.add('open');
 }
-function closeSettings(){
+function hasSettingsChanges() {
+  const clientUrl = document.getElementById('clientUrl')?.value.trim() || 'cliente.html';
+  const pixKey = document.getElementById('pixKey')?.value.trim() || '';
+  const pixName = document.getElementById('pixName')?.value.trim() || '';
+  const pixBank = document.getElementById('pixBank')?.value.trim() || '';
+  const waTemplate = document.getElementById('waTemplate')?.value.trim() || '';
+  const companyName = document.getElementById('companyName')?.value.trim() || '';
+  const companyDoc = document.getElementById('companyDoc')?.value.trim() || '';
+  const companyEmail = document.getElementById('companyEmail')?.value.trim() || '';
+  const companyInsta = document.getElementById('companyInsta')?.value.trim() || '';
+
+  return clientUrl !== (localStorage.getItem('mavic_clientUrl') || 'cliente.html') ||
+         pixKey !== (localStorage.getItem('mavic_pixKey') || '') ||
+         pixName !== (localStorage.getItem('mavic_pixName') || '') ||
+         pixBank !== (localStorage.getItem('mavic_pixBank') || '') ||
+         waTemplate !== (localStorage.getItem('mavic_waTemplate') || '') ||
+         companyName !== (localStorage.getItem('mavic_companyName') || '') ||
+         companyDoc !== (localStorage.getItem('mavic_companyDoc') || '') ||
+         companyEmail !== (localStorage.getItem('mavic_companyEmail') || '') ||
+         companyInsta !== (localStorage.getItem('mavic_companyInsta') || '');
+}
+
+function closeSettings(confirmIfDirty = false){
   const el=document.getElementById('settingsOverlay');
-  if(el) el.classList.remove('open');
+  if(!el) return;
+  if(confirmIfDirty && hasSettingsChanges()){
+    showConfirm('Deseja descartar as alterações não salvas nas configurações?', () => {
+      el.classList.remove('open');
+    }, { title: 'Descartar alterações?', okText: 'Descartar', danger: true });
+  } else {
+    el.classList.remove('open');
+  }
 }
 function saveSettings(){
   const cUrl=document.getElementById('clientUrl').value.trim()||'cliente.html';
@@ -998,3 +1073,110 @@ window.addEventListener('online', async () => {
   showToast('Conexão restabelecida — sincronizando…', 'success');
   await reloadPageData();
 });
+
+// ══════════════════════════════════════════
+//  MÁSCARA DE MOEDA BRL (GLOBAL)
+// ══════════════════════════════════════════
+function maskCurrencyInput(el) {
+  let digits = el.value.replace(/\D/g, '');
+  if (!digits) { el.value = ''; return; }
+  digits = digits.replace(/^0+(?=\d)/, '');
+  while (digits.length < 3) digits = '0' + digits;
+  const cents = digits.slice(-2);
+  const intFormatted = digits.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  el.value = `${intFormatted},${cents}`;
+}
+function parseCurrencyInput(str) {
+  if (!str) return 0;
+  const clean = String(str).replace(/\./g, '').replace(',', '.');
+  return parseFloat(clean) || 0;
+}
+function toBRLInputStr(num) {
+  const cents = Math.round((parseFloat(num) || 0) * 100).toString().padStart(3, '0');
+  const intFormatted = cents.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${intFormatted},${cents.slice(-2)}`;
+}
+
+// ══════════════════════════════════════════
+//  BACKUP E RESTAURAÇÃO DE DADOS (JSON)
+// ══════════════════════════════════════════
+function exportBackup() {
+  const data = {
+    projects,
+    clients,
+    notifications,
+    global_notices: globalNotices,
+    budgets,
+    config: {
+      columns: appColumns,
+      visibleColumns,
+      minimizedColumns,
+      noteTemplates,
+      quickMsgs,
+      projectTypes,
+      waTemplate: localStorage.getItem('mavic_waTemplate'),
+      companyName: localStorage.getItem('mavic_companyName'),
+      companyDoc: localStorage.getItem('mavic_companyDoc'),
+      pixKey: localStorage.getItem('mavic_pixKey'),
+      pixName: localStorage.getItem('mavic_pixName'),
+      pixBank: localStorage.getItem('mavic_pixBank')
+    }
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup_mavic_${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Backup exportado com sucesso!', 'success');
+}
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      const projs = data.projects;
+      const clis = data.clients;
+      if (!projs || !clis) {
+        showToast('Formato de arquivo inválido!', 'error');
+        return;
+      }
+      showConfirm('Deseja realmente restaurar este backup? Isso substituirá todos os dados atuais (localmente e na nuvem).', () => {
+        projects = projs;
+        clients = clis;
+        notifications = data.notifications || [];
+        globalNotices = data.global_notices || data.globalNotices || [];
+        budgets = data.budgets || [];
+        if (data.config) {
+          const cfg = data.config;
+          if (cfg.columns) appColumns = cfg.columns;
+          if (cfg.visibleColumns) visibleColumns = cfg.visibleColumns;
+          if (cfg.minimizedColumns) minimizedColumns = cfg.minimizedColumns;
+          if (cfg.noteTemplates) noteTemplates = cfg.noteTemplates;
+          if (cfg.quickMsgs) quickMsgs = cfg.quickMsgs;
+          if (cfg.projectTypes) projectTypes = cfg.projectTypes;
+          if (cfg.waTemplate !== undefined) localStorage.setItem('mavic_waTemplate', cfg.waTemplate);
+          if (cfg.companyName !== undefined) localStorage.setItem('mavic_companyName', cfg.companyName);
+          if (cfg.companyDoc !== undefined) localStorage.setItem('mavic_companyDoc', cfg.companyDoc);
+          if (cfg.pixKey !== undefined) localStorage.setItem('mavic_pixKey', cfg.pixKey);
+          if (cfg.pixName !== undefined) localStorage.setItem('mavic_pixName', cfg.pixName);
+          if (cfg.pixBank !== undefined) localStorage.setItem('mavic_pixBank', cfg.pixBank);
+        }
+        scheduleSync();
+        renderCurrentPage();
+        showToast('Backup restaurado com sucesso!', 'success');
+      });
+    } catch (err) {
+      showToast('Erro ao ler arquivo de backup!', 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+

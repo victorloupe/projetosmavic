@@ -95,26 +95,7 @@ function ensureOrcClient() {
 
 // ══════════════════════════════════════════
 //  MÁSCARA DE MOEDA (R$)
-// ══════════════════════════════════════════
-function maskCurrencyInput(el) {
-  let digits = el.value.replace(/\D/g, '');
-  if (!digits) { el.value = ''; return; }
-  digits = digits.replace(/^0+(?=\d)/, '');
-  while (digits.length < 3) digits = '0' + digits;
-  const cents = digits.slice(-2);
-  const intFormatted = digits.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  el.value = `${intFormatted},${cents}`;
-}
-function parseCurrencyInput(str) {
-  if (!str) return 0;
-  const clean = String(str).replace(/\./g, '').replace(',', '.');
-  return parseFloat(clean) || 0;
-}
-function toBRLInputStr(num) {
-  const cents = Math.round((parseFloat(num) || 0) * 100).toString().padStart(3, '0');
-  const intFormatted = cents.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return `${intFormatted},${cents.slice(-2)}`;
-}
+// MÁSCARA DE MOEDA BRL carregada globalmente de common.js
 
 function openOrcamentoModal(id = null) {
   if (!document.getElementById('orcClient')) return;

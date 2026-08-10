@@ -112,7 +112,7 @@ function renderCliProductsTable(cl,editingId=null){
           <input id="epName_${p.id}" class="inp inp-sm" value="${p.name}" style="width:100%;margin-bottom:4px">
           <input id="epDesc_${p.id}" class="inp inp-sm" value="${p.desc||''}" placeholder="Descrição (opcional)" style="width:100%;font-size:11.5px">
         </td>
-        <td style="padding:5px 8px"><input id="epPrice_${p.id}" type="number" class="inp inp-sm" value="${p.price}" step="0.01" style="width:90px"></td>
+        <td style="padding:5px 8px"><input id="epPrice_${p.id}" type="text" inputmode="decimal" class="inp inp-sm" value="${toBRLInputStr(p.price)}" oninput="maskCurrencyInput(this)" style="width:110px"></td>
         <td style="padding:5px 8px;text-align:right;white-space:nowrap">
           <button class="btn btn-primary btn-sm" onclick="saveProdEdit(${p.id})"><i class="bi bi-check2"></i></button>
           <button class="prod-del" onclick="renderCliProductsTable(clients.find(x=>x.id===currentCliId))"><i class="bi bi-x-lg"></i></button>
@@ -144,17 +144,20 @@ function saveProdEdit(id){
   const p=cl.products.find(x=>x.id===id);if(!p)return;
   const newName=document.getElementById('epName_'+id)?.value.trim();
   const newDesc=document.getElementById('epDesc_'+id)?.value.trim();
-  const newPrice=parseFloat(document.getElementById('epPrice_'+id)?.value);
+  const newPriceStr=document.getElementById('epPrice_'+id)?.value.trim();
+  if(!newPriceStr)return showToast('Preço inválido','warning');
+  const newPrice=parseCurrencyInput(newPriceStr);
   if(!newName)return showToast('Nome não pode ser vazio','warning');
-  if(isNaN(newPrice)||newPrice<0)return showToast('Preço inválido','warning');
   p.name=newName;p.price=newPrice;p.desc=newDesc;
   renderCliProductsTable(cl);renderCliList();scheduleSync();showToast('Serviço atualizado!','success');
 }
 
 function addProdToCli(){
-  const n=document.getElementById('newProdName').value.trim(),pr=parseFloat(document.getElementById('newProdPrice').value);
+  const n=document.getElementById('newProdName').value.trim();
   const desc=document.getElementById('newProdDesc').value.trim();
-  if(!n||isNaN(pr))return showToast('Preencha nome e preço','warning');
+  const prStr=document.getElementById('newProdPrice').value.trim();
+  if(!n||!prStr)return showToast('Preencha nome e preço','warning');
+  const pr=parseCurrencyInput(prStr);
   const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
   if(!cl.products)cl.products=[];cl.products.push({id:Date.now(),name:n,price:pr,desc});
   document.getElementById('newProdName').value='';document.getElementById('newProdPrice').value='';document.getElementById('newProdDesc').value='';

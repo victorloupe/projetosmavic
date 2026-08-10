@@ -7,7 +7,29 @@ function initPage() {
   updateProjColSelect();
   updateProjClientSelect();
   updateClientFilter();
+
+  // Restaurar filtros salvos do sessionStorage
+  const savedType = sessionStorage.getItem('board_fType');
+  const savedPrio = sessionStorage.getItem('board_fPrio');
+  const savedCli = sessionStorage.getItem('board_fClient');
+  const savedSearch = sessionStorage.getItem('board_srch');
+
+  if(savedType && document.getElementById('fType')) document.getElementById('fType').value = savedType;
+  if(savedPrio && document.getElementById('fPrio')) document.getElementById('fPrio').value = savedPrio;
+  if(savedCli && document.getElementById('fClient')) document.getElementById('fClient').value = savedCli;
+  if(savedSearch && document.getElementById('srch')) document.getElementById('srch').value = savedSearch;
+
   renderBoard();
+
+  // Checar parâmetro da URL para abrir modal de projeto automaticamente
+  const params = new URLSearchParams(window.location.search);
+  const openProjId = params.get('openProj');
+  if (openProjId) {
+    const id = parseInt(openProjId);
+    setTimeout(() => {
+      openProjectModal(id);
+    }, 150);
+  }
 }
 
 function renderBoard(){
@@ -17,7 +39,15 @@ function renderBoard(){
   const fType=document.getElementById('fType').value;
   const fPrio=document.getElementById('fPrio').value;
   const fCli=document.getElementById('fClient').value;
-  const srch=document.getElementById('srch').value.toLowerCase().trim();
+  const srchEl=document.getElementById('srch');
+  const srch=srchEl ? srchEl.value.toLowerCase().trim() : '';
+
+  // Persistir filtros no sessionStorage
+  sessionStorage.setItem('board_fType', fType);
+  sessionStorage.setItem('board_fPrio', fPrio);
+  sessionStorage.setItem('board_fClient', fCli);
+  sessionStorage.setItem('board_srch', srchEl ? srchEl.value : '');
+
   let total=0;
   
   appColumns.filter(c=>visibleColumns.includes(c.id)).forEach(col=>{
@@ -284,7 +314,7 @@ function openProjectModal(id=null){
     document.getElementById('projClient').value=p.client;
     document.getElementById('projImage').value=p.image||'';
     document.getElementById('projDriveLink').value=p.driveLink||'';
-    document.getElementById('projValue').value=p.value||'';
+    document.getElementById('projValue').value=p.value?toBRLInputStr(p.value):'';
     document.getElementById('projType').value=p.type;
     document.getElementById('projPrio').value=p.priority;
     document.getElementById('projCol').value=p.column;
@@ -317,7 +347,58 @@ function openProjectModal(id=null){
   document.getElementById('projectOverlay').classList.add('open');
 }
 
-function closeProjectModal(){document.getElementById('projectOverlay').classList.remove('open');}
+function hasProjModalChanges() {
+  const id = document.getElementById('projId').value;
+  const name = document.getElementById('projName').value.trim();
+  const client = document.getElementById('projClient').value;
+  const img = document.getElementById('projImage').value.trim();
+  const drive = document.getElementById('projDriveLink').value.trim();
+  const val = document.getElementById('projValue').value.trim();
+  const type = document.getElementById('projType').value;
+  const prio = document.getElementById('projPrio').value;
+  const col = document.getElementById('projCol').value;
+  const note = document.getElementById('projNote').value.trim();
+  const date = document.getElementById('projDate').value;
+  
+  if (!id) {
+    // Modo: Criação de Novo Projeto
+    return name !== '' || client !== '' || img !== '' || drive !== '' || val !== '' || note !== '' || date !== '' || tempSubs.length > 0 || tempPayments.length > 0 || tempProds.length > 0;
+  } else {
+    // Modo: Edição de Projeto Existente
+    const p = projects.find(x => x.id === parseInt(id));
+    if (!p) return false;
+    
+    const isSubsChanged = JSON.stringify(p.subtasks || []) !== JSON.stringify(tempSubs);
+    const isPaysChanged = JSON.stringify(p.payments || []) !== JSON.stringify(tempPayments);
+    const isProdsChanged = JSON.stringify(p.products || []) !== JSON.stringify(tempProds);
+    
+    return name !== (p.name || '') ||
+           client !== (p.client || '') ||
+           img !== (p.image || '') ||
+           drive !== (p.driveLink || '') ||
+           parseCurrencyInput(val) !== (p.value || 0) ||
+           type !== (p.type || 'Residencial') ||
+           prio !== (p.priority || 'Média') ||
+           col !== (p.column || 'Briefing') ||
+           note !== (p.note || '') ||
+           date !== (p.date || '') ||
+           isSubsChanged ||
+           isPaysChanged ||
+           isProdsChanged;
+  }
+}
+
+function closeProjectModal(confirmIfDirty = false){
+  const el = document.getElementById('projectOverlay');
+  if(!el) return;
+  if(confirmIfDirty && hasProjModalChanges()){
+    showConfirm('Deseja descartar as alterações não salvas no projeto?', () => {
+      el.classList.remove('open');
+    }, { title: 'Descartar alterações?', okText: 'Descartar', danger: true });
+  } else {
+    el.classList.remove('open');
+  }
+}
 
 function handleClientChange(keepTitle=false) {
   const clientName = document.getElementById('projClient').value;
@@ -352,7 +433,7 @@ function applyProjClientProd() {
   if (!prod) return;
   
   document.getElementById('newProdName').value = prod.name;
-  document.getElementById('newProdPrice').value = prod.price;
+  document.getElementById('newProdPrice').value = toBRLInputStr(prod.price);
 }
 
 function saveProject(){
@@ -365,7 +446,7 @@ function saveProject(){
     client,
     image:document.getElementById('projImage').value.trim(),
     driveLink:document.getElementById('projDriveLink').value.trim(),
-    value:document.getElementById('projValue').value,
+    value:parseCurrencyInput(document.getElementById('projValue').value),
     payments:tempPayments,
     paid:tempPayments.reduce((s,x)=>s+parseFloat(x.amount||0),0),
     products:tempProds,
@@ -445,7 +526,7 @@ function renderSubsList(){
 //  FINANCE IN PROJECT
 // ══════════════════════════════════════════
 function addPayment(){
-  const amount=parseFloat(document.getElementById('newPayAmount').value),date=document.getElementById('newPayDate').value;
+  const amount=parseCurrencyInput(document.getElementById('newPayAmount').value),date=document.getElementById('newPayDate').value;
   const method=document.getElementById('newPayMethod')?.value||'Pix';
   if(isNaN(amount)||amount<=0||!date)return showToast('Preencha valores corretos','warning');
   tempPayments.push({id:Date.now(),amount,date,method});
@@ -464,7 +545,7 @@ function renderPaymentsModal(){
 //  PRODUCTS IN PROJECT
 // ══════════════════════════════════════════
 function addProdToProj(){
-  const name=document.getElementById('newProdName').value.trim(),price=parseFloat(document.getElementById('newProdPrice').value);
+  const name=document.getElementById('newProdName').value.trim(),price=parseCurrencyInput(document.getElementById('newProdPrice').value);
   if(!name||isNaN(price)||price<=0)return showToast('Valores incorretos','warning');
   tempProds.push({id:Date.now(),name,price});
   document.getElementById('newProdName').value='';document.getElementById('newProdPrice').value='';
@@ -478,7 +559,7 @@ function renderProjProdsTable(){
   // Só sobrescreve o campo quando há produtos vinculados somando algo — assim
   // um valor de contrato digitado à mão (ou vindo de um pagamento direto sem
   // produtos) não é apagado toda vez que o modal abre/fecha um produto.
-  if(total>0) document.getElementById('projValue').value=total.toFixed(2);
+  if(total>0) document.getElementById('projValue').value=toBRLInputStr(total);
   if(!tempProds.length){el.innerHTML='<tr><td colspan="3" style="text-align:center;color:var(--text3);padding:10px">Nenhum produto cadastrado</td></tr>';return;}
   el.innerHTML=tempProds.map(p=>`<tr><td style="font-weight:600">${p.name}</td><td style="text-align:right">${fmt(p.price)}</td><td style="text-align:center"><button class="btn btn-ghost btn-sm" style="padding:3px" onclick="removeProdFromProj(${p.id})"><i class="bi bi-trash3"></i></button></td></tr>`).join('');
 }

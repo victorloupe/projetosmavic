@@ -109,6 +109,49 @@ function formatDocMask(v){
 }
 function maskDocInput(el){ el.value=formatDocMask(el.value); }
 
+function formatPhoneMask(v) {
+  if (!v) return '';
+  const d = String(v).replace(/\D/g, '');
+  if (d.length > 11) return d.substring(0, 11).replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3');
+  if (d.length <= 10) {
+    return d.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2');
+  } else {
+    return d.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2');
+  }
+}
+function maskPhoneInput(el){ if(el) el.value = formatPhoneMask(el.value); }
+
+function insertWaVar(varTag) {
+  const ta = document.getElementById('waTemplate');
+  if (!ta) return;
+  const start = ta.selectionStart || 0;
+  const end = ta.selectionEnd || 0;
+  const val = ta.value;
+  ta.value = val.substring(0, start) + varTag + val.substring(end);
+  ta.selectionStart = ta.selectionEnd = start + varTag.length;
+  ta.focus();
+}
+
+function formatWaMsgText(symbol) {
+  const ta = document.getElementById('waMsg');
+  if (!ta) return;
+  const start = ta.selectionStart || 0;
+  const end = ta.selectionEnd || 0;
+  const selected = ta.value.substring(start, end);
+  if (selected) {
+    const replacement = `${symbol}${selected}${symbol}`;
+    ta.value = ta.value.substring(0, start) + replacement + ta.value.substring(end);
+    ta.selectionStart = start;
+    ta.selectionEnd = start + replacement.length;
+  } else {
+    const replacement = `${symbol}texto${symbol}`;
+    ta.value = ta.value.substring(0, start) + replacement + ta.value.substring(end);
+    ta.selectionStart = start + 1;
+    ta.selectionEnd = start + 6;
+  }
+  ta.focus();
+}
+
 // Validação de dígito verificador (algoritmo padrão mod11). Campo vazio não é erro —
 // o CPF/CNPJ é opcional em vários formulários daqui.
 function isValidCPF(v){

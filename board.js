@@ -752,8 +752,62 @@ function deleteProject(id,fromArch=false){
 // ══════════════════════════════════════════
 //  WHATSAPP HANDLERS
 // ══════════════════════════════════════════
-function buildWhatsAppMsg(projId){
-  const p=projects.find(x=>x.id===projId);if(!p)return {msg:'',waLinkBlock:'',waPixBlock:'',hasLinkTag:false,hasPixTag:false};
+const WA_PRESETS = {
+  default: null,
+  update: `Olá, *{Cliente}*!
+
+Passando para informar sobre o andamento do projeto *{Projeto}*:
+
+*Etapa atual:* {Etapa}
+*Prazo:* {Prazo}
+{TarefaAtual}
+{Observacao}
+{LinkPainel}
+_Equipe MAVIC Projetos_`,
+
+  payment: `Olá, *{Cliente}*!
+
+Segue o resumo financeiro do projeto *{Projeto}*:
+
+*Valor contratado:* {ValorTotal}
+*Pago:* {ValorPago} | *Pendente:* {SaldoPendente}
+{DadosPix}
+Dúvidas, estamos à disposição!
+_Equipe MAVIC Projetos_`,
+
+  completed: `Olá, *{Cliente}*!
+
+Projeto *{Projeto}* concluído com sucesso! 🎉
+
+Você pode visualizar e acessar todos os arquivos nos links abaixo:
+{LinkPainel}
+{LinkDrive}
+Agradecemos a confiança!
+_Equipe MAVIC Projetos_`
+};
+
+function getWaPrefs() {
+  try {
+    const raw = localStorage.getItem('mavic_waPrefs');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { pix: true, link: false, drive: false };
+}
+
+function saveWaPrefs() {
+  const pixBox = document.getElementById('waIncludePix');
+  const linkBox = document.getElementById('waIncludeLink');
+  const driveBox = document.getElementById('waIncludeDrive');
+  const prefs = {
+    pix: pixBox ? pixBox.checked : true,
+    link: linkBox ? linkBox.checked : false,
+    drive: driveBox ? driveBox.checked : false
+  };
+  localStorage.setItem('mavic_waPrefs', JSON.stringify(prefs));
+}
+
+function buildWhatsAppMsg(projId, customTemplate = null){
+  const p=projects.find(x=>x.id===projId);if(!p)return {msg:'',waLinkBlock:'',waPixBlock:'',waDriveBlock:'',hasLinkTag:false,hasPixTag:false,hasDriveTag:false};
   const cli=clients.find(c=>c.name===p.client);
   const pays=p.payments||[];
   const total=parseFloat(p.value||0);
@@ -761,7 +815,7 @@ function buildWhatsAppMsg(projId){
   const rest=total-paid;
   const link=cli?.token?buildLink(cli.name,cli.token):'';
   const dl=p.date?new Date(p.date+'T12:00:00').toLocaleDateString('pt-BR'):'Sem prazo';
-  const firstName=p.client.split(' ')[0];
+  const firstName=p.client?(p.client.trim().split(' ')[0]):'';
   const pixKey=(localStorage.getItem('mavic_pixKey')||'').trim();
   const pixName=(localStorage.getItem('mavic_pixName')||'').trim();
   const pixBank=(localStorage.getItem('mavic_pixBank')||'').trim();
@@ -778,11 +832,13 @@ function buildWhatsAppMsg(projId){
 
   const waLinkBlock=link?`\n*Seu painel:*\n${link}\n`:'';
   const waPixBlock=pixKey?`\n*Dados para PIX:*\n*Chave:* ${pixKey}\n*Titular:* ${pixName}\n*Banco:* ${pixBank}\n`:'';
+  const waDriveBlock=(p.driveLink && p.driveLink.trim())?`\n*Pasta de arquivos:*\n${p.driveLink.trim()}\n`:'';
 
   const linkBox=document.getElementById('waIncludeLink');
   const pixBox=document.getElementById('waIncludePix');
+  const driveBox=document.getElementById('waIncludeDrive');
 
-  let template = localStorage.getItem('mavic_waTemplate') || DEFAULT_WA_TEMPLATE;
+  let template = customTemplate || localStorage.getItem('mavic_waTemplate') || DEFAULT_WA_TEMPLATE;
   let msg = template
     .replace(/{Cliente}/g, firstName)
     .replace(/{ClienteCompleto}/g, p.client || '')
@@ -793,11 +849,11 @@ function buildWhatsAppMsg(projId){
     .replace(/{ValorPago}/g, fmt(paid))
     .replace(/{SaldoPendente}/g, rest <= 0 ? 'Quitado' : fmt(rest))
     .replace(/{Observacao}/g, p.note ? `_${p.note}_` : '')
-    .replace(/{LinkDrive}/g, p.driveLink || '')
     .replace(/{TarefaAtual}/g, subtaskText);
 
   const hasLinkTag = template.includes('{LinkPainel}');
   const hasPixTag = template.includes('{DadosPix}');
+  const hasDriveTag = template.includes('{LinkDrive}');
 
   if (hasLinkTag) {
     msg = msg.replace(/{LinkPainel}/g, (linkBox && linkBox.checked) ? waLinkBlock : '');
@@ -805,8 +861,28 @@ function buildWhatsAppMsg(projId){
   if (hasPixTag) {
     msg = msg.replace(/{DadosPix}/g, (pixBox && pixBox.checked) ? waPixBlock : '');
   }
+  if (hasDriveTag) {
+    msg = msg.replace(/{LinkDrive}/g, (driveBox && driveBox.checked) ? waDriveBlock : '');
+  }
 
-  return { msg, waLinkBlock, waPixBlock, hasLinkTag, hasPixTag };
+  return { msg, waLinkBlock, waPixBlock, waDriveBlock, hasLinkTag, hasPixTag, hasDriveTag };
+}
+
+function applyWaPreset(presetKey) {
+  const projId = parseInt(document.getElementById('waOverlay').dataset.projId);
+  const presetTemplate = WA_PRESETS[presetKey] || null;
+  const res = buildWhatsAppMsg(projId, presetTemplate);
+  document.getElementById('waMsg').value = cleanNewlines(res.msg);
+
+  const linkBox = document.getElementById('waIncludeLink');
+  const pixBox = document.getElementById('waIncludePix');
+  const driveBox = document.getElementById('waIncludeDrive');
+
+  if (!res.hasLinkTag && linkBox && linkBox.checked) insertBlock(res.waLinkBlock);
+  if (!res.hasPixTag && pixBox && pixBox.checked) insertBlock(res.waPixBlock);
+  if (!res.hasDriveTag && driveBox && driveBox.checked) insertBlock(res.waDriveBlock);
+
+  document.getElementById('waMsg').value = cleanNewlines(document.getElementById('waMsg').value);
 }
 
 function openWhatsApp(projId){
@@ -815,24 +891,38 @@ function openWhatsApp(projId){
   const cli=clients.find(c=>c.name===p.client);
   const link=cli?.token?buildLink(cli.name,cli.token):'';
   const pixKey=(localStorage.getItem('mavic_pixKey')||'').trim();
+  const driveLink=(p.driveLink||'').trim();
+  const prefs = getWaPrefs();
 
   const linkWrap=document.getElementById('waLinkWrap');
   const linkBox=document.getElementById('waIncludeLink');
-  if(link){linkWrap.style.display='';linkBox.checked=false;}
+  if(link){linkWrap.style.display='';linkBox.checked=prefs.link;}
   else{linkWrap.style.display='none';linkBox.checked=false;}
 
   const pixWrap=document.getElementById('waPixWrap');
   const pixBox=document.getElementById('waIncludePix');
-  if(pixKey){pixWrap.style.display='';pixBox.checked=true;}
+  if(pixKey){pixWrap.style.display='';pixBox.checked=prefs.pix;}
   else{pixWrap.style.display='none';pixBox.checked=false;}
 
-  document.getElementById('waPhone').value=cli?.phone||'';
+  const driveWrap=document.getElementById('waDriveWrap');
+  const driveBox=document.getElementById('waIncludeDrive');
+  if(driveWrap && driveBox){
+    if(driveLink){driveWrap.style.display='';driveBox.checked=prefs.drive;}
+    else{driveWrap.style.display='none';driveBox.checked=false;}
+  }
+
+  const presetSel = document.getElementById('waPresetSelect');
+  if (presetSel) presetSel.value = 'default';
+
+  const rawPhone = cli?.phone || '';
+  document.getElementById('waPhone').value = typeof formatPhoneMask === 'function' ? formatPhoneMask(rawPhone) : rawPhone;
 
   const res = buildWhatsAppMsg(projId);
   document.getElementById('waMsg').value=cleanNewlines(res.msg);
 
-  if (!res.hasLinkTag && linkBox.checked) insertBlock(res.waLinkBlock);
-  if (!res.hasPixTag && pixBox.checked) insertBlock(res.waPixBlock);
+  if (!res.hasLinkTag && linkBox && linkBox.checked) insertBlock(res.waLinkBlock);
+  if (!res.hasPixTag && pixBox && pixBox.checked) insertBlock(res.waPixBlock);
+  if (!res.hasDriveTag && driveBox && driveBox.checked) insertBlock(res.waDriveBlock);
 
   document.getElementById('waMsg').value=cleanNewlines(document.getElementById('waMsg').value);
 
@@ -863,9 +953,12 @@ function removeBlock(block){
   ta.value = cleanNewlines(ta.value);
 }
 function toggleWaPix(){
+  saveWaPrefs();
   const projId = parseInt(document.getElementById('waOverlay').dataset.projId);
   const box=document.getElementById('waIncludePix');
-  const res = buildWhatsAppMsg(projId);
+  const presetVal = document.getElementById('waPresetSelect')?.value || 'default';
+  const presetTpl = WA_PRESETS[presetVal] || null;
+  const res = buildWhatsAppMsg(projId, presetTpl);
   if (res.hasPixTag) {
     document.getElementById('waMsg').value = cleanNewlines(res.msg);
   } else {
@@ -874,13 +967,30 @@ function toggleWaPix(){
   }
 }
 function toggleWaLink(){
+  saveWaPrefs();
   const projId = parseInt(document.getElementById('waOverlay').dataset.projId);
   const box=document.getElementById('waIncludeLink');
-  const res = buildWhatsAppMsg(projId);
+  const presetVal = document.getElementById('waPresetSelect')?.value || 'default';
+  const presetTpl = WA_PRESETS[presetVal] || null;
+  const res = buildWhatsAppMsg(projId, presetTpl);
   if (res.hasLinkTag) {
     document.getElementById('waMsg').value = cleanNewlines(res.msg);
   } else {
     if(box.checked)insertBlock(res.waLinkBlock);else removeBlock(res.waLinkBlock);
+    document.getElementById('waMsg').value = cleanNewlines(document.getElementById('waMsg').value);
+  }
+}
+function toggleWaDrive(){
+  saveWaPrefs();
+  const projId = parseInt(document.getElementById('waOverlay').dataset.projId);
+  const box=document.getElementById('waIncludeDrive');
+  const presetVal = document.getElementById('waPresetSelect')?.value || 'default';
+  const presetTpl = WA_PRESETS[presetVal] || null;
+  const res = buildWhatsAppMsg(projId, presetTpl);
+  if (res.hasDriveTag) {
+    document.getElementById('waMsg').value = cleanNewlines(res.msg);
+  } else {
+    if(box && box.checked)insertBlock(res.waDriveBlock);else removeBlock(res.waDriveBlock);
     document.getElementById('waMsg').value = cleanNewlines(document.getElementById('waMsg').value);
   }
 }

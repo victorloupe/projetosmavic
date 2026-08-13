@@ -258,6 +258,20 @@
       <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
       <div class="fld">
         <label class="flbl">Template de Mensagem</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Cliente}')" title="Primeiro nome do cliente">+ {Cliente}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Projeto}')" title="Nome do projeto">+ {Projeto}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Etapa}')" title="Etapa/Coluna">+ {Etapa}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Prazo}')" title="Prazo do projeto">+ {Prazo}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorTotal}')" title="Valor total">+ {ValorTotal}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorPago}')" title="Valor pago">+ {ValorPago}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{SaldoPendente}')" title="Saldo pendente">+ {SaldoPendente}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{TarefaAtual}')" title="Subtarefas em foco">+ {TarefaAtual}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Observacao}')" title="Observações">+ {Observacao}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkPainel}')" title="Painel do cliente">+ {LinkPainel}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkDrive}')" title="Pasta de arquivos">+ {LinkDrive}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{DadosPix}')" title="Dados PIX">+ {DadosPix}</button>
+        </div>
         <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
       </div>
     </div>
@@ -375,7 +389,7 @@
       <label class="flbl"><i class="bi bi-telephone" style="color:#25D366"></i> Número do WhatsApp</label>
       <div style="display:flex;gap:7px;align-items:center">
         <span style="padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text2);white-space:nowrap">+55</span>
-        <input class="inp inp-sm" id="waPhone" placeholder="(11) 99999-9999" style="flex:1">
+        <input class="inp inp-sm" id="waPhone" placeholder="(11) 99999-9999" oninput="maskPhoneInput(this)" style="flex:1">
       </div>
       <div style="font-size:11.5px;color:var(--text3);margin-top:4px"><i class="bi bi-info-circle"></i> Deixe vazio para escolher o contato no WhatsApp</div>
     </div>
@@ -390,10 +404,30 @@
           <div class="wa-opt-lbl"><span class="wa-opt-ic" style="background:var(--blue-bg);color:var(--blue)"><i class="bi bi-window"></i></span> Link do painel do cliente</div>
           <label class="tgl"><input type="checkbox" id="waIncludeLink" onchange="toggleWaLink()"><span class="tgl-sl"></span></label>
         </div>
+        <div class="wa-opt" id="waDriveWrap" style="display:none">
+          <div class="wa-opt-lbl"><span class="wa-opt-ic" style="background:var(--yellow-bg);color:var(--yellow)"><i class="bi bi-folder2-open"></i></span> Pasta de arquivos</div>
+          <label class="tgl"><input type="checkbox" id="waIncludeDrive" onchange="toggleWaDrive()"><span class="tgl-sl"></span></label>
+        </div>
       </div>
     </div>
     <div class="fld">
-      <label class="flbl">Mensagem <span style="color:var(--text3);font-weight:400;text-transform:none">(editável)</span></label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+        <label class="flbl" style="margin:0">Mensagem <span style="color:var(--text3);font-weight:400;text-transform:none">(editável)</span></label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11.5px;color:var(--text2)">Modelo:</span>
+          <select class="inp inp-sm" id="waPresetSelect" style="width:auto;font-size:11.5px;padding:3px 8px" onchange="applyWaPreset(this.value)">
+            <option value="default">Template Padrão</option>
+            <option value="update">Atualização de Etapa</option>
+            <option value="payment">Lembrete de Pagamento</option>
+            <option value="completed">Conclusão do Projeto</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:6px">
+        <button type="button" class="btn btn-xs btn-ghost" onclick="formatWaMsgText('*')" title="Negrito" style="padding:2px 8px;font-weight:700">B</button>
+        <button type="button" class="btn btn-xs btn-ghost" onclick="formatWaMsgText('_')" title="Itálico" style="padding:2px 8px;font-style:italic">I</button>
+        <button type="button" class="btn btn-xs btn-ghost" onclick="formatWaMsgText('~')" title="Tachado" style="padding:2px 8px;text-decoration:line-through">S</button>
+      </div>
       <textarea class="inp" id="waMsg" rows="11" style="font-size:13px;line-height:1.6;resize:vertical"></textarea>
     </div>
   </div>

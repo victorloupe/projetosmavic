@@ -242,6 +242,20 @@
       <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
       <div class="fld">
         <label class="flbl">Template de Mensagem</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Cliente}')" title="Primeiro nome do cliente">+ {Cliente}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Projeto}')" title="Nome do projeto">+ {Projeto}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Etapa}')" title="Etapa/Coluna">+ {Etapa}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Prazo}')" title="Prazo do projeto">+ {Prazo}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorTotal}')" title="Valor total">+ {ValorTotal}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorPago}')" title="Valor pago">+ {ValorPago}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{SaldoPendente}')" title="Saldo pendente">+ {SaldoPendente}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{TarefaAtual}')" title="Subtarefas em foco">+ {TarefaAtual}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Observacao}')" title="Observações">+ {Observacao}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkPainel}')" title="Painel do cliente">+ {LinkPainel}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkDrive}')" title="Pasta de arquivos">+ {LinkDrive}</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{DadosPix}')" title="Dados PIX">+ {DadosPix}</button>
+        </div>
         <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
       </div>
     </div>

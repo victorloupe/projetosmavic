@@ -260,6 +260,61 @@ if (currentPath.includes('dashboard.html')) {
 }
 
 // ══════════════════════════════════════════
+//  ADMIN AUTHENTICATION & ACCESS GUARD
+// ══════════════════════════════════════════
+function getAdminSession() {
+  try {
+    const raw = localStorage.getItem('mavic_admin_session') || sessionStorage.getItem('mavic_admin_session');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session || !session.expiresAt || session.expiresAt <= Date.now()) {
+      localStorage.removeItem('mavic_admin_session');
+      sessionStorage.removeItem('mavic_admin_session');
+      return null;
+    }
+    return session;
+  } catch (e) {
+    return null;
+  }
+}
+
+function isAdminLoggedIn() {
+  return getAdminSession() !== null;
+}
+
+function requireAdminAuth() {
+  // Ignora página do cliente e página de login
+  if (window.location.pathname.includes('cliente.html') || window.location.pathname.includes('login.html')) {
+    return true;
+  }
+  if (!isAdminLoggedIn()) {
+    const file = window.location.pathname.split('/').pop() || 'index.html';
+    const query = window.location.search || '';
+    const dest = file + query;
+    window.location.replace('login.html?redirect=' + encodeURIComponent(dest));
+    return false;
+  }
+  return true;
+}
+
+// Executa verificação imediata para telas administrativas
+requireAdminAuth();
+
+async function logoutAdmin() {
+  showConfirm('Deseja realmente sair do painel administrativo?', async () => {
+    if (sb && sb.auth) {
+      try { await sb.auth.signOut(); } catch(e){}
+    }
+    localStorage.removeItem('mavic_admin_session');
+    sessionStorage.removeItem('mavic_admin_session');
+    showToast('Sessão encerrada', 'info');
+    setTimeout(() => {
+      window.location.replace('login.html');
+    }, 250);
+  }, { title: 'Encerrar Sessão', okText: 'Sair do Painel', danger: true });
+}
+
+// ══════════════════════════════════════════
 //  SUPABASE CONNECTION & CACHE
 // ══════════════════════════════════════════
 function initSupabase(){
@@ -686,6 +741,9 @@ function getInitials(name){return(name||'?').trim().split(/\s+/).slice(0,2).map(
 // ══════════════════════════════════════════
 function openSettings(){
   if(!document.getElementById('settingsOverlay')) return;
+  const sess = getAdminSession();
+  const emailEl = document.getElementById('stAdminEmail');
+  if (emailEl) emailEl.textContent = sess?.email || 'projetos.mavic@hotmail.com';
   document.getElementById('clientUrl').value=localStorage.getItem('mavic_clientUrl')||'cliente.html';
   document.getElementById('pixKey').value=localStorage.getItem('mavic_pixKey')||'';
   document.getElementById('pixName').value=localStorage.getItem('mavic_pixName')||'';

@@ -1,7 +1,9 @@
-const CACHE = 'mavic-v83';
+const CACHE = 'mavic-v84';
 
 const STATIC = [
   './',
+  './login.html',
+  './login.js',
   './index.html',
   './index.css',
   './common.js',

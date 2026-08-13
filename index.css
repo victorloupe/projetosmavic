@@ -2524,6 +2524,38 @@ textarea.inp {
   }
 }
 
+/* ══════════════════════════════════════════
+   ADMIN LOGOUT & AUTH STYLES
+   ══════════════════════════════════════════ */
+.btn-logout {
+  color: var(--red) !important;
+  opacity: 0.85;
+}
+.btn-logout:hover {
+  opacity: 1;
+  background: var(--red-bg) !important;
+  color: var(--red) !important;
+}
+
+.btn-outline-danger {
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 6px 12px;
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+.btn-outline-danger:hover {
+  background: var(--red-bg);
+}
+
+
 
 
 

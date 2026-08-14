@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=91">
+<link rel="stylesheet" href="index.css?v=102">
 <script>
 (function(){
   try {
@@ -76,28 +76,32 @@
     <h4 style="font-weight:700;color:var(--accent);margin:0">Quadro de Projetos</h4>
     <button class="btn btn-primary btn-sm btn-novo-desktop" onclick="openProjectModal()"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
   </div>
-  <div class="toolbar" style="background:transparent;border:none;padding:6px 14px 10px">
-    <input type="text" class="inp inp-sm" id="srch" placeholder="Buscar projeto ou cliente…" oninput="renderBoard()" style="max-width:220px">
-    <select class="inp inp-sm project-type-select" id="fType" onchange="renderBoard()" style="width:auto">
-      <option value="">Todos os Tipos</option>
-    </select>
-    <button class="btn btn-ghost btn-sm" onclick="openManageProjectTypesModal()" title="Gerenciar tipos de projeto"><i class="bi bi-tags"></i></button>
-    <select class="inp inp-sm" id="fPrio" onchange="renderBoard()" style="width:auto">
-      <option value="">Prioridades</option>
-      <option value="Alta">🔴 Alta</option><option value="Média">🟡 Média</option><option value="Baixa">🟢 Baixa</option>
-    </select>
-    <select class="inp inp-sm" id="fClient" onchange="renderBoard()" style="width:auto">
-      <option value="">Todos os Clientes</option>
-    </select>
-    <div style="position:relative">
-      <button class="btn btn-ghost btn-sm" onclick="toggleColsMenu()"><i class="bi bi-layout-three-columns"></i> Colunas</button>
-      <div class="sort-menu" id="colsMenu" style="min-width:190px;left:0;right:auto">
-        <div id="colMenuItems"></div>
-        <div style="height:1px;background:var(--border);margin:3px 0"></div>
-        <button onclick="openManageColumnsModal();closeColsMenu()"><i class="bi bi-gear"></i> Gerenciar colunas</button>
+  <div class="toolbar">
+    <input type="text" class="inp inp-sm" id="srch" placeholder="Buscar projeto ou cliente…" oninput="renderBoard()">
+    <div class="toolbar-filters">
+      <div style="display:flex;gap:4px;align-items:center;min-width:130px;flex:1">
+        <select class="inp inp-sm project-type-select" id="fType" onchange="renderBoard()" style="width:100%">
+          <option value="">Todos os Tipos</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="openManageProjectTypesModal()" title="Gerenciar tipos de projeto" style="padding:6px 8px;flex-shrink:0"><i class="bi bi-tags"></i></button>
+      </div>
+      <select class="inp inp-sm" id="fPrio" onchange="renderBoard()">
+        <option value="">Prioridades</option>
+        <option value="Alta">🔴 Alta</option><option value="Média">🟡 Média</option><option value="Baixa">🟢 Baixa</option>
+      </select>
+      <select class="inp inp-sm" id="fClient" onchange="renderBoard()">
+        <option value="">Todos os Clientes</option>
+      </select>
+      <div style="position:relative">
+        <button class="btn btn-ghost btn-sm" onclick="toggleColsMenu()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px"><i class="bi bi-layout-three-columns"></i> Colunas</button>
+        <div class="sort-menu" id="colsMenu" style="min-width:190px;left:0;right:auto">
+          <div id="colMenuItems"></div>
+          <div style="height:1px;background:var(--border);margin:3px 0"></div>
+          <button onclick="openManageColumnsModal();closeColsMenu()"><i class="bi bi-gear"></i> Gerenciar colunas</button>
+        </div>
       </div>
     </div>
-    <div style="flex:1"></div>
+    <div style="flex:1" class="nav-spacer"></div>
     <span id="boardCount" style="font-size:12px;color:var(--text3)"></span>
   </div>
   <div class="board-outer"><div class="board" id="board"></div></div>
@@ -194,11 +198,11 @@
       </div>
     </div>
   </div>
-  <div class="mftr" style="display:flex;justify-content:space-between">
-    <button class="btn btn-danger" id="btnDelProj" onclick="deleteCurrentProject()" style="display:none">Excluir</button>
-    <div style="display:flex;gap:7px;margin-left:auto">
-      <button class="btn btn-ghost" id="btnArchProj" onclick="archiveCurrentProject()">Arquivar</button>
-      <button class="btn-ghost" onclick="closeProjectModal(true)">Cancelar</button>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <button class="btn btn-danger" id="btnDelProj" onclick="deleteCurrentProject()" style="display:none"><i class="bi bi-trash"></i> Excluir</button>
+    <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
+      <button class="btn btn-ghost" id="btnArchProj" onclick="archiveCurrentProject()"><i class="bi bi-archive"></i> Arquivar</button>
+      <button class="btn btn-ghost" onclick="closeProjectModal(true)">Cancelar</button>
       <button class="btn btn-primary" onclick="saveProject()"><i class="bi bi-check2"></i> Salvar</button>
     </div>
   </div>
@@ -481,8 +485,8 @@
   <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
 </nav>
 
-<script src="common.js?v=91"></script>
-<script src="board.js?v=91"></script>
+<script src="common.js?v=102"></script>
+<script src="board.js?v=102"></script>
 <script>
   // Board column popover selector helper
   function toggleColsMenu() {

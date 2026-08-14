@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#92623a">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=91">
+<link rel="stylesheet" href="index.css?v=102">
 <script>
 (function(){
   try {
@@ -63,40 +63,40 @@
 
 <!-- PAGAMENTOS VIEW -->
 <div class="dash-view" id="pagamentosView" style="display:block">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">
     <h4 style="font-weight:700;color:var(--accent);margin:0">Controle de Pagamentos</h4>
-    <button class="btn btn-primary btn-sm" onclick="openAddPaymentDirectModal()"><i class="bi bi-plus-lg"></i> Registrar Pagamento</button>
+    <button class="btn btn-primary btn-sm" onclick="openAddPaymentDirectModal()"><i class="bi bi-plus-lg"></i> Novo Pagamento</button>
   </div>
   
-  <div class="toolbar" style="padding:10px 0;background:transparent;border:none;display:flex;gap:10px">
-    <input type="text" class="inp inp-sm" id="fPaySearch" placeholder="Buscar pagamento…" oninput="pgReset('pagamentos');renderPagamentos()" style="max-width:250px">
-    <select class="inp inp-sm" id="fPayClient" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
-      <option value="">Todos os Clientes</option>
-    </select>
-    <select class="inp inp-sm" id="fPayYear" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
-      <option value="">Todos os Anos</option>
-      <option>2026</option>
-      <option>2025</option>
-      <option>2024</option>
-    </select>
-    <select class="inp inp-sm" id="fPayMonth" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
-      <option value="">Todos os Meses</option>
-      <option value="01">Janeiro</option>
-      <option value="02">Fevereiro</option>
-      <option value="03">Março</option>
-      <option value="04">Abril</option>
-      <option value="05">Maio</option>
-      <option value="06">Junho</option>
-      <option value="07">Julho</option>
-      <option value="08">Agosto</option>
-      <option value="09">Setembro</option>
-      <option value="10">Outubro</option>
-      <option value="11">Novembro</option>
-      <option value="12">Dezembro</option>
-    </select>
+  <div class="toolbar">
+    <input type="text" class="inp inp-sm" id="fPaySearch" placeholder="Buscar pagamento…" oninput="pgReset('pagamentos');renderPagamentos()">
+    <div class="toolbar-filters">
+      <select class="inp inp-sm" id="fPayClient" onchange="pgReset('pagamentos');renderPagamentos()">
+        <option value="">Todos os Clientes</option>
+      </select>
+      <select class="inp inp-sm" id="fPayYear" onchange="pgReset('pagamentos');renderPagamentos()">
+        <option value="">Todos os Anos</option>
+      </select>
+      <select class="inp inp-sm" id="fPayMonth" onchange="pgReset('pagamentos');renderPagamentos()">
+        <option value="">Todos os Meses</option>
+        <option value="01">Janeiro</option>
+        <option value="02">Fevereiro</option>
+        <option value="03">Março</option>
+        <option value="04">Abril</option>
+        <option value="05">Maio</option>
+        <option value="06">Junho</option>
+        <option value="07">Julho</option>
+        <option value="08">Agosto</option>
+        <option value="09">Setembro</option>
+        <option value="10">Outubro</option>
+        <option value="11">Novembro</option>
+        <option value="12">Dezembro</option>
+      </select>
+    </div>
   </div>
   
-  <div class="dash-table">
+  <!-- Tabela Desktop -->
+  <div class="dash-table pay-desktop-table">
     <table>
       <thead>
         <tr>
@@ -115,6 +115,12 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Cards Mobile -->
+  <div class="pay-mobile-list" id="payMobileList">
+    <div style="text-align:center;color:var(--text3);padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px">Nenhum pagamento registrado</div>
+  </div>
+
   <div id="payPagination"></div>
 </div>
 
@@ -393,7 +399,7 @@
   <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
 </nav>
 
-<script src="common.js?v=91"></script>
-<script src="pagamentos.js?v=91"></script>
+<script src="common.js?v=102"></script>
+<script src="pagamentos.js?v=102"></script>
 </body>
 </html>

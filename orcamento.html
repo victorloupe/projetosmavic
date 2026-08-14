@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#92623a">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=91">
+<link rel="stylesheet" href="index.css?v=102">
 <script>
 (function(){
   try {
@@ -63,32 +63,32 @@
 
 <!-- ORÇAMENTOS VIEW -->
 <div class="dash-view" id="orcamentosView" style="display:block">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">
     <h4 style="font-weight:700;color:var(--accent);margin:0">Orçamentos</h4>
     <button class="btn btn-primary btn-sm" onclick="openOrcamentoModal()"><i class="bi bi-plus-lg"></i> Novo Orçamento</button>
   </div>
   
-  <div class="toolbar" style="padding:10px 0;background:transparent;border:none;display:flex;gap:10px">
-    <input type="text" class="inp inp-sm" id="fOrcSearch" placeholder="Buscar orçamento…" oninput="pgReset('orcamentos');renderOrcamentos()" style="max-width:250px">
-    <select class="inp inp-sm" id="fOrcClient" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
-      <option value="">Todos os Clientes</option>
-    </select>
-    <select class="inp inp-sm" id="fOrcStatus" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
-      <option value="">Todos os Status</option>
-      <option value="Pendente">Pendente</option>
-      <option value="Aprovado">Aprovado</option>
-      <option value="Recusado">Recusado</option>
-      <option value="Convertido">Convertido</option>
-    </select>
-    <select class="inp inp-sm" id="fOrcYear" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
-      <option value="">Todos os Anos</option>
-      <option>2026</option>
-      <option>2025</option>
-      <option>2024</option>
-    </select>
+  <div class="toolbar">
+    <input type="text" class="inp inp-sm" id="fOrcSearch" placeholder="Buscar orçamento…" oninput="pgReset('orcamentos');renderOrcamentos()">
+    <div class="toolbar-filters">
+      <select class="inp inp-sm" id="fOrcClient" onchange="pgReset('orcamentos');renderOrcamentos()">
+        <option value="">Todos os Clientes</option>
+      </select>
+      <select class="inp inp-sm" id="fOrcStatus" onchange="pgReset('orcamentos');renderOrcamentos()">
+        <option value="">Todos os Status</option>
+        <option value="Pendente">Pendente</option>
+        <option value="Aprovado">Aprovado</option>
+        <option value="Recusado">Recusado</option>
+        <option value="Convertido">Convertido</option>
+      </select>
+      <select class="inp inp-sm" id="fOrcYear" onchange="pgReset('orcamentos');renderOrcamentos()">
+        <option value="">Todos os Anos</option>
+      </select>
+    </div>
   </div>
   
-  <div class="dash-table">
+  <!-- Tabela Desktop -->
+  <div class="dash-table orc-desktop-table">
     <table>
       <thead>
         <tr>
@@ -108,6 +108,12 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Cards Mobile -->
+  <div class="orc-mobile-list" id="orcMobileList">
+    <div style="text-align:center;color:var(--text3);padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px">Nenhum orçamento cadastrado</div>
+  </div>
+
   <div id="orcPagination"></div>
 </div>
 
@@ -487,7 +493,7 @@
   <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
 </nav>
 
-<script src="common.js?v=91"></script>
-<script src="orcamento.js?v=91"></script>
+<script src="common.js?v=102"></script>
+<script src="orcamento.js?v=102"></script>
 </body>
 </html>

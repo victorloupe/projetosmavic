@@ -90,8 +90,13 @@ function populateTypeFilter(){
 let pinnedCards=new Set(),expandedFin=new Set();
 let openNotifIds = new Set();
 const AVATAR_COLORS=['#e07b54','#5b8dd9','#8b5cf6','#059669','#d97706','#db2777','#0891b2','#65a30d','#dc2626','#7c3aed'];
-function getClientColor(name){let h=0;for(let i=0;i<name.length;i++)h=name.charCodeAt(i)+((h<<5)-h);return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];}
-function getInitials(name){return(name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();}
+function getClientColor(name){
+  if(!name || typeof name !== 'string') return AVATAR_COLORS[0] || '#e07b54';
+  let h=0;for(let i=0;i<name.length;i++)h=name.charCodeAt(i)+((h<<5)-h);return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];
+}
+function getInitials(name){
+  return (name && typeof name === 'string' ? name : '?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase() || '?';
+}
 
 const params=new URLSearchParams(window.location.search);
 clientName=(params.get('nome')||'').trim();

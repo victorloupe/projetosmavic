@@ -6,6 +6,7 @@ let editingOrcItemId = null;
 function initPage() {
   ensureOrcNumbers();
   updateClientFilter();
+  updateYearFilter();
   renderOrcamentos();
 }
 
@@ -606,6 +607,8 @@ function saveOrcamento() {
   
   closeOrcamentoModal();
   scheduleSync();
+  updateClientFilter();
+  updateYearFilter();
   renderOrcamentos();
   return bData.id;
 }
@@ -617,18 +620,21 @@ function saveOrcamentoAndDownloadPdf() {
 
 function renderOrcamentos() {
   const tbody = document.getElementById('orcTableBody');
-  if(!tbody) return;
-  const search = document.getElementById('fOrcSearch').value.toLowerCase().trim();
-  const clientFilter = document.getElementById('fOrcClient').value;
-  const statusFilter = document.getElementById('fOrcStatus').value;
-  const yearFilter = document.getElementById('fOrcYear').value;
+  const mobileList = document.getElementById('orcMobileList');
+  if(!tbody && !mobileList) return;
+  const search = (document.getElementById('fOrcSearch')?.value || '').toLowerCase().trim();
+  const clientFilter = document.getElementById('fOrcClient')?.value || '';
+  const statusFilter = document.getElementById('fOrcStatus')?.value || '';
+  const yearFilter = document.getElementById('fOrcYear')?.value || '';
   
   let filtered = [...budgets];
   
   if (search) {
     filtered = filtered.filter(b => 
-      b.title.toLowerCase().includes(search) || 
-      b.client.toLowerCase().includes(search)
+      (b.title || '').toLowerCase().includes(search) || 
+      (b.client || '').toLowerCase().includes(search) ||
+      (b.number && String(b.number).includes(search)) ||
+      fmt(b.total - (parseFloat(b.discount) || 0)).toLowerCase().includes(search)
     );
   }
   
@@ -641,61 +647,130 @@ function renderOrcamentos() {
   }
   
   if (yearFilter) {
+    allPayments = filtered.filter(b => b.date && b.date.startsWith(yearFilter));
     filtered = filtered.filter(b => b.date && b.date.startsWith(yearFilter));
   }
   
-  filtered.sort((a, b) => b.id - a.id);
+  filtered.sort((a, b) => (b.number || b.id) - (a.number || a.id));
 
   const pgEl = document.getElementById('orcPagination');
   if (pgEl) pgEl.innerHTML = pgBarHtml('orcamentos', filtered.length, 'renderOrcamentos');
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px">Nenhum orçamento encontrado</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px"><i class="bi bi-file-earmark-spreadsheet" style="font-size:24px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum orçamento encontrado</td></tr>`;
+    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-file-earmark-spreadsheet" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum orçamento encontrado</div>`;
     return;
   }
 
   const pageItems = pgSlice(filtered, 'orcamentos');
 
-  tbody.innerHTML = pageItems.map(b => {
-    const dStr = b.date ? new Date(b.date + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
-    const vStr = b.validUntil ? new Date(b.validUntil + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
-    
-    const showConvert = b.status !== 'Convertido';
-    const convertBtn = showConvert 
-      ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 8px;margin-right:4px" title="Transformar em Fatura (Projeto)"><i class="bi bi-arrow-right-circle"></i> Faturar</button>`
-      : `<span style="font-size:11px;color:var(--text3);margin-right:8px;font-weight:600"><i class="bi bi-check-all" style="color:var(--green)"></i> Faturado</span>`;
+  if (tbody) {
+    tbody.innerHTML = pageItems.map(b => {
+      const clientName = b.client || 'Sem cliente';
+      const dStr = b.date ? new Date(b.date + (b.date.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR') : '—';
+      const vStr = b.validUntil ? new Date(b.validUntil + (b.validUntil.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR') : '—';
       
-    const netTotal = b.total - (parseFloat(b.discount) || 0);
+      const showConvert = b.status !== 'Convertido';
+      const convertBtn = showConvert 
+        ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 8px;margin-right:4px" title="Transformar em Fatura (Projeto)"><i class="bi bi-arrow-right-circle"></i> Faturar</button>`
+        : `<span style="font-size:11px;color:var(--text3);margin-right:8px;font-weight:600"><i class="bi bi-check-all" style="color:var(--green)"></i> Faturado</span>`;
+        
+      const netTotal = b.total - (parseFloat(b.discount) || 0);
 
-    const isExpired = b.validUntil && b.status !== 'Convertido' && new Date(b.validUntil + 'T23:59:59') < new Date();
-    const expiredBadge = isExpired ? ' <span class="badge b-venc" style="font-size:9px">Vencido</span>' : '';
+      const isExpired = b.validUntil && b.status !== 'Convertido' && new Date(b.validUntil + 'T23:59:59') < new Date();
+      const expiredBadge = isExpired ? ' <span class="badge b-venc" style="font-size:9px">Vencido</span>' : '';
 
-    return `
-      <tr>
-        <td style="font-weight:600">${b.number ? `<span style="color:var(--text3);font-weight:600;font-family:'Courier New',monospace;font-size:11.5px">#${b.number}</span> ` : ''}${b.title}</td>
-        <td>
-          <span class="kcard-avatar" style="background:${getClientColor(b.client)};display:inline-flex;margin-right:8px;vertical-align:middle;width:24px;height:24px;font-size:10px">${getInitials(b.client)}</span>
-          ${b.client}
-        </td>
-        <td>${dStr}</td>
-        <td>${vStr}</td>
-        <td style="font-family:'Courier New',monospace;font-weight:700">${fmt(netTotal)}</td>
-        <td><span class="b-orc-${b.status}">${b.status}</span>${expiredBadge}</td>
-        <td style="text-align:right">
-          <div style="display:inline-flex;gap:4px;justify-content:flex-end;width:100%;align-items:center">
-            ${convertBtn}
-            <button class="btn btn-ghost btn-sm" onclick="duplicateOrcamento(${b.id})" style="padding:4px 8px" title="Duplicar"><i class="bi bi-copy"></i></button>
-            <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFFile(${b.id})" style="padding:4px 8px;color:var(--accent)" title="Baixar Arquivo PDF"><i class="bi bi-download"></i></button>
-            <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFDirect(${b.id})" style="padding:4px 8px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i></button>
-            <button class="btn btn-ghost btn-sm" onclick="shareOrcamentoPDF(${b.id})" style="padding:4px 8px;color:#2563EB" title="Compartilhar PDF"><i class="bi bi-share"></i></button>
-            <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:4px 8px;color:#25D366" title="Enviar Proposta via WhatsApp"><i class="bi bi-whatsapp"></i></button>
-            <button class="btn btn-ghost btn-sm" onclick="openOrcamentoModal(${b.id})" style="padding:4px 8px" title="Editar"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-danger btn-sm" onclick="deleteOrcamento(${b.id})" style="padding:4px 8px" title="Excluir"><i class="bi bi-trash"></i></button>
+      return `
+        <tr>
+          <td style="font-weight:600">${b.number ? `<span style="color:var(--text3);font-weight:600;font-family:'Courier New',monospace;font-size:11.5px">#${b.number}</span> ` : ''}${b.title || 'Sem título'}</td>
+          <td>
+            <span class="kcard-avatar" style="background:${getClientColor(clientName)};display:inline-flex;margin-right:8px;vertical-align:middle;width:24px;height:24px;font-size:10px">${getInitials(clientName)}</span>
+            ${clientName}
+          </td>
+          <td>${dStr}</td>
+          <td>${vStr}</td>
+          <td style="font-family:'Courier New',monospace;font-weight:700">${fmt(netTotal)}</td>
+          <td><span class="b-orc-${b.status}">${b.status}</span>${expiredBadge}</td>
+          <td style="text-align:right">
+            <div style="display:inline-flex;gap:4px;justify-content:flex-end;width:100%;align-items:center">
+              ${convertBtn}
+              <button class="btn btn-ghost btn-sm" onclick="duplicateOrcamento(${b.id})" style="padding:4px 8px" title="Duplicar"><i class="bi bi-copy"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFFile(${b.id})" style="padding:4px 8px;color:var(--accent)" title="Baixar Arquivo PDF"><i class="bi bi-download"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFDirect(${b.id})" style="padding:4px 8px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="shareOrcamentoPDF(${b.id})" style="padding:4px 8px;color:#2563EB" title="Compartilhar PDF"><i class="bi bi-share"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:4px 8px;color:#25D366" title="Enviar Proposta via WhatsApp"><i class="bi bi-whatsapp"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="openOrcamentoModal(${b.id})" style="padding:4px 8px" title="Editar"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-danger btn-sm" onclick="deleteOrcamento(${b.id})" style="padding:4px 8px" title="Excluir"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  if (mobileList) {
+    mobileList.innerHTML = pageItems.map(b => {
+      const clientName = b.client || 'Sem cliente';
+      const dStr = b.date ? new Date(b.date + (b.date.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR') : '—';
+      const vStr = b.validUntil ? new Date(b.validUntil + (b.validUntil.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR') : '—';
+      const netTotal = b.total - (parseFloat(b.discount) || 0);
+      const showConvert = b.status !== 'Convertido';
+      const isExpired = b.validUntil && b.status !== 'Convertido' && new Date(b.validUntil + 'T23:59:59') < new Date();
+      const expiredBadge = isExpired ? ' <span class="badge b-venc" style="font-size:9px">Vencido</span>' : '';
+
+      return `
+        <div class="orc-card">
+          <div class="orc-card-top">
+            <div class="orc-card-title">
+              ${b.number ? `<span class="orc-card-num">#${b.number}</span>` : ''}
+              <span>${b.title || 'Sem título'}</span>
+            </div>
+            <div>
+              <span class="b-orc-${b.status}">${b.status}</span>${expiredBadge}
+            </div>
           </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
+
+          <div class="orc-card-client">
+            <span class="kcard-avatar" style="background:${getClientColor(clientName)};display:inline-flex;width:24px;height:24px;font-size:10px">${getInitials(clientName)}</span>
+            <span>${clientName}</span>
+            ${b.projectType ? `<span class="badge" style="margin-left:auto;font-size:10px;background:${typeBg(b.projectType)};color:${typeColor(b.projectType)}">${b.projectType}</span>` : ''}
+          </div>
+
+          <div class="orc-card-grid">
+            <div class="orc-card-grid-item">
+              <span class="orc-grid-lbl"><i class="bi bi-calendar3"></i> Emissão</span>
+              <span class="orc-grid-val">${dStr}</span>
+            </div>
+            <div class="orc-card-grid-item">
+              <span class="orc-grid-lbl"><i class="bi bi-clock-history"></i> Validade</span>
+              <span class="orc-grid-val">${vStr}</span>
+            </div>
+            <div class="orc-card-grid-item full-width">
+              <span class="orc-grid-lbl"><i class="bi bi-cash-stack"></i> Valor Total</span>
+              <span class="orc-grid-val price">${fmt(netTotal)}</span>
+            </div>
+          </div>
+
+          <div class="orc-card-actions">
+            <div class="orc-card-actions-left">
+              ${showConvert 
+                ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:6px 10px;font-size:12px"><i class="bi bi-arrow-right-circle"></i> Faturar</button>`
+                : `<span style="font-size:11.5px;color:var(--text3);font-weight:600;display:inline-flex;align-items:center;gap:4px;padding:4px 6px"><i class="bi bi-check-all" style="color:var(--green);font-size:16px"></i> Faturado</span>`
+              }
+              <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:6px 9px;color:#25D366" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFDirect(${b.id})" style="padding:6px 9px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFFile(${b.id})" style="padding:6px 9px;color:var(--accent)" title="Baixar PDF"><i class="bi bi-download"></i></button>
+            </div>
+            <div class="orc-card-actions-right">
+              <button class="btn btn-ghost btn-sm" onclick="openOrcamentoModal(${b.id})" style="padding:6px 8px" title="Editar"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="duplicateOrcamento(${b.id})" style="padding:6px 8px" title="Duplicar"><i class="bi bi-copy"></i></button>
+              <button class="btn btn-danger btn-sm" onclick="deleteOrcamento(${b.id})" style="padding:6px 8px" title="Excluir"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
 }
 
 function deleteOrcamento(id) {
@@ -1034,11 +1109,38 @@ function saveOrcamentoAndShare() {
 }
 
 function updateClientFilter(){
-  const list = clients.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
-  const oSel=document.getElementById('fOrcClient');
-  if(oSel) {
-    const oCur=oSel.value;
-    oSel.innerHTML='<option value="">Todos os Clientes</option>'+list;
-    if(oCur)oSel.value=oCur;
+  const clList = Array.isArray(clients) ? clients : [];
+  const clientNames = new Set(clList.map(c => c?.name).filter(Boolean));
+  (budgets || []).forEach(b => {
+    if (b && b.client) clientNames.add(b.client);
+  });
+  const sortedNames = Array.from(clientNames).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const list = sortedNames.map(name => `<option value="${name}">${name}</option>`).join('');
+  const oSel = document.getElementById('fOrcClient');
+  if (oSel) {
+    const oCur = oSel.value;
+    oSel.innerHTML = '<option value="">Todos os Clientes</option>' + list;
+    if (oCur && sortedNames.includes(oCur)) oSel.value = oCur;
   }
+}
+
+function updateYearFilter() {
+  const ySel = document.getElementById('fOrcYear');
+  if (!ySel) return;
+  const cur = ySel.value;
+  const years = new Set();
+  const currentYear = new Date().getFullYear();
+  years.add(String(currentYear));
+  years.add(String(currentYear - 1));
+  years.add(String(currentYear - 2));
+
+  (budgets || []).forEach(b => {
+    if (b?.date) {
+      const y = String(b.date).substring(0, 4);
+      if (/^\d{4}$/.test(y)) years.add(y);
+    }
+  });
+
+  const sortedYears = Array.from(years).sort((a, b) => b.localeCompare(a));
+  ySel.innerHTML = '<option value="">Todos os Anos</option>' + sortedYears.map(y => `<option value="${y}" ${y === cur ? 'selected' : ''}>${y}</option>`).join('');
 }

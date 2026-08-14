@@ -1,4 +1,4 @@
-const CACHE = 'mavic-v92';
+const CACHE = 'mavic-v102';
 
 const STATIC = [
   './',

@@ -333,26 +333,37 @@ async function downloadReceiptPDFDirect(projId, payId) {
     clone.style.border = '2px dotted #4b5563';
     clone.style.borderRadius = '8px';
 
-    const wrapper = document.createElement('div');
-    wrapper.style.position = 'absolute';
-    wrapper.style.left = '-9999px';
-    wrapper.style.top = '-9999px';
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
+    let wrapper = null;
+    try {
+      wrapper = document.createElement('div');
+      wrapper.style.position = 'fixed';
+      wrapper.style.left = '0';
+      wrapper.style.top = '0';
+      wrapper.style.zIndex = '-9999';
+      wrapper.style.pointerEvents = 'none';
+      wrapper.style.background = '#ffffff';
+      wrapper.style.width = '190mm';
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
 
-    const pdfBlob = await html2pdf().from(clone).set(opt).outputPdf('blob');
-    document.body.removeChild(wrapper);
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    if (previewTab) {
-      previewTab.location.href = blobUrl;
-    } else {
-      window.open(blobUrl, '_blank');
+      await loadHtml2Pdf();
+      const pdfBlob = await html2pdf().from(clone).set(opt).outputPdf('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      if (previewTab) {
+        previewTab.location.href = blobUrl;
+      } else {
+        window.open(blobUrl, '_blank');
+      }
+      showToast('PDF gerado! Confira a pré-visualização na nova aba.', 'success');
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err);
+      if (previewTab) previewTab.close();
+      showToast('Erro ao gerar PDF', 'error');
+    } finally {
+      if (wrapper && wrapper.parentNode) {
+        document.body.removeChild(wrapper);
+      }
     }
-    showToast('PDF gerado! Confira a pré-visualização na nova aba.', 'success');
-  } catch (err) {
-    console.error('Erro ao gerar PDF:', err);
-    if (previewTab) previewTab.close();
-    showToast('Erro ao gerar PDF', 'error');
   }
 }
 

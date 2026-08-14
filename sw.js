@@ -1,4 +1,4 @@
-const CACHE = 'mavic-v84';
+const CACHE = 'mavic-v92';
 
 const STATIC = [
   './',
@@ -24,13 +24,15 @@ const STATIC = [
   './cliente.js',
   './LOGO NOVA.png',
   './icon.ico',
+  './apple-touch-icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './icons/icon-maskable-192.png',
+  './icons/icon-maskable-512.png',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
   'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
 ];
 
 // Instala e cacheia os arquivos estáticos

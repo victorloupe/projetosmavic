@@ -24,6 +24,24 @@ let clientName='',clientToken='';
 let clientDoc='',clientAddress='',companyName='MAVIC Arquitetura e Engenharia',companyDoc='';
 let pixKey='',pixName='',pixBank='';
 
+function loadHtml2Pdf() {
+  if (window.html2pdf) return Promise.resolve(window.html2pdf);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src*="html2pdf"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.html2pdf));
+      existing.addEventListener('error', () => reject(new Error('Erro ao carregar motor de PDF')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    script.async = true;
+    script.onload = () => resolve(window.html2pdf);
+    script.onerror = () => reject(new Error('Não foi possível carregar o motor de PDF. Verifique a conexão com a internet.'));
+    document.head.appendChild(script);
+  });
+}
+
 // Máscara de CPF/CNPJ (cópia autônoma — cliente.js não carrega common.js)
 function formatDocMask(v){
   if(!v) return '';
@@ -754,17 +772,20 @@ async function downloadClientReceiptPDF(projId, payId) {
 
   showToast('Gerando PDF...', 'info');
   try {
+    await loadHtml2Pdf();
     const pdfBlob = await html2pdf().from(wrapper.firstElementChild).set(opt).outputPdf('blob');
-    document.body.removeChild(wrapper);
     const blobUrl = URL.createObjectURL(pdfBlob);
     if (previewTab) previewTab.location.href = blobUrl;
     else window.open(blobUrl, '_blank');
     showToast('PDF gerado! Confira a pré-visualização na nova aba.', 'success');
   } catch (err) {
     console.error('Erro ao gerar PDF:', err);
-    document.body.removeChild(wrapper);
     if (previewTab) previewTab.close();
     showToast('Erro ao gerar PDF', 'error');
+  } finally {
+    if (wrapper && wrapper.parentNode) {
+      document.body.removeChild(wrapper);
+    }
   }
 }
 

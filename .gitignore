@@ -3,3 +3,4 @@ Thumbs.db
 *.log
 .vscode/
 supabase/.temp/
+*_backup.png

@@ -65,6 +65,27 @@ function populateProjectTypeSelects(){
   });
 }
 
+// ══════════════════════════════════════════
+//  LAZY LOADER: HTML2PDF (Carrega sob demanda)
+// ══════════════════════════════════════════
+function loadHtml2Pdf() {
+  if (window.html2pdf) return Promise.resolve(window.html2pdf);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src*="html2pdf"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.html2pdf));
+      existing.addEventListener('error', () => reject(new Error('Erro ao carregar motor de PDF')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    script.async = true;
+    script.onload = () => resolve(window.html2pdf);
+    script.onerror = () => reject(new Error('Não foi possível carregar o motor de PDF. Verifique a conexão com a internet.'));
+    document.head.appendChild(script);
+  });
+}
+
 // Uma coluna conta como "concluída" se estiver marcada com isFinal.
 // Compatibilidade: configs salvas antes desse campo existir caem no nome
 // literal "Concluído", pra não quebrar dados já sincronizados.

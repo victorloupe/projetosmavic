@@ -127,8 +127,10 @@ function openOrcamentoModal(id = null) {
     document.getElementById('orcDiscount').value = toBRLInputStr(b.discount || 0);
     tempOrcItems = [...b.items];
     document.getElementById('orcModalTitle').textContent = 'Editar Orçamento';
-    document.getElementById('btnPrnOrc').style.display = 'block';
-    document.getElementById('btnPdfOrc').style.display = 'block';
+    document.getElementById('btnPrnOrc').style.display = 'inline-flex';
+    document.getElementById('btnPdfOrc').style.display = 'inline-flex';
+    document.getElementById('btnDownloadPdfOrc').style.display = 'inline-flex';
+    document.getElementById('btnSharePdfOrc').style.display = 'inline-flex';
 
     handleOrcClientChange(true);
   } else {
@@ -147,6 +149,8 @@ function openOrcamentoModal(id = null) {
     document.getElementById('orcModalTitle').textContent = 'Novo Orçamento';
     document.getElementById('btnPrnOrc').style.display = 'none';
     document.getElementById('btnPdfOrc').style.display = 'none';
+    document.getElementById('btnDownloadPdfOrc').style.display = 'none';
+    document.getElementById('btnSharePdfOrc').style.display = 'none';
   }
   
   updateOrcItemFormMode();
@@ -219,50 +223,94 @@ document.addEventListener('click', (e) => {
 
 
 function updateOrcPreviewLabels() {
-  const clientName = document.getElementById('orcClient').value;
-  const title = document.getElementById('orcTitle').value;
-  const date = document.getElementById('orcDate').value;
-  const notes = document.getElementById('orcNotes').value;
-  const number = document.getElementById('orcNumber').value;
-  const discountVal = parseCurrencyInput(document.getElementById('orcDiscount').value);
+  const clientName = document.getElementById('orcClient')?.value.trim() || '';
+  const title = document.getElementById('orcTitle')?.value.trim() || '';
+  const date = document.getElementById('orcDate')?.value || '';
+  const validUntil = document.getElementById('orcValidUntil')?.value || '';
+  const notes = document.getElementById('orcNotes')?.value.trim() || '';
+  const number = document.getElementById('orcNumber')?.value || '';
+  const projectType = document.getElementById('orcProjectType')?.value || '';
+  const discountVal = parseCurrencyInput(document.getElementById('orcDiscount')?.value || '0');
   
-  const cl = clients.find(x => x.name === clientName);
+  const cl = clients.find(x => x.name.toLowerCase() === clientName.toLowerCase());
   
-  document.getElementById('lblOrcClientName').textContent = clientName || '—';
+  // Projeto e Tipo de Projeto
+  const projNameEl = document.getElementById('lblOrcProjectName');
+  if (projNameEl) {
+    projNameEl.textContent = title || (clientName ? `Projeto - ${clientName}` : 'Proposta de Projeto');
+  }
+  const projTypeEl = document.getElementById('lblOrcProjectTypePreview');
+  if (projTypeEl) {
+    projTypeEl.textContent = projectType || 'Geral';
+  }
+
+  // Cliente
+  const clientNameEl = document.getElementById('lblOrcClientName');
+  if (clientNameEl) {
+    clientNameEl.textContent = clientName || '—';
+  }
   
   let phoneStr = 'Não informado';
   if (cl && cl.phone) {
     phoneStr = formatPhone(cl.phone);
   }
-  document.getElementById('lblOrcClientPhone').textContent = phoneStr;
+  const clientPhoneEl = document.getElementById('lblOrcClientPhone');
+  if (clientPhoneEl) {
+    clientPhoneEl.textContent = phoneStr;
+  }
   
+  // Emissor MAVIC
   const companyName = localStorage.getItem('mavic_companyName') || 'MAVIC Arquitetura e Engenharia';
   const companyDoc = localStorage.getItem('mavic_companyDoc') || '35060501841';
   const companyEmail = localStorage.getItem('mavic_companyEmail') || 'projetos.mavic@hotmail.com';
   const companyInsta = localStorage.getItem('mavic_companyInsta') || '@mavic.arquitetuta';
   
-  document.getElementById('lblOrcProviderHeaderName').textContent = companyName;
-  document.getElementById('lblOrcProviderHeaderContact').textContent = `${companyEmail} | ${companyInsta}`;
-  document.getElementById('lblOrcProviderHeaderDoc').textContent = `CPF/CNPJ: ${formatDocMask(companyDoc)}`;
+  const hName = document.getElementById('lblOrcProviderHeaderName');
+  const hContact = document.getElementById('lblOrcProviderHeaderContact');
+  const hDoc = document.getElementById('lblOrcProviderHeaderDoc');
+  if (hName) hName.textContent = companyName;
+  if (hContact) hContact.textContent = `${companyEmail} | ${companyInsta}`;
+  if (hDoc) hDoc.textContent = `CPF/CNPJ: ${formatDocMask(companyDoc)}`;
   
-  document.getElementById('lblProposalNum').textContent = number ? `Orçamento #${number}` : 'Novo Orçamento';
+  // Identificação e Datas
+  const numEl = document.getElementById('lblProposalNum');
+  if (numEl) {
+    numEl.textContent = number ? `Orçamento #${number}` : 'Novo Orçamento';
+  }
   
-  document.getElementById('lblOrcDatePreview').textContent = date ? new Date(date + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
-  document.getElementById('lblOrcNotesPreview').textContent = notes || 'Nenhuma observação informada.';
+  const dateEl = document.getElementById('lblOrcDatePreview');
+  if (dateEl) {
+    dateEl.textContent = date ? new Date(date + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+  }
+
+  const validEl = document.getElementById('lblOrcValidUntilPreview');
+  if (validEl) {
+    validEl.textContent = validUntil ? new Date(validUntil + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+  }
+  
+  const notesEl = document.getElementById('lblOrcNotesPreview');
+  if (notesEl) {
+    notesEl.textContent = notes || 'Nenhuma observação informada.';
+  }
   
   // Calculate discount & totals
   const subtotal = tempOrcItems.reduce((s, x) => s + (parseFloat(x.price || 0) * parseInt(x.qty || 1)), 0);
-  const totalGeral = subtotal - discountVal;
+  const totalGeral = Math.max(0, subtotal - discountVal);
   
   const subLabel = document.getElementById('lblOrcSubtotalPreview');
   const discLabel = document.getElementById('lblOrcDiscountPreview');
+  const discRow = document.getElementById('lblOrcDiscountRow');
   const totalLabel = document.getElementById('lblOrcTotalGeralPreview');
   
   if (subLabel) subLabel.textContent = fmt(subtotal);
   if (discLabel) discLabel.textContent = fmt(discountVal);
+  if (discRow) discRow.style.display = discountVal > 0 ? 'flex' : 'none';
   if (totalLabel) totalLabel.textContent = fmt(totalGeral);
   
-  document.getElementById('lblSigProviderName').textContent = companyName.startsWith('MAVIC') ? 'Victor Lourenço Pereira' : companyName;
+  const sigName = document.getElementById('lblSigProviderName');
+  if (sigName) {
+    sigName.textContent = companyName.startsWith('MAVIC') ? 'Victor Lourenço Pereira' : companyName;
+  }
 }
 
 // Preenche o <select> com as observações padrão salvas (config.noteTemplates),
@@ -463,24 +511,25 @@ function renderOrcItems() {
   const previewDiscount = document.getElementById('lblOrcDiscountPreview');
   const previewTotalGeral = document.getElementById('lblOrcTotalGeralPreview');
   const inputTotal = document.getElementById('orcTotalVal');
-  const discountVal = parseCurrencyInput(document.getElementById('orcDiscount').value);
+  const discountVal = parseCurrencyInput(document.getElementById('orcDiscount')?.value || '0');
 
   if (!tempOrcItems.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px">Nenhum item adicionado à proposta</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:24px">Nenhum produto ou serviço adicionado</td></tr>`;
     if (previewSubtotal) previewSubtotal.textContent = fmt(0);
     if (previewDiscount) previewDiscount.textContent = fmt(0);
     if (previewTotalGeral) previewTotalGeral.textContent = fmt(0);
-    inputTotal.value = fmt(0);
+    if (inputTotal) inputTotal.value = fmt(0);
     return;
   }
 
   let total = 0;
   let html = tempOrcItems.map((item) => {
-    const subtotal = parseFloat(item.price || 0) * parseInt(item.qty || 1);
+    const qty = parseInt(item.qty || 1);
+    const subtotal = parseFloat(item.price || 0) * qty;
     total += subtotal;
 
-    const fmtVal = toBRLInputStr(item.price);
-    const fmtSub = toBRLInputStr(subtotal);
+    const fmtVal = fmt(item.price);
+    const fmtSub = fmt(subtotal);
     const isEditing = editingOrcItemId === item.id;
 
     return `
@@ -488,8 +537,11 @@ function renderOrcItems() {
         <td>
           ${renderItemDescription(item)}
         </td>
-        <td style="text-align:right;font-weight:600">${fmtVal}</td>
-        <td style="text-align:right;font-weight:700">${fmtSub}</td>
+        <td style="text-align:center;font-weight:600;color:var(--text2)">
+          ${qty}
+        </td>
+        <td style="text-align:right;font-weight:600;font-family:'Courier New',monospace;color:var(--text2)">${fmtVal}</td>
+        <td style="text-align:right;font-weight:700;font-family:'Courier New',monospace;color:var(--text)">${fmtSub}</td>
         <td style="text-align:center" class="no-print">
           <button class="prod-del" onclick="editOrcItem(${item.id})" title="Editar item"><i class="bi bi-pencil"></i></button>
           <button class="prod-del" onclick="removeOrcItem(${item.id})" title="Remover item"><i class="bi bi-trash3"></i></button>
@@ -500,12 +552,12 @@ function renderOrcItems() {
 
   tbody.innerHTML = html;
 
-  const totalGeral = total - discountVal;
+  const totalGeral = Math.max(0, total - discountVal);
 
   if (previewSubtotal) previewSubtotal.textContent = fmt(total);
   if (previewDiscount) previewDiscount.textContent = fmt(discountVal);
   if (previewTotalGeral) previewTotalGeral.textContent = fmt(totalGeral);
-  inputTotal.value = fmt(totalGeral);
+  if (inputTotal) inputTotal.value = fmt(totalGeral);
 }
 
 function saveOrcamento() {
@@ -633,7 +685,9 @@ function renderOrcamentos() {
           <div style="display:inline-flex;gap:4px;justify-content:flex-end;width:100%;align-items:center">
             ${convertBtn}
             <button class="btn btn-ghost btn-sm" onclick="duplicateOrcamento(${b.id})" style="padding:4px 8px" title="Duplicar"><i class="bi bi-copy"></i></button>
+            <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFFile(${b.id})" style="padding:4px 8px;color:var(--accent)" title="Baixar Arquivo PDF"><i class="bi bi-download"></i></button>
             <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFDirect(${b.id})" style="padding:4px 8px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i></button>
+            <button class="btn btn-ghost btn-sm" onclick="shareOrcamentoPDF(${b.id})" style="padding:4px 8px;color:#2563EB" title="Compartilhar PDF"><i class="bi bi-share"></i></button>
             <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:4px 8px;color:#25D366" title="Enviar Proposta via WhatsApp"><i class="bi bi-whatsapp"></i></button>
             <button class="btn btn-ghost btn-sm" onclick="openOrcamentoModal(${b.id})" style="padding:4px 8px" title="Editar"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-danger btn-sm" onclick="deleteOrcamento(${b.id})" style="padding:4px 8px" title="Excluir"><i class="bi bi-trash"></i></button>
@@ -780,13 +834,31 @@ Fico à disposição para qualquer dúvida ou para prosseguirmos com a contrata�
   window.open(url, '_blank');
 }
 
-async function downloadOrcamentoPDFDirect(id) {
-  const b = budgets.find(x => x.id === id);
-  if (!b) return;
+function getOrcamentoPdfFilename(b) {
+  const num = b.number || '0';
+  const client = (b.client || 'Cliente').trim().replace(/[/\\?%*:|"<>]/g, '');
+  const proj = (b.title || 'Projeto').trim().replace(/[/\\?%*:|"<>]/g, '');
+  
+  let dateFormatted = '';
+  if (b.date) {
+    const parts = b.date.split('-');
+    if (parts.length === 3) {
+      dateFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    } else {
+      dateFormatted = b.date;
+    }
+  } else {
+    const now = new Date();
+    const d = String(now.getDate()).padStart(2, '0');
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const y = now.getFullYear();
+    dateFormatted = `${d}-${m}-${y}`;
+  }
 
-  // Abre a aba já aqui (ainda dentro do gesto de clique do usuário) para o navegador não bloquear o popup
-  const previewTab = window.open('', '_blank');
+  return `Orçamento ${num}_${client}_${proj}_${dateFormatted}.pdf`;
+}
 
+async function generateOrcamentoPdfBlob(b) {
   if (!b.number) { b.number = getNextOrcNumber(); scheduleSync(); }
 
   document.getElementById('orcId').value = b.id;
@@ -795,62 +867,170 @@ async function downloadOrcamentoPDFDirect(id) {
   document.getElementById('orcTitle').value = b.title;
   document.getElementById('orcDate').value = b.date;
   document.getElementById('orcValidUntil').value = b.validUntil;
+  document.getElementById('orcProjectType').value = b.projectType || 'Residencial';
   document.getElementById('orcNotes').value = b.notes || '';
   document.getElementById('orcStatus').value = b.status;
   document.getElementById('orcDiscount').value = toBRLInputStr(b.discount || 0);
-  tempOrcItems = [...b.items];
+  tempOrcItems = [...(b.items || [])];
   editingOrcItemId = null;
 
   renderOrcItems();
   updateOrcPreviewLabels();
 
   const element = document.querySelector('#orcamentoOverlay .proposal-sheet');
+  if (!element) throw new Error('Modelo de proposta não encontrado');
+
+  const filename = getOrcamentoPdfFilename(b);
   const opt = {
-    margin:       [10, 10, 10, 10],
-    filename:     `Orcamento_${b.number}_${b.client.replace(/\s+/g, '_')}.pdf`,
+    margin:       [4, 4, 4, 4],
+    filename:     filename,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, logging: false },
+    html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0 },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
-  
-  showToast('Gerando PDF...', 'info');
+
+  const clone = element.cloneNode(true);
+  clone.querySelectorAll('.no-print').forEach(el => el.remove());
+  clone.style.background = '#ffffff';
+  clone.style.color = '#1C1B19';
+  clone.style.padding = '4mm 4mm';
+  clone.style.width = '202mm';
+  clone.style.boxSizing = 'border-box';
+  clone.style.boxShadow = 'none';
+  clone.style.margin = '0 auto';
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.left = '0';
+  wrapper.style.top = '0';
+  wrapper.style.zIndex = '-9999';
+  wrapper.style.pointerEvents = 'none';
+  wrapper.style.background = '#ffffff';
+  wrapper.style.width = '202mm';
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
   try {
-    const clone = element.cloneNode(true);
-    clone.querySelectorAll('.no-print').forEach(el => el.remove());
-    clone.style.background = '#ffffff';
-    clone.style.color = '#000000';
-    clone.style.padding = '20px';
-    clone.style.width = '190mm';
-    clone.style.boxSizing = 'border-box';
-
-    const wrapper = document.createElement('div');
-    wrapper.style.position = 'absolute';
-    wrapper.style.left = '-9999px';
-    wrapper.style.top = '-9999px';
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
-
+    await loadHtml2Pdf();
     const pdfBlob = await html2pdf().from(clone).set(opt).outputPdf('blob');
-    document.body.removeChild(wrapper);
-    const blobUrl = URL.createObjectURL(pdfBlob);
+    return { blob: pdfBlob, filename, budget: b };
+  } finally {
+    if (wrapper && wrapper.parentNode) {
+      document.body.removeChild(wrapper);
+    }
+  }
+}
+
+async function downloadOrcamentoPDFDirect(id) {
+  const b = budgets.find(x => x.id === id);
+  if (!b) return;
+
+  const previewTab = window.open('', '_blank');
+  showToast('Gerando visualização do PDF...', 'info');
+
+  try {
+    const { blob } = await generateOrcamentoPdfBlob(b);
+    const blobUrl = URL.createObjectURL(blob);
     if (previewTab) {
       previewTab.location.href = blobUrl;
     } else {
       window.open(blobUrl, '_blank');
     }
-    showToast('PDF gerado! Confira a pré-visualização na nova aba.', 'success');
+    showToast('PDF aberto para visualização!', 'success');
   } catch (err) {
     console.error('Erro ao gerar PDF:', err);
     if (previewTab) previewTab.close();
-    showToast('Erro ao gerar PDF', 'error');
+    showToast('Erro ao gerar PDF: ' + (err.message || err), 'error');
+  }
+}
+
+async function downloadOrcamentoPDFFile(id) {
+  const b = budgets.find(x => x.id === id);
+  if (!b) return;
+
+  showToast('Baixando PDF...', 'info');
+  try {
+    const { blob, filename } = await generateOrcamentoPdfBlob(b);
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    showToast(`PDF baixado com sucesso! (${filename})`, 'success');
+  } catch (err) {
+    console.error('Erro ao baixar PDF:', err);
+    showToast('Erro ao baixar PDF: ' + (err.message || err), 'error');
+  }
+}
+
+async function shareOrcamentoPDF(id) {
+  const b = budgets.find(x => x.id === id);
+  if (!b) return;
+
+  showToast('Preparando para compartilhar...', 'info');
+  try {
+    const { blob, filename } = await generateOrcamentoPdfBlob(b);
+    const file = new File([blob], filename, { type: 'application/pdf' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: filename.replace('.pdf', ''),
+        text: `Olá! Segue a Proposta Comercial referente ao projeto ${b.title || 'MAVIC'}.`
+      });
+      showToast('Orçamento compartilhado com sucesso!', 'success');
+    } else {
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      
+      showToast('PDF baixado! Abrindo WhatsApp...', 'success');
+      setTimeout(() => sendOrcamentoWhatsApp(b.id), 600);
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.error('Erro ao compartilhar PDF:', err);
+      showToast('Erro ao compartilhar PDF: ' + (err.message || err), 'error');
+    }
   }
 }
 
 function downloadOrcamentoPDFModal() {
   const id = parseInt(document.getElementById('orcId').value);
-  if (id) {
-    downloadOrcamentoPDFDirect(id);
-  }
+  if (id) downloadOrcamentoPDFDirect(id);
+}
+
+function downloadOrcamentoPDFFileModal() {
+  const id = parseInt(document.getElementById('orcId').value);
+  if (id) downloadOrcamentoPDFFile(id);
+}
+
+function shareOrcamentoPDFModal() {
+  const id = parseInt(document.getElementById('orcId').value);
+  if (id) shareOrcamentoPDF(id);
+}
+
+function saveOrcamentoAndDownloadPdf() {
+  const savedId = saveOrcamento();
+  if (savedId) downloadOrcamentoPDFDirect(savedId);
+}
+
+function saveOrcamentoAndDownloadFile() {
+  const savedId = saveOrcamento();
+  if (savedId) downloadOrcamentoPDFFile(savedId);
+}
+
+function saveOrcamentoAndShare() {
+  const savedId = saveOrcamento();
+  if (savedId) shareOrcamentoPDF(savedId);
 }
 
 function updateClientFilter(){

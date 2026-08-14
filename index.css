@@ -2180,35 +2180,140 @@ textarea.inp {
 }
 
 /* ==========================================
-   PROPOSAL (ORÇAMENTO) — MINIMAL / CLEAN STYLE
+   PROPOSAL (ORÇAMENTO) — CLEAN ARCHITECTURAL STYLE
    ========================================== */
 .proposal-sheet {
   background: var(--surface) !important;
   color: var(--text) !important;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
-  padding: 40px;
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  padding: 24px 28px;
+  box-shadow: none;
 }
 .proposal-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 12px;
-  margin-bottom: 14px;
+  align-items: flex-start;
+  padding-bottom: 8px;
 }
 .proposal-brand {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
 }
+.proposal-logo-wrap {
+  display: flex;
+  align-items: center;
+}
 .proposal-logo {
-  height: 100px;
+  height: 80px;
+  max-width: 220px;
   object-fit: contain;
   flex-shrink: 0;
 }
+.proposal-brand-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+.proposal-brand-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+.proposal-brand-sub {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.4;
+  font-weight: 400;
+}
+.proposal-divider {
+  height: 1px;
+  background: var(--border2);
+  margin: 10px 0 20px;
+}
+
+/* Seção de Informações (Cliente, Projeto, Metadados) */
+.proposal-meta-section {
+  display: grid;
+  grid-template-columns: 1.15fr 1.15fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+}
+@media (max-width: 768px) {
+  .proposal-meta-section {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+.proposal-meta-col {
+  display: flex;
+  flex-direction: column;
+}
+.proposal-section-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text3);
+  margin-bottom: 3px;
+}
+.proposal-client-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+.proposal-client-phone {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 2px;
+}
+.proposal-project-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+.proposal-project-type {
+  font-size: 11.5px;
+  color: var(--text3);
+  margin-top: 2px;
+  font-weight: 500;
+}
+.proposal-meta-col-right {
+  text-align: right;
+}
+.proposal-num {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 3px;
+  line-height: 1.2;
+}
+.proposal-date-line {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 2px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.proposal-date-line span {
+  color: var(--text3);
+}
+.proposal-date-line strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .orc-item-grid {
   display: grid;
   grid-template-columns: 1fr 120px 80px 40px;
@@ -2219,31 +2324,21 @@ textarea.inp {
     grid-template-columns: 1fr;
   }
 }
-.proposal-brand-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0;
-  line-height: 1.3;
-}
-.proposal-brand-sub {
-  font-size: 11.5px;
-  color: var(--text3);
-  letter-spacing: 0;
-  line-height: 1.5;
-}
 .proposal-table-title {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: var(--text3);
-  margin-bottom: 10px;
+  color: var(--accent);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .proposal-table-wrapper {
   border: none;
   border-radius: 0;
-  overflow: visible;
+  background: transparent;
   margin-bottom: 4px;
 }
 .proposal-table {
@@ -2252,16 +2347,16 @@ textarea.inp {
 }
 .proposal-table th {
   background: transparent;
-  padding: 0 4px 10px;
-  font-size: 10.5px;
-  font-weight: 600;
+  padding: 8px 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.6px;
   color: var(--text3);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border2);
 }
 .proposal-table td {
-  padding: 14px 4px;
+  padding: 12px 4px;
   font-size: 13px;
   color: var(--text);
   border-bottom: 1px solid var(--border);
@@ -2272,6 +2367,19 @@ textarea.inp {
 }
 .orc-item-editing td {
   background: var(--accent-bg);
+}
+.proposal-item-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.35;
+}
+.proposal-item-desc {
+  font-size: 11.5px;
+  color: var(--text3);
+  margin-top: 2px;
+  line-height: 1.4;
+  font-weight: 400;
 }
 
 /* Autocomplete — tabela de preços do cliente */
@@ -2323,147 +2431,70 @@ textarea.inp {
   margin-top: 2px;
   line-height: 1.4;
 }
-.proposal-item-name {
-  font-weight: 600;
-  font-size: 13.5px;
-  color: var(--text);
-}
-.proposal-item-desc {
-  font-size: 11.5px;
-  color: var(--text3);
-  margin-top: 3px;
-  line-height: 1.45;
-  font-weight: 400;
-}
-.notes-title {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text3);
-  margin-bottom: 6px;
-}
-.notes-content {
-  font-size: 10.5px;
-  color: var(--text3);
-  line-height: 1.45;
-  white-space: pre-wrap;
-}
 
-@media print {
-  .proposal-sheet {
-    background: #fff !important;
-    color: #000 !important;
-    padding: 0 !important;
-  }
-  .proposal-header {
-    border-bottom-color: #000 !important;
-  }
-  .proposal-brand-name {
-    color: #000 !important;
-  }
-  .proposal-table th {
-    color: #000 !important;
-    border-bottom-color: #000 !important;
-  }
-  .proposal-table td {
-    color: #000 !important;
-    border-bottom-color: #e5e7eb !important;
-  }
-}
-
-.proposal-brand-details {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  text-align: right;
-}
-.proposal-title-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 28px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 16px;
-}
-.proposal-meta-card {
-  background: transparent;
-  border: none;
-  padding: 0;
-  text-align: right;
-  min-width: 160px;
-}
-.proposal-number {
-  font-weight: 700;
-  font-size: 17px;
-  color: var(--accent);
-}
-.proposal-date {
-  font-size: 13px;
-  color: var(--text3);
-  margin-top: 3px;
-}
-.client-lbl {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text3);
-  margin-bottom: 3px;
-}
-.client-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-}
-.client-phone {
-  font-size: 12.5px;
-  color: var(--text2);
-  margin-top: 2px;
-}
 .proposal-mid-bar {
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid var(--border);
-  padding: 12px 4px;
-  font-weight: 600;
-  font-size: 13px;
-  margin-bottom: 28px;
-  color: var(--text2);
+  border-top: 1px solid var(--border2);
+  padding: 10px 4px 18px;
 }
 .subtotal-bar {
   display: flex;
   gap: 24px;
   font-family: 'Courier New', monospace;
+  font-size: 13px;
   color: var(--text);
+  font-weight: 600;
 }
+.subtotal-bar span:first-child {
+  color: var(--text3);
+  font-size: 11.5px;
+}
+.subtotal-bar span:last-child {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
 .proposal-bottom-layout {
   display: grid;
-  grid-template-columns: 1fr 250px;
-  gap: 32px;
+  grid-template-columns: 1fr 240px;
+  gap: 28px;
   align-items: start;
 }
-.proposal-notes-panel {
-  font-size: 12.5px;
-  color: var(--text2);
-  line-height: 1.6;
+@media (max-width: 768px) {
+  .proposal-bottom-layout {
+    grid-template-columns: 1fr;
+  }
 }
+.proposal-notes-panel {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.notes-content {
+  font-size: 11.5px;
+  color: var(--text2);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  margin-top: 3px;
+}
+
 .proposal-totals-panel {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 .totals-block {
   background: transparent;
   border: none;
-  border-radius: 0;
   padding: 0;
 }
 .totals-row {
   display: flex;
   justify-content: space-between;
-  font-size: 12.5px;
-  padding: 5px 0;
+  align-items: center;
+  font-size: 12px;
+  padding: 3px 0;
   color: var(--text2);
 }
 .totals-row span:last-child {
@@ -2471,38 +2502,51 @@ textarea.inp {
   font-weight: 600;
   color: var(--text);
 }
-.main-total-row {
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
-  padding-top: 10px;
-  font-size: 13.5px;
+.discount-row span:last-child {
+  color: var(--green);
   font-weight: 700;
+}
+.main-total-row {
+  border-top: 1px solid var(--border2);
+  margin-top: 6px;
+  padding-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.main-total-lbl {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
 }
 .main-total-row strong {
   color: var(--accent);
-  font-size: 17px;
+  font-size: 18px;
+  font-weight: 800;
 }
+
 .signature-block {
   display: flex;
   flex-direction: column;
   align-items: center;
   align-self: flex-end;
   margin-top: 24px;
+  width: 100%;
 }
 .signature-name {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
   white-space: nowrap;
   text-align: center;
 }
 .signature-title {
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   color: var(--text3);
-  margin-top: 4px;
+  margin-top: 3px;
   border-top: 1px solid var(--border2);
   padding-top: 4px;
   width: 140px;
@@ -2510,17 +2554,78 @@ textarea.inp {
 }
 
 @media print {
-  .proposal-title-section {
-    border-bottom-color: #000 !important;
+  @page {
+    margin: 4mm 4mm;
+    size: A4 portrait;
+  }
+  .proposal-sheet {
+    background: #ffffff !important;
+    color: #1C1B19 !important;
+    padding: 2mm 2mm !important;
+    box-shadow: none !important;
+    width: 100% !important;
+  }
+  .proposal-brand-name {
+    color: #1C1B19 !important;
+  }
+  .proposal-brand-sub {
+    color: #5C5852 !important;
+  }
+  .proposal-divider {
+    background: #1C1B19 !important;
+  }
+  .proposal-section-lbl {
+    color: #7E786E !important;
+  }
+  .proposal-client-name,
+  .proposal-project-name {
+    color: #1C1B19 !important;
+  }
+  .proposal-client-phone,
+  .proposal-project-type {
+    color: #5C5852 !important;
+  }
+  .proposal-num {
+    color: #92623a !important;
+  }
+  .proposal-date-line span {
+    color: #7E786E !important;
+  }
+  .proposal-date-line strong {
+    color: #1C1B19 !important;
+  }
+  .proposal-table th {
+    color: #7E786E !important;
+    border-bottom-color: #1C1B19 !important;
+  }
+  .proposal-table td {
+    color: #1C1B19 !important;
+    border-bottom-color: #e5e7eb !important;
+  }
+  .proposal-item-name {
+    color: #1C1B19 !important;
+  }
+  .proposal-item-desc {
+    color: #5C5852 !important;
   }
   .proposal-mid-bar {
-    border-top-color: #000 !important;
+    border-top-color: #1C1B19 !important;
+  }
+  .notes-content {
+    color: #5C5852 !important;
   }
   .main-total-row {
-    border-top-color: #000 !important;
+    border-top-color: #1C1B19 !important;
+  }
+  .main-total-row strong {
+    color: #92623a !important;
+  }
+  .signature-name {
+    color: #1C1B19 !important;
   }
   .signature-title {
-    border-top-color: #000 !important;
+    color: #5C5852 !important;
+    border-top-color: #1C1B19 !important;
   }
 }
 
@@ -2555,7 +2660,30 @@ textarea.inp {
   background: var(--red-bg);
 }
 
-
-
-
-
+/* ==========================================
+   MOBILE HARDWARE ACCELERATION & PERFORMANCE
+   ========================================== */
+@media (max-width: 768px) {
+  /* Desativa filtros de blur pesados no mobile para economizar GPU e bateria */
+  .nav, .mtab-bar, .overlay, .modal, .kcard, .mbox {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  
+  /* Rolagem fluida com aceleração por hardware nativa */
+  body, .main, .tbl-wrap, .board, .kcards, .mbody {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+  
+  /* Evita recalcular o layout da tela inteira ao rolar cards e tabelas */
+  .kcol, .kcard, .tbl tr, .proposal-meta-col {
+    contain: content;
+  }
+  
+  /* Força renderização direta na GPU */
+  .kcard, .btn, .mtab-item, .proposal-sheet {
+    transform: translateZ(0);
+    will-change: auto;
+  }
+}

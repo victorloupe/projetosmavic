@@ -182,18 +182,29 @@ function handleOrcItemDescInput() {
   const clientName = document.getElementById('orcClient').value;
   const cl = clients.find(c => c.name === clientName);
 
-  if (!val || !cl || !cl.products?.length) return hideOrcItemSuggestions();
+  if (!val) return hideOrcItemSuggestions();
 
-  const matches = cl.products.filter(p => p.name.toLowerCase().includes(val)).slice(0, 6);
+  // Busca serviços gerais e serviços associados a este cliente
+  const availableServices = getServicesForClient(cl ? cl.id : null);
+  const clientLegacyProducts = (cl && Array.isArray(cl.products)) ? cl.products : [];
+  
+  const allItems = [...availableServices];
+  clientLegacyProducts.forEach(lp => {
+    if (!allItems.some(x => (x.name || '').toLowerCase() === (lp.name || '').toLowerCase())) {
+      allItems.push(lp);
+    }
+  });
+
+  const matches = allItems.filter(p => (p.name || '').toLowerCase().includes(val)).slice(0, 6);
   if (!matches.length) return hideOrcItemSuggestions();
 
   box.innerHTML = matches.map(p => `
-    <div class="ac-item" onclick="selectOrcItemSuggestion(${p.id})">
+    <div class="ac-item" onclick="selectOrcItemSuggestion('${p.id}')">
       <div class="ac-item-top">
-        <span class="ac-item-name">${p.name}</span>
-        <span class="ac-item-price">${fmt(p.price)}</span>
+        <span class="ac-item-name">${escapeHtml(p.name)}</span>
+        <span class="ac-item-price">${fmt(p.price || 0)}</span>
       </div>
-      ${p.desc ? `<div class="ac-item-desc">${p.desc}</div>` : ''}
+      ${p.desc ? `<div class="ac-item-desc">${escapeHtml(p.desc)}</div>` : ''}
     </div>
   `).join('');
   box.classList.remove('d-none');
@@ -202,11 +213,16 @@ function handleOrcItemDescInput() {
 function selectOrcItemSuggestion(prodId) {
   const clientName = document.getElementById('orcClient').value;
   const cl = clients.find(c => c.name === clientName);
-  if (!cl) return;
-  const prod = cl.products.find(p => p.id === prodId);
+  
+  const availableServices = getServicesForClient(cl ? cl.id : null);
+  const clientLegacyProducts = (cl && Array.isArray(cl.products)) ? cl.products : [];
+  const allItems = [...availableServices, ...clientLegacyProducts];
+
+  const prod = allItems.find(p => String(p.id) === String(prodId));
   if (!prod) return;
+
   document.getElementById('newOrcItemDesc').value = prod.name;
-  document.getElementById('newOrcItemPrice').value = toBRLInputStr(prod.price);
+  document.getElementById('newOrcItemPrice').value = toBRLInputStr(prod.price || 0);
   document.getElementById('newOrcItemNote').value = prod.desc || '';
   hideOrcItemSuggestions();
   document.getElementById('newOrcItemPrice').focus();
@@ -815,20 +831,398 @@ function printOrcamento() {
   window.print();
 }
 
+function addDays(dateStr, days) {
+  const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T12:00:00'));
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function transformBudgetToProject(id) {
   const b = budgets.find(x => x.id === id);
   if (!b) return;
   if (b.status === 'Convertido') return showToast('Orçamento já foi faturado (convertido)!', 'warning');
 
+  currentFaturarPlan = null;
+  const netTotal = b.total - (parseFloat(b.discount) || 0);
+
   document.getElementById('fatOrcId').value = b.id;
-  document.getElementById('fatOrcInfo').textContent = `${b.title} — ${b.client}`;
+  document.getElementById('fatOrcInfo').innerHTML = `
+    <span><strong>${b.title}</strong> · ${b.client}</span>
+    <span style="color:var(--accent);font-weight:800;font-size:15px">${fmt(netTotal)}</span>
+  `;
   document.getElementById('fatPriority').value = 'Média';
-  document.getElementById('fatDeadline').value = b.validUntil || today();
+  document.getElementById('fatDeadline').value = b.validUntil || addDays(today(), 15);
+  
+  const condSel = document.getElementById('fatPayCondition');
+  if (condSel) condSel.value = '50_50';
+  
+  handleFatConditionChange();
   document.getElementById('faturarOverlay').classList.add('open');
 }
 
 function closeFaturarModal() {
   document.getElementById('faturarOverlay').classList.remove('open');
+}
+
+function handleFatConditionChange() {
+  const cond = document.getElementById('fatPayCondition')?.value || '50_50';
+  const wrap = document.getElementById('fatDynamicControls');
+  if (!wrap) return;
+
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  const netTotal = b ? (b.total - (parseFloat(b.discount) || 0)) : 0;
+  const deadline = document.getElementById('fatDeadline')?.value || addDays(today(), 15);
+
+  if (cond === '50_50') {
+    const halfVal = Math.round((netTotal / 2) * 100) / 100;
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+          <span style="font-size:12.5px;font-weight:600">Entrada (50%): <strong style="color:var(--accent)">${fmt(halfVal)}</strong></span>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;font-weight:600">
+            <input type="checkbox" id="fatEntryPaid" checked onchange="updateFaturarPlanPreview()" style="accent-color:var(--accent)">
+            Já recebida hoje
+          </label>
+        </div>
+        <div class="row2" id="fatEntryMethodWrap">
+          <div class="fld" style="margin:0"><label class="flbl">Forma de Pagamento da Entrada</label>
+            <select class="inp inp-sm" id="fatEntryMethod" onchange="updateFaturarPlanPreview()">
+              <option value="Pix" selected>Pix</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Cartão de Débito">Cartão de Débito</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Boleto">Boleto</option>
+              <option value="Transferência">Transferência</option>
+            </select>
+          </div>
+          <div class="fld" style="margin:0"><label class="flbl">Data da Entrada</label>
+            <input type="date" class="inp inp-sm" id="fatEntryDate" value="${today()}" onchange="updateFaturarPlanPreview()">
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--text2);padding:4px 2px">
+          <i class="bi bi-calendar-check" style="color:var(--accent)"></i> Saldo restante de <strong>${fmt(netTotal - halfVal)}</strong> com vencimento na data de entrega (${deadline ? new Date(deadline + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}).
+        </div>
+      </div>
+    `;
+  } else if (cond === 'vista') {
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+          <span style="font-size:12.5px;font-weight:600">Total à Vista: <strong style="color:var(--accent)">${fmt(netTotal)}</strong></span>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;font-weight:600">
+            <input type="checkbox" id="fatVistaPaid" checked onchange="updateFaturarPlanPreview()" style="accent-color:var(--accent)">
+            Já recebido hoje
+          </label>
+        </div>
+        <div class="row2">
+          <div class="fld" style="margin:0"><label class="flbl">Forma de Pagamento</label>
+            <select class="inp inp-sm" id="fatVistaMethod" onchange="updateFaturarPlanPreview()">
+              <option value="Pix" selected>Pix</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Cartão de Débito">Cartão de Débito</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Boleto">Boleto</option>
+              <option value="Transferência">Transferência</option>
+            </select>
+          </div>
+          <div class="fld" style="margin:0"><label class="flbl">Data do Vencimento / Recebimento</label>
+            <input type="date" class="inp inp-sm" id="fatVistaDate" value="${today()}" onchange="updateFaturarPlanPreview()">
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (cond === 'entrada_parc') {
+    const defaultEntry = Math.round((netTotal * 0.3) * 100) / 100;
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="row2">
+          <div class="fld" style="margin:0"><label class="flbl">Valor da Entrada (R$)</label>
+            <input type="text" inputmode="decimal" class="inp inp-sm" id="fatCustomEntryAmount" value="${toBRLInputStr(defaultEntry)}" oninput="maskCurrencyInput(this);updateFaturarPlanPreview()">
+          </div>
+          <div class="fld" style="margin:0"><label class="flbl">Parcelas do Saldo</label>
+            <select class="inp inp-sm" id="fatCustomParcCount" onchange="updateFaturarPlanPreview()">
+              <option value="2" selected>2x no Saldo</option>
+              <option value="3">3x no Saldo</option>
+              <option value="4">4x no Saldo</option>
+              <option value="5">5x no Saldo</option>
+              <option value="6">6x no Saldo</option>
+              <option value="10">10x no Saldo</option>
+              <option value="12">12x no Saldo</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;font-weight:600">
+            <input type="checkbox" id="fatEntryPaid" checked onchange="updateFaturarPlanPreview()" style="accent-color:var(--accent)">
+            Entrada já recebida hoje
+          </label>
+          <select class="inp inp-sm" id="fatEntryMethod" style="width:auto;padding:3px 8px;font-size:12px" onchange="updateFaturarPlanPreview()">
+            <option value="Pix" selected>Pix</option>
+            <option value="Cartão de Crédito">Cartão de Crédito</option>
+            <option value="Dinheiro">Dinheiro</option>
+            <option value="Boleto">Boleto</option>
+          </select>
+        </div>
+        <div class="row2">
+          <div class="fld" style="margin:0"><label class="flbl">1º Vencimento do Saldo</label>
+            <input type="date" class="inp inp-sm" id="fatCustomFirstDueDate" value="${addDays(today(), 30)}" onchange="updateFaturarPlanPreview()">
+          </div>
+          <div class="fld" style="margin:0"><label class="flbl">Intervalo</label>
+            <select class="inp inp-sm" id="fatCustomInterval" onchange="updateFaturarPlanPreview()">
+              <option value="30" selected>Mensal (a cada 30 dias)</option>
+              <option value="15">Quinzenal (a cada 15 dias)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (cond === 'parcelado') {
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="row2">
+          <div class="fld" style="margin:0"><label class="flbl">Quantidade de Parcelas</label>
+            <select class="inp inp-sm" id="fatDirectParcCount" onchange="updateFaturarPlanPreview()">
+              <option value="2">2x</option>
+              <option value="3" selected>3x</option>
+              <option value="4">4x</option>
+              <option value="5">5x</option>
+              <option value="6">6x</option>
+              <option value="10">10x</option>
+              <option value="12">12x</option>
+            </select>
+          </div>
+          <div class="fld" style="margin:0"><label class="flbl">1º Vencimento</label>
+            <input type="date" class="inp inp-sm" id="fatDirectFirstDueDate" value="${addDays(today(), 30)}" onchange="updateFaturarPlanPreview()">
+          </div>
+        </div>
+        <div class="fld" style="margin:0"><label class="flbl">Intervalo entre Parcelas</label>
+          <select class="inp inp-sm" id="fatDirectInterval" onchange="updateFaturarPlanPreview()">
+            <option value="30" selected>Mensal (a cada 30 dias)</option>
+            <option value="15">Quinzenal (a cada 15 dias)</option>
+          </select>
+        </div>
+      </div>
+    `;
+  }
+
+  updateFaturarPlanPreview();
+}
+
+function calculateFaturarPlan(netTotal, deadline) {
+  const cond = document.getElementById('fatPayCondition')?.value || '50_50';
+  let installments = [];
+  let payments = [];
+
+  if (cond === '50_50') {
+    const halfVal = Math.round((netTotal / 2) * 100) / 100;
+    const restVal = Math.round((netTotal - halfVal) * 100) / 100;
+    const isEntryPaid = document.getElementById('fatEntryPaid')?.checked ?? true;
+    const entryMethod = document.getElementById('fatEntryMethod')?.value || 'Pix';
+    const entryDate = document.getElementById('fatEntryDate')?.value || today();
+
+    const inst1Id = Date.now();
+    const inst2Id = Date.now() + 1;
+
+    const inst1 = {
+      id: inst1Id,
+      number: 1,
+      desc: 'Entrada (50%)',
+      amount: halfVal,
+      dueDate: entryDate,
+      status: isEntryPaid ? 'Pago' : 'Pendente',
+      paidDate: isEntryPaid ? entryDate : null,
+      method: isEntryPaid ? entryMethod : null
+    };
+
+    const inst2 = {
+      id: inst2Id,
+      number: 2,
+      desc: 'Saldo na Entrega (50%)',
+      amount: restVal,
+      dueDate: deadline || addDays(today(), 15),
+      status: 'Pendente'
+    };
+
+    installments = [inst1, inst2];
+
+    if (isEntryPaid) {
+      payments.push({
+        id: inst1Id,
+        amount: halfVal,
+        date: entryDate,
+        method: entryMethod,
+        desc: 'Entrada (50%)'
+      });
+    }
+  } else if (cond === 'vista') {
+    const isPaid = document.getElementById('fatVistaPaid')?.checked ?? true;
+    const method = document.getElementById('fatVistaMethod')?.value || 'Pix';
+    const vDate = document.getElementById('fatVistaDate')?.value || today();
+    const instId = Date.now();
+
+    installments.push({
+      id: instId,
+      number: 1,
+      desc: 'Pagamento Integral À Vista',
+      amount: netTotal,
+      dueDate: vDate,
+      status: isPaid ? 'Pago' : 'Pendente',
+      paidDate: isPaid ? vDate : null,
+      method: isPaid ? method : null
+    });
+
+    if (isPaid) {
+      payments.push({
+        id: instId,
+        amount: netTotal,
+        date: vDate,
+        method: method,
+        desc: 'Pagamento Integral À Vista'
+      });
+    }
+  } else if (cond === 'entrada_parc') {
+    const entryAmount = parseBRL(document.getElementById('fatCustomEntryAmount')?.value || '0');
+    const validEntry = Math.min(Math.max(0, entryAmount), netTotal);
+    const count = parseInt(document.getElementById('fatCustomParcCount')?.value || '2');
+    const isEntryPaid = document.getElementById('fatEntryPaid')?.checked ?? true;
+    const entryMethod = document.getElementById('fatEntryMethod')?.value || 'Pix';
+    const firstDate = document.getElementById('fatCustomFirstDueDate')?.value || addDays(today(), 30);
+    const intervalDays = parseInt(document.getElementById('fatCustomInterval')?.value || '30');
+
+    let runningId = Date.now();
+
+    if (validEntry > 0) {
+      const entryInstId = runningId++;
+      installments.push({
+        id: entryInstId,
+        number: 1,
+        desc: 'Entrada',
+        amount: validEntry,
+        dueDate: today(),
+        status: isEntryPaid ? 'Pago' : 'Pendente',
+        paidDate: isEntryPaid ? today() : null,
+        method: isEntryPaid ? entryMethod : null
+      });
+
+      if (isEntryPaid) {
+        payments.push({
+          id: entryInstId,
+          amount: validEntry,
+          date: today(),
+          method: entryMethod,
+          desc: 'Entrada'
+        });
+      }
+    }
+
+    const restTotal = Math.max(0, netTotal - validEntry);
+    if (restTotal > 0 && count > 0) {
+      const perParc = Math.round((restTotal / count) * 100) / 100;
+      let accum = 0;
+      for (let i = 1; i <= count; i++) {
+        const pVal = (i === count) ? Math.round((restTotal - accum) * 100) / 100 : perParc;
+        accum += pVal;
+        const pDate = addDays(firstDate, (i - 1) * intervalDays);
+        installments.push({
+          id: runningId++,
+          number: installments.length + 1,
+          desc: `Parcela ${i}/${count}`,
+          amount: pVal,
+          dueDate: pDate,
+          status: 'Pendente'
+        });
+      }
+    }
+  } else if (cond === 'parcelado') {
+    const count = parseInt(document.getElementById('fatDirectParcCount')?.value || '3');
+    const firstDate = document.getElementById('fatDirectFirstDueDate')?.value || addDays(today(), 30);
+    const intervalDays = parseInt(document.getElementById('fatDirectInterval')?.value || '30');
+
+    let runningId = Date.now();
+    const perParc = Math.round((netTotal / count) * 100) / 100;
+    let accum = 0;
+
+    for (let i = 1; i <= count; i++) {
+      const pVal = (i === count) ? Math.round((netTotal - accum) * 100) / 100 : perParc;
+      accum += pVal;
+      const pDate = addDays(firstDate, (i - 1) * intervalDays);
+      installments.push({
+        id: runningId++,
+        number: i,
+        desc: `Parcela ${i}/${count}`,
+        amount: pVal,
+        dueDate: pDate,
+        status: 'Pendente'
+      });
+    }
+  }
+
+  const paid = payments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  return { installments, payments, paid };
+}
+
+let currentFaturarPlan = null;
+
+function updateFaturarPlanPreview(keepEdits = false) {
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  if (!b) return;
+
+  const netTotal = b.total - (parseFloat(b.discount) || 0);
+  const deadline = document.getElementById('fatDeadline')?.value || addDays(today(), 15);
+
+  if (!keepEdits || !currentFaturarPlan || !Array.isArray(currentFaturarPlan.installments)) {
+    currentFaturarPlan = calculateFaturarPlan(netTotal, deadline);
+  }
+
+  const preview = document.getElementById('fatInstallmentsPreview');
+  const sumEl = document.getElementById('fatSummaryTotal');
+  if (sumEl) sumEl.textContent = `Total: ${fmt(netTotal)}`;
+
+  if (!preview) return;
+
+  preview.innerHTML = currentFaturarPlan.installments.map((inst, idx) => {
+    const isPaid = inst.status === 'Pago';
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface);border:1px solid ${isPaid ? 'rgba(22,163,74,0.35)' : 'var(--border)'};border-radius:8px;font-size:12px;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:200px">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${isPaid ? 'rgba(22,163,74,0.15)' : 'var(--surface2)'};color:${isPaid ? 'var(--green)' : 'var(--text3)'};font-size:11px;font-weight:700">${inst.number}</span>
+          <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+            <div style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">
+              <span>${inst.desc}</span>
+              <span class="badge" style="font-size:9.5px;padding:1px 6px;background:${isPaid ? 'rgba(22,163,74,0.15)' : 'var(--surface2)'};color:${isPaid ? 'var(--green)' : 'var(--text3)'}">${isPaid ? '✓ Já Pago' : '⏳ Pendente'}</span>
+            </div>
+            <div style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)">
+              <i class="bi bi-calendar3" style="color:var(--accent)"></i>
+              <span>Vencimento:</span>
+              <input type="date" class="inp inp-sm" style="padding:1px 6px;font-size:11.5px;height:24px;border-radius:6px;width:125px;background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer" value="${inst.dueDate || ''}" onchange="changeFaturarInstDate(${idx}, this.value)" title="Clique para editar a data de vencimento desta parcela">
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:700;font-family:'Courier New',monospace;font-size:13.5px;color:${isPaid ? 'var(--green)' : 'var(--text)'}">${fmt(inst.amount)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function changeFaturarInstDate(index, newDate) {
+  if (!currentFaturarPlan || !currentFaturarPlan.installments || !currentFaturarPlan.installments[index]) return;
+  currentFaturarPlan.installments[index].dueDate = newDate;
+
+  const inst = currentFaturarPlan.installments[index];
+  if (inst.status === 'Pago') {
+    inst.paidDate = newDate;
+    if (Array.isArray(currentFaturarPlan.payments)) {
+      const pay = currentFaturarPlan.payments.find(p => p.id === inst.id || p.desc === inst.desc);
+      if (pay) pay.date = newDate;
+    }
+  }
 }
 
 function confirmFaturarOrcamento() {
@@ -856,14 +1250,25 @@ function confirmFaturarOrcamento() {
 
   const value = b.total - (parseFloat(b.discount) || 0);
 
+  if (!currentFaturarPlan || !Array.isArray(currentFaturarPlan.installments)) {
+    currentFaturarPlan = calculateFaturarPlan(value, deadline);
+  }
+
+  const installments = currentFaturarPlan.installments;
+  const payments = currentFaturarPlan.payments || [];
+  const paid = payments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const condition = document.getElementById('fatPayCondition')?.value || '50_50';
+
   const newProj = {
     id: Date.now(),
     name: b.title,
     client: b.client,
     image: '',
     value: value,
-    payments: [],
-    paid: 0,
+    payments: payments,
+    paid: paid,
+    installments: installments,
+    paymentCondition: condition,
     products: products,
     product: products.map(p => p.name).join(', '),
     type: b.projectType || 'Outro',
@@ -880,7 +1285,7 @@ function confirmFaturarOrcamento() {
   b.status = 'Convertido';
   scheduleSync();
   closeFaturarModal();
-  showToast('Orçamento faturado com sucesso! Salvo no Kanban da Página Inicial.', 'success');
+  showToast('Orçamento faturado com sucesso! Salvo no Kanban da Página Inicial com parcelamento configurado.', 'success');
   renderOrcamentos();
 }
 
@@ -965,11 +1370,15 @@ async function generateOrcamentoPdfBlob(b) {
   };
 
   const clone = element.cloneNode(true);
+  clone.classList.remove('mbody');
+  clone.classList.add('proposal-sheet-pdf');
   clone.querySelectorAll('.no-print').forEach(el => el.remove());
   clone.style.background = '#ffffff';
   clone.style.color = '#1C1B19';
   clone.style.padding = '4mm 4mm';
   clone.style.width = '202mm';
+  clone.style.minWidth = '202mm';
+  clone.style.maxWidth = '202mm';
   clone.style.boxSizing = 'border-box';
   clone.style.boxShadow = 'none';
   clone.style.margin = '0 auto';
@@ -982,6 +1391,8 @@ async function generateOrcamentoPdfBlob(b) {
   wrapper.style.pointerEvents = 'none';
   wrapper.style.background = '#ffffff';
   wrapper.style.width = '202mm';
+  wrapper.style.minWidth = '202mm';
+  wrapper.style.maxWidth = '202mm';
   wrapper.appendChild(clone);
   document.body.appendChild(wrapper);
 

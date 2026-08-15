@@ -104,13 +104,29 @@ function copyCliLink(){
 function renderCliProductsTable(cl,editingId=null){
   const tb=document.getElementById('cliProdList');
   if(!tb) return;
-  if(!cl.products?.length){tb.innerHTML='<tr><td colspan="4"><div class="empty-state" style="padding:16px"><i class="bi bi-table"></i><span>Tabela vazia</span></div></td></tr>';return;}
-  tb.innerHTML=cl.products.map(p=>{
+  
+  const clientServices = getServicesForClient(cl.id);
+  const clientLegacy = Array.isArray(cl.products) ? cl.products : [];
+  
+  const allProds = [...clientServices];
+  clientLegacy.forEach(lp => {
+    if (!allProds.some(x => String(x.id) === String(lp.id) || (x.name||'').toLowerCase() === (lp.name||'').toLowerCase())) {
+      allProds.push(lp);
+    }
+  });
+
+  if(!allProds.length){
+    tb.innerHTML='<tr><td colspan="4"><div class="empty-state" style="padding:16px"><i class="bi bi-table"></i><span>Nenhum serviço associado</span></div></td></tr>';
+    return;
+  }
+
+  tb.innerHTML=allProds.map(p=>{
+    const isGlobal = !p.targetType || p.targetType === 'all';
     if(p.id===editingId){
       return `<tr style="background:var(--accent-bg)">
         <td style="padding:5px 8px">
-          <input id="epName_${p.id}" class="inp inp-sm" value="${p.name}" style="width:100%;margin-bottom:4px">
-          <input id="epDesc_${p.id}" class="inp inp-sm" value="${p.desc||''}" placeholder="Descrição (opcional)" style="width:100%;font-size:11.5px">
+          <input id="epName_${p.id}" class="inp inp-sm" value="${escapeHtml(p.name)}" style="width:100%;margin-bottom:4px">
+          <input id="epDesc_${p.id}" class="inp inp-sm" value="${escapeHtml(p.desc||'')}" placeholder="Descrição (opcional)" style="width:100%;font-size:11.5px">
         </td>
         <td style="padding:5px 8px"><input id="epPrice_${p.id}" type="text" inputmode="decimal" class="inp inp-sm" value="${toBRLInputStr(p.price)}" oninput="maskCurrencyInput(this)" style="width:110px"></td>
         <td style="padding:5px 8px;text-align:right;white-space:nowrap">
@@ -121,8 +137,11 @@ function renderCliProductsTable(cl,editingId=null){
     }
     return `<tr>
       <td style="padding:7px 10px">
-        <div style="font-size:13px;font-weight:500">${p.name}</div>
-        ${p.desc?`<div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4">${p.desc}</div>`:''}
+        <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px">
+          <span>${escapeHtml(p.name)}</span>
+          ${isGlobal ? '<span class="badge" style="font-size:9.5px;padding:1px 5px;background:rgba(22,163,74,0.12);color:var(--green)">Geral</span>' : ''}
+        </div>
+        ${p.desc?`<div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4">${escapeHtml(p.desc)}</div>`:''}
       </td>
       <td style="padding:7px 10px;font-family:'Courier New',monospace;font-weight:700;color:var(--green)">${fmt(p.price)}</td>
       <td style="padding:7px 10px;text-align:right;white-space:nowrap">
@@ -141,14 +160,25 @@ function editProdCli(id){
 
 function saveProdEdit(id){
   const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
-  const p=cl.products.find(x=>x.id===id);if(!p)return;
   const newName=document.getElementById('epName_'+id)?.value.trim();
   const newDesc=document.getElementById('epDesc_'+id)?.value.trim();
   const newPriceStr=document.getElementById('epPrice_'+id)?.value.trim();
   if(!newPriceStr)return showToast('Preço inválido','warning');
   const newPrice=parseCurrencyInput(newPriceStr);
   if(!newName)return showToast('Nome não pode ser vazio','warning');
-  p.name=newName;p.price=newPrice;p.desc=newDesc;
+
+  // Atualiza em cl.products se existir
+  if (Array.isArray(cl.products)) {
+    const p=cl.products.find(x=>x.id===id);
+    if (p) { p.name=newName; p.price=newPrice; p.desc=newDesc; }
+  }
+
+  // Atualiza em services se existir
+  if (Array.isArray(services)) {
+    const s = services.find(x => x.id === id);
+    if (s) { s.name=newName; s.price=newPrice; s.desc=newDesc; }
+  }
+
   renderCliProductsTable(cl);renderCliList();scheduleSync();showToast('Serviço atualizado!','success');
 }
 
@@ -159,13 +189,38 @@ function addProdToCli(){
   if(!n||!prStr)return showToast('Preencha nome e preço','warning');
   const pr=parseCurrencyInput(prStr);
   const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
-  if(!cl.products)cl.products=[];cl.products.push({id:Date.now(),name:n,price:pr,desc});
+  
+  const newId = Date.now();
+  if(!cl.products)cl.products=[];
+  cl.products.push({id:newId,name:n,price:pr,desc});
+  
+  if(!Array.isArray(services)) services = [];
+  services.push({
+    id: newId,
+    name: n,
+    category: 'Geral',
+    price: pr,
+    desc: desc,
+    targetType: 'selected',
+    clientIds: [cl.id],
+    createdAt: Date.now()
+  });
+
   document.getElementById('newProdName').value='';document.getElementById('newProdPrice').value='';document.getElementById('newProdDesc').value='';
   renderCliProductsTable(cl);renderCliList();scheduleSync();showToast('Item adicionado!','success');
 }
 
 function removeProdFromCli(id){
   const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
-  cl.products=cl.products.filter(p=>p.id!==id);
+  if(Array.isArray(cl.products)) cl.products=cl.products.filter(p=>p.id!==id);
+  if(Array.isArray(services)) {
+    const s = services.find(x => x.id === id);
+    if (s && s.targetType === 'selected') {
+      s.clientIds = (s.clientIds || []).filter(cid => cid !== cl.id);
+      if (s.clientIds.length === 0) {
+        services = services.filter(x => x.id !== id);
+      }
+    }
+  }
   renderCliProductsTable(cl);renderCliList();scheduleSync();
 }

@@ -54,12 +54,13 @@
   </div>
   <div class="nav-sep"></div>
   <div class="nav-tabs">
-    <a class="nav-tab on" href="index.html"><i class="bi bi-kanban"></i> Board</a>
+    <a class="nav-tab on" href="index.html"><i class="bi bi-kanban"></i> Quadro</a>
     <a class="nav-tab" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
     <a class="nav-tab" href="orcamento.html"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamentos</a>
     <a class="nav-tab" href="pagamentos.html"><i class="bi bi-credit-card"></i> Pagamentos</a>
     <a class="nav-tab" href="relatorio.html"><i class="bi bi-graph-up-arrow"></i> Relatórios</a>
     <a class="nav-tab" href="clientes.html"><i class="bi bi-people"></i> Clientes</a>
+    <a class="nav-tab" href="servicos.html"><i class="bi bi-box-seam"></i> Serviços</a>
   </div>
   <div class="nav-spacer"></div>
   <button class="btn-icon" id="gnNavBtn" onclick="openGlobalNoticeModal()" title="Central de Avisos"><i class="bi bi-megaphone"></i></button>
@@ -68,23 +69,19 @@
   <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Tema"><i class="bi bi-moon-stars"></i></button>
   <button class="btn-icon btn-logout" onclick="logoutAdmin()" title="Sair do painel"><i class="bi bi-box-arrow-right"></i></button>
 </nav>
-<button class="fab" onclick="openProjectModal()" title="Novo Projeto"><i class="bi bi-plus-lg"></i></button>
 
 <!-- BOARD VIEW -->
 <div class="board-view" id="boardView">
   <div class="board-header">
     <h4 style="font-weight:700;color:var(--accent);margin:0">Quadro de Projetos</h4>
-    <button class="btn btn-primary btn-sm btn-novo-desktop" onclick="openProjectModal()"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
+    <button class="btn btn-primary btn-sm" onclick="openProjectModal()" style="white-space:nowrap"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
   </div>
   <div class="toolbar">
     <input type="text" class="inp inp-sm" id="srch" placeholder="Buscar projeto ou cliente…" oninput="renderBoard()">
     <div class="toolbar-filters">
-      <div style="display:flex;gap:4px;align-items:center;min-width:130px;flex:1">
-        <select class="inp inp-sm project-type-select" id="fType" onchange="renderBoard()" style="width:100%">
-          <option value="">Todos os Tipos</option>
-        </select>
-        <button class="btn btn-ghost btn-sm" onclick="openManageProjectTypesModal()" title="Gerenciar tipos de projeto" style="padding:6px 8px;flex-shrink:0"><i class="bi bi-tags"></i></button>
-      </div>
+      <select class="inp inp-sm project-type-select" id="fType" onchange="renderBoard()">
+        <option value="">Todos os Tipos</option>
+      </select>
       <select class="inp inp-sm" id="fPrio" onchange="renderBoard()">
         <option value="">Prioridades</option>
         <option value="Alta">🔴 Alta</option><option value="Média">🟡 Média</option><option value="Baixa">🟢 Baixa</option>
@@ -94,10 +91,11 @@
       </select>
       <div style="position:relative">
         <button class="btn btn-ghost btn-sm" onclick="toggleColsMenu()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px"><i class="bi bi-layout-three-columns"></i> Colunas</button>
-        <div class="sort-menu" id="colsMenu" style="min-width:190px;left:0;right:auto">
+        <div class="sort-menu" id="colsMenu" style="min-width:215px;right:0;left:auto;z-index:500">
           <div id="colMenuItems"></div>
           <div style="height:1px;background:var(--border);margin:3px 0"></div>
-          <button onclick="openManageColumnsModal();closeColsMenu()"><i class="bi bi-gear"></i> Gerenciar colunas</button>
+          <button onclick="openManageColumnsModal();closeColsMenu()"><i class="bi bi-layout-three-columns"></i> Gerenciar colunas</button>
+          <button onclick="openManageProjectTypesModal();closeColsMenu()"><i class="bi bi-tags"></i> Gerenciar tipos de projeto</button>
         </div>
       </div>
     </div>
@@ -477,16 +475,17 @@
 </div>
 
 <nav class="mtab-bar" id="mtabBar">
-  <a class="mtab-item active" href="index.html" title="Board" aria-label="Board"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
+  <a class="mtab-item active" href="index.html" title="Quadro" aria-label="Quadro"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
   <a class="mtab-item" href="dashboard.html" title="Dashboard" aria-label="Dashboard"><span class="mtab-bubble"><i class="bi bi-speedometer2"></i></span></a>
   <a class="mtab-item" href="orcamento.html" title="Orçamentos" aria-label="Orçamentos"><span class="mtab-bubble"><i class="bi bi-file-earmark-spreadsheet"></i></span></a>
   <a class="mtab-item" href="pagamentos.html" title="Pagamentos" aria-label="Pagamentos"><span class="mtab-bubble"><i class="bi bi-credit-card"></i></span></a>
   <a class="mtab-item" href="relatorio.html" title="Relatórios" aria-label="Relatórios"><span class="mtab-bubble"><i class="bi bi-graph-up-arrow"></i></span></a>
   <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
+  <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=102"></script>
-<script src="board.js?v=102"></script>
+<script src="common.js?v=106"></script>
+<script src="board.js?v=106"></script>
 <script>
   // Board column popover selector helper
   function toggleColsMenu() {

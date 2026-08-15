@@ -46,12 +46,13 @@
   </div>
   <div class="nav-sep"></div>
   <div class="nav-tabs">
-    <a class="nav-tab" href="index.html"><i class="bi bi-kanban"></i> Board</a>
+    <a class="nav-tab" href="index.html"><i class="bi bi-kanban"></i> Quadro</a>
     <a class="nav-tab" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
     <a class="nav-tab on" href="orcamento.html"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamentos</a>
     <a class="nav-tab" href="pagamentos.html"><i class="bi bi-credit-card"></i> Pagamentos</a>
     <a class="nav-tab" href="relatorio.html"><i class="bi bi-graph-up-arrow"></i> Relatórios</a>
     <a class="nav-tab" href="clientes.html"><i class="bi bi-people"></i> Clientes</a>
+    <a class="nav-tab" href="servicos.html"><i class="bi bi-box-seam"></i> Serviços</a>
   </div>
   <div class="nav-spacer"></div>
   <button class="btn-icon" id="gnNavBtn" onclick="openGlobalNoticeModal()" title="Central de Avisos"><i class="bi bi-megaphone"></i></button>
@@ -304,16 +305,48 @@
 </div>
 
 <div class="overlay" id="faturarOverlay" onclick="if(event.target===this)closeFaturarModal()">
-<div class="mbox msm">
-  <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-arrow-right-circle"></i> Faturar Orçamento</h5><button class="btn-icon btn-sm" onclick="closeFaturarModal()"><i class="bi bi-x-lg"></i></button></div>
+<div class="mbox mmd">
+  <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-arrow-right-circle"></i> Faturar Orçamento em Projeto</h5><button class="btn-icon btn-sm" onclick="closeFaturarModal()"><i class="bi bi-x-lg"></i></button></div>
   <div class="mbody">
     <input type="hidden" id="fatOrcId">
-    <div class="fld"><label class="flbl">Orçamento</label><div id="fatOrcInfo" style="font-size:14px;font-weight:600;padding:8px 10px;background:var(--surface2);border-radius:8px"></div></div>
-    <div class="row2">
-      <div class="fld"><label class="flbl">Prioridade</label><select class="inp inp-sm" id="fatPriority"><option value="Alta">&#128308; Alta</option><option value="Média" selected>&#128993; Média</option><option value="Baixa">&#128994; Baixa</option></select></div>
-      <div class="fld"><label class="flbl">Prazo de Entrega *</label><input type="date" class="inp inp-sm" id="fatDeadline"></div>
+    
+    <div class="fld" style="margin-bottom:12px">
+      <label class="flbl">Orçamento Selecionado</label>
+      <div id="fatOrcInfo" style="font-size:14px;font-weight:600;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"></div>
     </div>
-    <p style="font-size:12px;color:var(--text3);margin:4px 0 0"><i class="bi bi-info-circle"></i> O projeto sera criado na coluna "Briefing" com os itens da proposta como tarefas.</p>
+
+    <div class="row2" style="margin-bottom:12px">
+      <div class="fld"><label class="flbl">Prioridade</label><select class="inp inp-sm" id="fatPriority"><option value="Alta">&#128308; Alta</option><option value="Média" selected>&#128993; Média</option><option value="Baixa">&#128994; Baixa</option></select></div>
+      <div class="fld"><label class="flbl">Prazo de Entrega do Projeto *</label><input type="date" class="inp inp-sm" id="fatDeadline" onchange="updateFaturarPlanPreview()"></div>
+    </div>
+
+    <div class="stgrp" style="margin-bottom:12px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">
+      <div class="sec" style="margin-bottom:10px;font-size:13px"><i class="bi bi-cash-coin" style="color:var(--accent)"></i> Condição de Pagamento</div>
+      
+      <div class="fld" style="margin-bottom:10px">
+        <label class="flbl">Como será realizado o pagamento?</label>
+        <select class="inp inp-sm" id="fatPayCondition" onchange="handleFatConditionChange()">
+          <option value="50_50" selected>50% Entrada + 50% na Entrega (Padrão MAVIC)</option>
+          <option value="vista">À Vista (100%)</option>
+          <option value="entrada_parc">Entrada + Parcelas do Saldo</option>
+          <option value="parcelado">Parcelado sem Entrada</option>
+        </select>
+      </div>
+
+      <!-- Configurações Dinâmicas por Condição -->
+      <div id="fatDynamicControls"></div>
+
+      <!-- Pré-visualização das Parcelas Calculadas -->
+      <div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+          <span>Cronograma de Vencimentos</span>
+          <span id="fatSummaryTotal" style="color:var(--accent);font-weight:800;font-size:12px"></span>
+        </div>
+        <div id="fatInstallmentsPreview" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+    </div>
+
+    <p style="font-size:11.5px;color:var(--text3);margin:4px 0 0"><i class="bi bi-info-circle"></i> O projeto será inserido na coluna <strong>"Briefing"</strong> com os produtos como checklist de tarefas e o financeiro sincronizado.</p>
   </div>
   <div class="mftr">
     <button class="btn btn-ghost" onclick="closeFaturarModal()">Cancelar</button>
@@ -485,15 +518,16 @@
 </div>
 
 <nav class="mtab-bar" id="mtabBar">
-  <a class="mtab-item" href="index.html" title="Board" aria-label="Board"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
+  <a class="mtab-item" href="index.html" title="Quadro" aria-label="Quadro"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
   <a class="mtab-item" href="dashboard.html" title="Dashboard" aria-label="Dashboard"><span class="mtab-bubble"><i class="bi bi-speedometer2"></i></span></a>
   <a class="mtab-item active" href="orcamento.html" title="Orçamentos" aria-label="Orçamentos"><span class="mtab-bubble"><i class="bi bi-file-earmark-spreadsheet"></i></span></a>
   <a class="mtab-item" href="pagamentos.html" title="Pagamentos" aria-label="Pagamentos"><span class="mtab-bubble"><i class="bi bi-credit-card"></i></span></a>
   <a class="mtab-item" href="relatorio.html" title="Relatórios" aria-label="Relatórios"><span class="mtab-bubble"><i class="bi bi-graph-up-arrow"></i></span></a>
   <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
+  <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=102"></script>
-<script src="orcamento.js?v=102"></script>
+<script src="common.js?v=106"></script>
+<script src="orcamento.js?v=106"></script>
 </body>
 </html>

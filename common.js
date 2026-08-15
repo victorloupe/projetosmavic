@@ -242,7 +242,7 @@ if (localStorage.getItem('mavic_waTemplate') === null) {
   localStorage.setItem('mavic_waTemplate', DEFAULT_WA_TEMPLATE);
 }
 
-let sb=null, projects=[], clients=[], appColumns=[...INIT_COLS], budgets=[];
+let sb=null, projects=[], clients=[], appColumns=[...INIT_COLS], budgets=[], services=[];
 let globalNotices=[];
 let visibleColumns=INIT_COLS.map(c=>c.id), minimizedColumns=[], colSorts={};
 let notifications=[], appTheme='light', currentView='board';
@@ -272,12 +272,161 @@ if (currentPath.includes('dashboard.html')) {
   currentView = 'orcamentos';
 } else if (currentPath.includes('pagamentos.html')) {
   currentView = 'pagamentos';
+} else if (currentPath.includes('servicos.html')) {
+  currentView = 'servicos';
 } else if (currentPath.includes('relatorio.html')) {
   currentView = 'relatorios';
 } else if (currentPath.includes('clientes.html')) {
   currentView = 'clientes';
 } else {
   currentView = 'board';
+}
+
+function getServicesForClient(clientId) {
+  const cid = clientId ? (typeof clientId === 'number' ? clientId : parseInt(clientId)) : null;
+  return (services || []).filter(s => {
+    if (!s.targetType || s.targetType === 'all') return true;
+    if (s.targetType === 'selected') {
+      if (!cid) return true;
+      const ids = Array.isArray(s.clientIds) ? s.clientIds.map(Number) : [];
+      return ids.includes(cid);
+    }
+    return true;
+  });
+}
+
+function safeParsePrice(val) {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (!val) return 0;
+  if (typeof val === 'string') {
+    const cleaned = val.replace(/[^\d.,]/g, '').trim();
+    if (!cleaned) return 0;
+    if (cleaned.includes(',')) {
+      return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    return parseFloat(cleaned) || 0;
+  }
+  return 0;
+}
+
+function checkAndMigrateLegacyProducts() {
+  if (!Array.isArray(services)) services = [];
+  let updated = false;
+  let migratedCount = 0;
+
+  // 1. Sincroniza produtos cadastrados nos Clientes
+  (clients || []).forEach(cl => {
+    let prods = cl.products;
+    if (typeof prods === 'string') {
+      try { prods = JSON.parse(prods); } catch(e) { prods = []; }
+    }
+    if (Array.isArray(prods)) {
+      prods.forEach(p => {
+        if (!p) return;
+        const pNameTrim = (p.name || p.desc || p.title || '').trim();
+        if (!pNameTrim) return;
+        const priceNum = safeParsePrice(p.price);
+        const existing = services.find(s => (s.name || '').trim().toLowerCase() === pNameTrim.toLowerCase());
+        if (existing) {
+          if (!Array.isArray(existing.clientIds)) existing.clientIds = [];
+          if (cl.id && !existing.clientIds.includes(cl.id)) {
+            existing.clientIds.push(cl.id);
+            updated = true;
+          }
+          if ((!existing.price || existing.price === 0) && priceNum > 0) {
+            existing.price = priceNum;
+            updated = true;
+          }
+          if (!existing.desc && p.desc) {
+            existing.desc = p.desc;
+            updated = true;
+          }
+        } else {
+          services.push({
+            id: p.id || (Date.now() + migratedCount),
+            name: pNameTrim,
+            category: 'Geral',
+            price: priceNum,
+            desc: p.desc || '',
+            targetType: 'selected',
+            clientIds: cl.id ? [cl.id] : [],
+            createdAt: Date.now()
+          });
+          migratedCount++;
+          updated = true;
+        }
+      });
+    }
+  });
+
+  // 2. Sincroniza produtos cadastrados em Projetos legados
+  (projects || []).forEach(proj => {
+    let prods = proj.products;
+    if (typeof prods === 'string') {
+      try { prods = JSON.parse(prods); } catch(e) { prods = []; }
+    }
+    if (Array.isArray(prods)) {
+      prods.forEach(p => {
+        if (!p) return;
+        const pNameTrim = (p.name || p.desc || p.title || '').trim();
+        if (!pNameTrim) return;
+        const priceNum = safeParsePrice(p.price);
+        const existing = services.find(s => (s.name || '').trim().toLowerCase() === pNameTrim.toLowerCase());
+        if (!existing) {
+          const matchedCli = (clients || []).find(c => (c.name || '').trim().toLowerCase() === (proj.client || '').trim().toLowerCase());
+          services.push({
+            id: p.id || (Date.now() + migratedCount),
+            name: pNameTrim,
+            category: 'Geral',
+            price: priceNum,
+            desc: p.desc || '',
+            targetType: matchedCli ? 'selected' : 'all',
+            clientIds: matchedCli ? [matchedCli.id] : [],
+            createdAt: Date.now()
+          });
+          migratedCount++;
+          updated = true;
+        }
+      });
+    }
+  });
+
+  // 3. Sincroniza itens cadastrados em Orçamentos legados
+  (budgets || []).forEach(b => {
+    let items = b.items;
+    if (typeof items === 'string') {
+      try { items = JSON.parse(items); } catch(e) { items = []; }
+    }
+    if (Array.isArray(items)) {
+      items.forEach(it => {
+        if (!it) return;
+        const itName = (it.desc || it.name || it.title || '').trim();
+        if (!itName) return;
+        const priceNum = safeParsePrice(it.price);
+        const existing = services.find(s => (s.name || '').trim().toLowerCase() === itName.toLowerCase());
+        if (!existing) {
+          const matchedCli = (clients || []).find(c => (c.name || '').trim().toLowerCase() === (b.client || '').trim().toLowerCase());
+          services.push({
+            id: it.id || (Date.now() + migratedCount),
+            name: itName,
+            category: 'Geral',
+            price: priceNum,
+            desc: it.note || it.desc || '',
+            targetType: matchedCli ? 'selected' : 'all',
+            clientIds: matchedCli ? [matchedCli.id] : [],
+            createdAt: Date.now()
+          });
+          migratedCount++;
+          updated = true;
+        }
+      });
+    }
+  });
+
+  if (updated) {
+    syncLocal();
+    scheduleSync();
+  }
 }
 
 // ══════════════════════════════════════════
@@ -368,6 +517,8 @@ async function loadData(){
     projects=map.projects||[];clients=map.clients||[];notifications=map.notifications||[];
     globalNotices=map.global_notices||(map.global_notice?[map.global_notice]:[]);
     budgets=map.budgets||[];
+    services=map.services||[];
+    checkAndMigrateLegacyProducts();
     const cfg=map.config||{};
     appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
     visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
@@ -392,6 +543,8 @@ function loadLocal(){
   notifications=JSON.parse(localStorage.getItem('mavic_notifications')||'[]') || [];
   globalNotices=JSON.parse(localStorage.getItem('mavic_global_notices')||'[]') || [];
   budgets=JSON.parse(localStorage.getItem('mavic_budgets')||'[]') || [];
+  services=JSON.parse(localStorage.getItem('mavic_services')||'[]') || [];
+  checkAndMigrateLegacyProducts();
   const cfg=JSON.parse(localStorage.getItem('mavic_config')||'{}') || {};
   appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
   visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
@@ -414,6 +567,7 @@ function syncLocal(){
   localStorage.setItem('mavic_notifications',JSON.stringify(notifications));
   localStorage.setItem('mavic_global_notices',JSON.stringify(globalNotices));
   localStorage.setItem('mavic_budgets',JSON.stringify(budgets));
+  localStorage.setItem('mavic_services',JSON.stringify(services));
   localStorage.setItem('mavic_config',JSON.stringify({
     columns:appColumns,
     visibleColumns,
@@ -447,6 +601,7 @@ async function syncCloud(){
       {key:'notifications',data:notifications},
       {key:'global_notices',data:globalNotices},
       {key:'budgets',data:budgets},
+      {key:'services',data:services},
       {key:'config',data:{
         columns:appColumns,
         visibleColumns,
@@ -746,6 +901,15 @@ function pgSetSize(key,value,renderFnName){
 }
 
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 function today(){return new Date().toISOString().split('T')[0];}
 function formatPhone(phone){
   const d=(phone||'').replace(/\D/g,'');

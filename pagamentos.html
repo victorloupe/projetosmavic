@@ -46,12 +46,13 @@
   </div>
   <div class="nav-sep"></div>
   <div class="nav-tabs">
-    <a class="nav-tab" href="index.html"><i class="bi bi-kanban"></i> Board</a>
+    <a class="nav-tab" href="index.html"><i class="bi bi-kanban"></i> Quadro</a>
     <a class="nav-tab" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
     <a class="nav-tab" href="orcamento.html"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamentos</a>
     <a class="nav-tab on" href="pagamentos.html"><i class="bi bi-credit-card"></i> Pagamentos</a>
     <a class="nav-tab" href="relatorio.html"><i class="bi bi-graph-up-arrow"></i> Relatórios</a>
     <a class="nav-tab" href="clientes.html"><i class="bi bi-people"></i> Clientes</a>
+    <a class="nav-tab" href="servicos.html"><i class="bi bi-box-seam"></i> Serviços</a>
   </div>
   <div class="nav-spacer"></div>
   <button class="btn-icon" id="gnNavBtn" onclick="openGlobalNoticeModal()" title="Central de Avisos"><i class="bi bi-megaphone"></i></button>
@@ -63,74 +64,216 @@
 
 <!-- PAGAMENTOS VIEW -->
 <div class="dash-view" id="pagamentosView" style="display:block">
-  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">
-    <h4 style="font-weight:700;color:var(--accent);margin:0">Controle de Pagamentos</h4>
-    <button class="btn btn-primary btn-sm" onclick="openAddPaymentDirectModal()"><i class="bi bi-plus-lg"></i> Novo Pagamento</button>
+  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px">
+    <h4 style="font-weight:700;color:var(--accent);margin:0">Pagamentos</h4>
+    <button class="btn btn-primary btn-sm" onclick="openAddPaymentDirectModal()" style="white-space:nowrap"><i class="bi bi-plus-lg"></i> Novo Pagamento</button>
   </div>
   
-  <div class="toolbar">
-    <input type="text" class="inp inp-sm" id="fPaySearch" placeholder="Buscar pagamento…" oninput="pgReset('pagamentos');renderPagamentos()">
-    <div class="toolbar-filters">
-      <select class="inp inp-sm" id="fPayClient" onchange="pgReset('pagamentos');renderPagamentos()">
-        <option value="">Todos os Clientes</option>
-      </select>
-      <select class="inp inp-sm" id="fPayYear" onchange="pgReset('pagamentos');renderPagamentos()">
-        <option value="">Todos os Anos</option>
-      </select>
-      <select class="inp inp-sm" id="fPayMonth" onchange="pgReset('pagamentos');renderPagamentos()">
-        <option value="">Todos os Meses</option>
-        <option value="01">Janeiro</option>
-        <option value="02">Fevereiro</option>
-        <option value="03">Março</option>
-        <option value="04">Abril</option>
-        <option value="05">Maio</option>
-        <option value="06">Junho</option>
-        <option value="07">Julho</option>
-        <option value="08">Agosto</option>
-        <option value="09">Setembro</option>
-        <option value="10">Outubro</option>
-        <option value="11">Novembro</option>
-        <option value="12">Dezembro</option>
-      </select>
+  <!-- KPI Cards Summary -->
+  <div class="pay-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;margin-bottom:16px">
+    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:10px;background:rgba(22,163,74,0.12);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-check2-circle"></i></div>
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">Total Recebido</div>
+        <div style="font-size:18px;font-weight:800;color:var(--green);font-family:'Courier New',monospace" id="kpiTotalRecebido">R$ 0,00</div>
+      </div>
+    </div>
+    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:10px;background:rgba(37,99,235,0.12);color:#2563EB;display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-hourglass-split"></i></div>
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">A Receber (Pendente)</div>
+        <div style="font-size:18px;font-weight:800;color:#2563EB;font-family:'Courier New',monospace" id="kpiTotalAReceber">R$ 0,00</div>
+      </div>
+    </div>
+    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:10px;background:rgba(220,38,38,0.12);color:var(--red);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-exclamation-triangle"></i></div>
+      <div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">Vencidos / Atrasados</div>
+        <div style="font-size:18px;font-weight:800;color:var(--red);font-family:'Courier New',monospace" id="kpiTotalAtrasado">R$ 0,00</div>
+      </div>
     </div>
   </div>
-  
-  <!-- Tabela Desktop -->
-  <div class="dash-table pay-desktop-table">
-    <table>
-      <thead>
-        <tr>
-          <th>Cliente</th>
-          <th>Projeto</th>
-          <th>Data</th>
-          <th>Forma</th>
-          <th>Valor Recebido</th>
-          <th style="width:240px;text-align:right">Ações</th>
-        </tr>
-      </thead>
-      <tbody id="payTableBody">
-        <tr>
-          <td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Nenhum pagamento registrado</td>
-        </tr>
-      </tbody>
-    </table>
+
+  <!-- Abas de Pagamentos (Segmented Control sem scroll) -->
+  <div class="pay-tabs-wrap">
+    <button class="pay-tab-btn active" id="tabBtnAReceber" onclick="switchPayTab('areceber')">
+      <i class="bi bi-clock-history"></i> <span>A Receber</span> <span class="badge" id="badgeCountAReceber">0</span>
+    </button>
+    <button class="pay-tab-btn" id="tabBtnPagos" onclick="switchPayTab('pagos')">
+      <i class="bi bi-check2-all"></i> <span>Pagos</span> <span class="badge" id="badgeCountPagos">0</span>
+    </button>
   </div>
 
-  <!-- Cards Mobile -->
-  <div class="pay-mobile-list" id="payMobileList">
-    <div style="text-align:center;color:var(--text3);padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px">Nenhum pagamento registrado</div>
+  <!-- ABA 1: A RECEBER / PENDENTES -->
+  <div id="tabContentAReceber">
+    <div class="toolbar">
+      <input type="text" class="inp inp-sm" id="fPendingSearch" placeholder="Buscar parcelas pendentes…" oninput="pgReset('pending_pays');renderPendingInstallments()">
+      <div class="toolbar-filters">
+        <select class="inp inp-sm" id="fPendingClient" onchange="pgReset('pending_pays');renderPendingInstallments()">
+          <option value="">Todos os Clientes</option>
+        </select>
+        <select class="inp inp-sm" id="fPendingStatus" onchange="pgReset('pending_pays');renderPendingInstallments()">
+          <option value="">Todos os Vencimentos</option>
+          <option value="overdue">⚠️ Atrasados</option>
+          <option value="today">⏰ Vencem Hoje</option>
+          <option value="upcoming">📅 A Vencer (No Prazo)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tabela Desktop A Receber -->
+    <div class="dash-table pay-desktop-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Projeto</th>
+            <th>Parcela / Descrição</th>
+            <th>Vencimento</th>
+            <th>Valor</th>
+            <th style="width:230px;text-align:right">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="pendingTableBody">
+          <tr>
+            <td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Nenhuma parcela pendente encontrada</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Cards Mobile A Receber -->
+    <div class="pay-mobile-list" id="pendingMobileList">
+      <div style="text-align:center;color:var(--text3);padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px">Nenhuma parcela pendente encontrada</div>
+    </div>
+
+    <div id="pendingPagination"></div>
   </div>
 
-  <div id="payPagination"></div>
+  <!-- ABA 2: RECEBIDOS / PAGOS -->
+  <div id="tabContentPagos" style="display:none">
+    <div class="toolbar">
+      <input type="text" class="inp inp-sm" id="fPaySearch" placeholder="Buscar pagamento…" oninput="pgReset('pagamentos');renderPagamentos()">
+      <div class="toolbar-filters">
+        <select class="inp inp-sm" id="fPayClient" onchange="pgReset('pagamentos');renderPagamentos()">
+          <option value="">Todos os Clientes</option>
+        </select>
+        <select class="inp inp-sm" id="fPayYear" onchange="pgReset('pagamentos');renderPagamentos()">
+          <option value="">Todos os Anos</option>
+        </select>
+        <select class="inp inp-sm" id="fPayMonth" onchange="pgReset('pagamentos');renderPagamentos()">
+          <option value="">Todos os Meses</option>
+          <option value="01">Janeiro</option>
+          <option value="02">Fevereiro</option>
+          <option value="03">Março</option>
+          <option value="04">Abril</option>
+          <option value="05">Maio</option>
+          <option value="06">Junho</option>
+          <option value="07">Julho</option>
+          <option value="08">Agosto</option>
+          <option value="09">Setembro</option>
+          <option value="10">Outubro</option>
+          <option value="11">Novembro</option>
+          <option value="12">Dezembro</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Tabela Desktop Pagos -->
+    <div class="dash-table pay-desktop-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Projeto</th>
+            <th>Data</th>
+            <th>Forma</th>
+            <th>Valor Recebido</th>
+            <th style="width:240px;text-align:right">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="payTableBody">
+          <tr>
+            <td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Nenhum pagamento registrado</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Cards Mobile Pagos -->
+    <div class="pay-mobile-list" id="payMobileList">
+      <div style="text-align:center;color:var(--text3);padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px">Nenhum pagamento registrado</div>
+    </div>
+
+    <div id="payPagination"></div>
+  </div>
 </div>
 
 <div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ══ DAR BAIXA EM PARCELA MODAL ══ -->
+<div class="overlay" id="darBaixaOverlay" onclick="if(event.target===this)closeDarBaixaModal()">
+<div class="mbox mmd">
+  <div class="mhdr">
+    <h5 style="color:var(--green)"><i class="bi bi-check2-circle"></i> Confirmar Recebimento de Parcela</h5>
+    <button class="btn-icon btn-sm" onclick="closeDarBaixaModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody">
+    <input type="hidden" id="baixaProjId">
+    <input type="hidden" id="baixaInstId">
+
+    <div style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px">
+      <div style="font-size:14px;font-weight:700;color:var(--text)" id="baixaInfoProj">—</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px" id="baixaInfoClient">—</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
+        <span style="font-size:12px;color:var(--accent);font-weight:600" id="baixaInfoDesc">Parcela</span>
+        <strong style="font-size:15px;color:var(--green);font-family:'Courier New',monospace" id="baixaInfoAmount">R$ 0,00</strong>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="fld">
+        <label class="flbl">Valor Recebido (R$) *</label>
+        <input type="text" inputmode="decimal" class="inp inp-sm" id="baixaAmount" oninput="maskCurrencyInput(this)">
+      </div>
+      <div class="fld">
+        <label class="flbl">Data do Recebimento *</label>
+        <input type="date" class="inp inp-sm" id="baixaDate">
+      </div>
+    </div>
+
+    <div class="fld">
+      <label class="flbl">Forma de Pagamento</label>
+      <select class="inp inp-sm" id="baixaMethod">
+        <option value="Pix" selected>Pix</option>
+        <option value="Cartão de Crédito">Cartão de Crédito</option>
+        <option value="Cartão de Débito">Cartão de Débito</option>
+        <option value="Dinheiro">Dinheiro</option>
+        <option value="Boleto">Boleto</option>
+        <option value="Transferência">Transferência</option>
+        <option value="Outro">Outro</option>
+      </select>
+    </div>
+
+    <div class="fld" style="margin-top:6px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;font-weight:600">
+        <input type="checkbox" id="baixaOpenReceipt" checked style="accent-color:var(--accent)">
+        Emitir e abrir recibo PDF após confirmação
+      </label>
+    </div>
+  </div>
+  <div class="mftr">
+    <button class="btn btn-ghost" onclick="closeDarBaixaModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="confirmDarBaixa()" style="background:var(--green);border-color:var(--green)"><i class="bi bi-check2"></i> Confirmar Recebimento</button>
+  </div>
+</div>
+</div>
 
 <!-- ══ REGISTRAR PAGAMENTO DIRETO MODAL ══ -->
 <div class="overlay" id="addPaymentDirectOverlay" onclick="if(event.target===this)closeAddPaymentDirectModal()">
 <div class="mbox mmd">
   <div class="mhdr">
-    <h5>Registrar Pagamento</h5>
+    <h5>Registrar Pagamento Avulso</h5>
     <button class="btn-icon btn-sm" onclick="closeAddPaymentDirectModal()"><i class="bi bi-x-lg"></i></button>
   </div>
   <div class="mbody">
@@ -391,15 +534,16 @@
 </div>
 
 <nav class="mtab-bar" id="mtabBar">
-  <a class="mtab-item" href="index.html" title="Board" aria-label="Board"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
+  <a class="mtab-item" href="index.html" title="Quadro" aria-label="Quadro"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
   <a class="mtab-item" href="dashboard.html" title="Dashboard" aria-label="Dashboard"><span class="mtab-bubble"><i class="bi bi-speedometer2"></i></span></a>
   <a class="mtab-item" href="orcamento.html" title="Orçamentos" aria-label="Orçamentos"><span class="mtab-bubble"><i class="bi bi-file-earmark-spreadsheet"></i></span></a>
   <a class="mtab-item active" href="pagamentos.html" title="Pagamentos" aria-label="Pagamentos"><span class="mtab-bubble"><i class="bi bi-credit-card"></i></span></a>
   <a class="mtab-item" href="relatorio.html" title="Relatórios" aria-label="Relatórios"><span class="mtab-bubble"><i class="bi bi-graph-up-arrow"></i></span></a>
   <a class="mtab-item" href="clientes.html" title="Clientes" aria-label="Clientes"><span class="mtab-bubble"><i class="bi bi-people"></i></span></a>
+  <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=102"></script>
-<script src="pagamentos.js?v=102"></script>
+<script src="common.js?v=106"></script>
+<script src="pagamentos.js?v=106"></script>
 </body>
 </html>

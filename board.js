@@ -323,6 +323,8 @@ function openProjectModal(id=null){
     tempSubs=[...(p.subtasks||[])];
     tempPayments=[...(p.payments||[])];
     tempProds=[...(p.products||[])];
+    tempInstallments=[...(p.installments||[])];
+    tempPaymentCondition=p.paymentCondition||'';
     document.getElementById('btnDelProj').style.display='block';
     document.getElementById('btnArchProj').textContent=p.archived?'Desarquivar':'Arquivar';
     
@@ -340,7 +342,7 @@ function openProjectModal(id=null){
     document.getElementById('projCol').value='Briefing';
     document.getElementById('projDate').value='';
     document.getElementById('projNote').value='';
-    tempSubs=[];tempPayments=[];tempProds=[];
+    tempSubs=[];tempPayments=[];tempProds=[];tempInstallments=[];tempPaymentCondition='';
     document.getElementById('btnDelProj').style.display='none';
   }
   renderSubsList();renderPaymentsModal();renderProjProdsTable();
@@ -401,9 +403,10 @@ function closeProjectModal(confirmIfDirty = false){
 }
 
 function handleClientChange(keepTitle=false) {
-  const clientName = document.getElementById('projClient').value;
+  const clientName = document.getElementById('projClient')?.value;
   const wrap = document.getElementById('projClientProdWrap');
   const sel = document.getElementById('projClientProd');
+  if (!wrap || !sel) return;
   
   if (!clientName) {
     wrap.classList.add('d-none');
@@ -411,29 +414,41 @@ function handleClientChange(keepTitle=false) {
   }
   
   const cl = clients.find(c => c.name === clientName);
-  if (!cl || !cl.products?.length) {
+  const availableServices = getServicesForClient(cl ? cl.id : null);
+  const clientLegacyProducts = (cl && Array.isArray(cl.products)) ? cl.products : [];
+  
+  const allItems = [...availableServices];
+  clientLegacyProducts.forEach(lp => {
+    if (!allItems.some(x => (x.name || '').toLowerCase() === (lp.name || '').toLowerCase())) {
+      allItems.push(lp);
+    }
+  });
+
+  if (!allItems.length) {
     wrap.classList.add('d-none');
     return;
   }
   
   wrap.classList.remove('d-none');
   sel.innerHTML = '<option value="">Selecione um serviço cadastrado (opcional)…</option>' + 
-                  cl.products.map(p => `<option value="${p.id}">${p.name} (${fmt(p.price)})</option>`).join('');
+                  allItems.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (${fmt(p.price || 0)})</option>`).join('');
 }
 
 function applyProjClientProd() {
-  const clientName = document.getElementById('projClient').value;
-  const prodId = document.getElementById('projClientProd').value;
+  const clientName = document.getElementById('projClient')?.value;
+  const prodId = document.getElementById('projClientProd')?.value;
   if (!clientName || !prodId) return;
   
   const cl = clients.find(c => c.name === clientName);
-  if (!cl) return;
+  const availableServices = getServicesForClient(cl ? cl.id : null);
+  const clientLegacyProducts = (cl && Array.isArray(cl.products)) ? cl.products : [];
+  const allItems = [...availableServices, ...clientLegacyProducts];
   
-  const prod = cl.products.find(p => p.id === parseInt(prodId));
+  const prod = allItems.find(p => String(p.id) === String(prodId));
   if (!prod) return;
   
   document.getElementById('newProdName').value = prod.name;
-  document.getElementById('newProdPrice').value = toBRLInputStr(prod.price);
+  document.getElementById('newProdPrice').value = toBRLInputStr(prod.price || 0);
 }
 
 function saveProject(){
@@ -449,6 +464,8 @@ function saveProject(){
     value:parseCurrencyInput(document.getElementById('projValue').value),
     payments:tempPayments,
     paid:tempPayments.reduce((s,x)=>s+parseFloat(x.amount||0),0),
+    installments:tempInstallments,
+    paymentCondition:tempPaymentCondition,
     products:tempProds,
     product:tempProds.map(x=>x.name).join(', '),
     type:document.getElementById('projType').value,
@@ -537,8 +554,38 @@ function renderPaymentsModal(){
   const c=document.getElementById('paysContainer');
   const total=tempPayments.reduce((s,x)=>s+parseFloat(x.amount||0),0);
   document.getElementById('payProgress').textContent=fmt(total);
-  if(!tempPayments.length){c.innerHTML='<div class="empty-state" style="padding:16px"><i class="bi bi-cash-coin"></i><span>Nenhum pagamento</span></div>';return;}
-  c.innerHTML=tempPayments.map(p=>`<div class="pay-item"><span>+ ${fmt(p.amount)} em ${new Date(p.date+'T12:00:00').toLocaleDateString('pt-BR')} <span style="color:var(--text3)">· ${p.method||'Pix'}</span></span><button class="cbtn del" onclick="delPayment(${p.id})"><i class="bi bi-trash3"></i></button></div>`).join('');
+
+  let instHtml = '';
+  if (tempInstallments && tempInstallments.length > 0) {
+    instHtml = `
+      <div style="margin-bottom:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">
+        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:6px;display:flex;justify-content:space-between">
+          <span><i class="bi bi-calendar-event"></i> Cronograma (${tempInstallments.length} parcelas)</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${tempInstallments.map(inst => {
+            const isPaid = inst.status === 'Pago';
+            const dateStr = inst.dueDate ? new Date(inst.dueDate + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:2px 0">
+                <span>${inst.desc} · <span style="color:var(--text3)">Venc: ${dateStr}</span></span>
+                <span style="display:inline-flex;align-items:center;gap:6px">
+                  <strong style="font-family:'Courier New',monospace">${fmt(inst.amount)}</strong>
+                  <span class="badge" style="font-size:9.5px;padding:1px 5px;background:${isPaid ? 'rgba(22,163,74,0.15)' : 'var(--surface)'};color:${isPaid ? 'var(--green)' : 'var(--text3)'}">${isPaid ? '✓ Pago' : '⏳ Pendente'}</span>
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  if(!tempPayments.length){
+    c.innerHTML = instHtml + '<div class="empty-state" style="padding:16px"><i class="bi bi-cash-coin"></i><span>Nenhum pagamento registrado</span></div>';
+    return;
+  }
+  c.innerHTML = instHtml + tempPayments.map(p=>`<div class="pay-item"><span>+ ${fmt(p.amount)} em ${new Date(p.date+'T12:00:00').toLocaleDateString('pt-BR')} <span style="color:var(--text3)">· ${p.method||'Pix'}</span></span><button class="cbtn del" onclick="delPayment(${p.id})"><i class="bi bi-trash3"></i></button></div>`).join('');
 }
 
 // ══════════════════════════════════════════

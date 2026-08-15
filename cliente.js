@@ -111,10 +111,22 @@ async function loadData(){
   document.getElementById('loading').style.display='flex';
   document.getElementById('errorScreen').classList.add('d-none');
   document.getElementById('boardView').style.display='flex';
+  const startTime = Date.now();
 
   if(!clientName){showError('bi-link-45deg','Link inválido','Nenhum cliente especificado na URL.');if(rIcon)rIcon.classList.remove('spinning');return;}
   document.getElementById('clientLabel').textContent=clientName;
-  document.getElementById('loadingText').textContent=`Carregando projetos de ${clientName}`;
+  const lName = document.getElementById('loadingClientName');
+  if (lName) lName.textContent = `, ${clientName}`;
+  document.getElementById('loadingText').textContent=`Carregando seus projetos…`;
+
+  const wName = document.getElementById('welcomeClientName');
+  if (wName) wName.textContent = clientName;
+  const wAvatar = document.getElementById('welcomeAvatar');
+  if (wAvatar) {
+    wAvatar.textContent = getInitials(clientName);
+    wAvatar.style.background = hexToRgba(getClientColor(clientName), 0.15);
+    wAvatar.style.color = getClientColor(clientName);
+  }
 
   try{
     const url=`${EDGE_FN}?nome=${encodeURIComponent(clientName)}${clientToken?'&token='+encodeURIComponent(clientToken):''}`;
@@ -159,6 +171,13 @@ async function loadData(){
     if(cfg.projectTypes?.length) projectTypes=cfg.projectTypes;
   }
   populateTypeFilter();
+
+  // Garante 2.5s a 2.8s de animação suave de boas-vindas
+  const elapsed = Date.now() - startTime;
+  const minWait = 2600;
+  if (elapsed < minWait) {
+    await new Promise(r => setTimeout(r, minWait - elapsed));
+  }
 
   document.getElementById('loading').style.display='none';
   if(rIcon) rIcon.classList.remove('spinning');
@@ -491,10 +510,11 @@ function createCardHTML(p, cardIdx=0){
       stepCls = 'step-active';
       stepIcon = `<i class="bi ${col.icon || DEFAULT_COL_ICON}"></i>`;
     }
+    const lineHtml = idx < visibleCols.length - 1 ? `<div class="timeline-line ${idx < currentIdx ? 'line-completed' : ''}"></div>` : '';
     return `<div class="timeline-step ${stepCls}" title="${col.id}">
       <div class="step-icon-wrap" style="${idx === currentIdx ? `background:${col.color||DEFAULT_COL_COLOR};color:#fff;border-color:${col.color||DEFAULT_COL_COLOR}` : ''}">${stepIcon}</div>
-    </div>`;
-  }).join('<div class="timeline-line"></div>');
+    </div>${lineHtml}`;
+  }).join('');
 
   const timelineHtml = `<div class="project-timeline">
     <div class="timeline-title"><i class="bi bi-compass" style="color:var(--accent)"></i> Etapa do Projeto: <strong>${p.column}</strong></div>
@@ -504,11 +524,11 @@ function createCardHTML(p, cardIdx=0){
   // Subtask Text HTML
   let subtaskTextHtml = '';
   if (currSubs.length === 1) {
-    subtaskTextHtml = `<div class="client-current-task" style="margin-top:10px;font-size:12px;background:var(--yellow-bg);padding:6px 10px;border-radius:8px;border:1px solid rgba(217,119,6,.15);display:flex;align-items:center;gap:6px;font-weight:500"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow);font-size:13px"></i> <span><strong>Trabalhando em:</strong> ${currSubs[0].text}</span></div>`;
+    subtaskTextHtml = `<div class="client-current-task" style="margin-top:10px;font-size:12px;background:var(--yellow-bg);padding:7px 11px;border-radius:10px;border:1px solid rgba(217,119,6,.15);display:flex;align-items:center;gap:7px;font-weight:500"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow);font-size:13px"></i> <span><strong>Trabalhando em:</strong> ${currSubs[0].text}</span></div>`;
   } else if (currSubs.length > 1) {
-    subtaskTextHtml = `<div class="client-current-task" style="margin-top:10px;font-size:12px;background:var(--yellow-bg);padding:6px 10px;border-radius:8px;border:1px solid rgba(217,119,6,.15);display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-weight:500">
+    subtaskTextHtml = `<div class="client-current-task" style="margin-top:10px;font-size:12px;background:var(--yellow-bg);padding:7px 11px;border-radius:10px;border:1px solid rgba(217,119,6,.15);display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-weight:500">
       <div style="display:flex;align-items:center;gap:6px"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow);font-size:13px"></i> <span><strong>Trabalhando em:</strong></span></div>
-      <ul style="margin:5px 0 0 20px;list-style-type:disc;line-height:1.4">
+      <ul style="margin:4px 0 0 18px;list-style-type:disc;line-height:1.4">
         ${currSubs.map(cs => `<li>${cs.text}</li>`).join('')}
       </ul>
     </div>`;
@@ -519,6 +539,7 @@ function createCardHTML(p, cardIdx=0){
   let finHtml='';
   if(total>0){
     const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'} · ${pg.method||'Pix'}</span><span class="fv">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
+    
     finHtml=`<div class="fin-blk">
       <div class="fin-sum">
         <div class="fin-row"><span class="lbl">Total do contrato</span><span class="val">${fmt(total)}</span></div>
@@ -602,9 +623,12 @@ function createCardHTML(p, cardIdx=0){
     </div>
     <div class="kcard-exp">
       ${timelineHtml}
-      ${subtaskTextHtml}
       ${driveHtml}
-      ${finHtml}${prodsHtml}${checkHtml}${noteHtml}
+      ${finHtml}
+      ${subtaskTextHtml}
+      ${prodsHtml}
+      ${checkHtml}
+      ${noteHtml}
     </div>
   </div>`;
 }
@@ -719,6 +743,70 @@ function toggleFinModal(pId) {
 
 function closeFinModal() {
   document.getElementById('finModal').classList.add('d-none');
+}
+
+// ══════════════════════════════════════════
+//  PIX MODAL & COPIA E COLA
+// ══════════════════════════════════════════
+function openPixModal(projName = '', amount = 0) {
+  const modal = document.getElementById('pixModal');
+  if (!modal) return;
+  
+  const pNameEl = document.getElementById('pixProjName');
+  if (pNameEl) pNameEl.textContent = projName ? `Projeto: ${projName}` : 'Pagamento de Projeto';
+  
+  const valEl = document.getElementById('pixPendingVal');
+  if (valEl) {
+    valEl.textContent = amount > 0 ? fmt(amount) : (document.getElementById('totalRest')?.textContent || 'R$ 0,00');
+  }
+  
+  const keyEl = document.getElementById('pixKeyDisplay');
+  if (keyEl) keyEl.value = pixKey || 'Chave não cadastrada';
+  
+  const nameEl = document.getElementById('pixNameDisplay');
+  if (nameEl) nameEl.textContent = pixName || companyName || 'MAVIC Arquitetura';
+  
+  const bankEl = document.getElementById('pixBankDisplay');
+  if (bankEl) bankEl.textContent = pixBank || 'Principal';
+  
+  const waBtn = document.getElementById('pixSendWaBtn');
+  if (waBtn) {
+    const text = encodeURIComponent(`Olá! Segue o comprovante de pagamento do projeto ${projName ? `"${projName}"` : ''} — ${clientName}.`);
+    waBtn.href = `https://wa.me/?text=${text}`;
+  }
+  
+  modal.classList.remove('d-none');
+}
+
+function closePixModal() {
+  document.getElementById('pixModal')?.classList.add('d-none');
+}
+
+function copyPixKeyFromModal() {
+  if (!pixKey) return showToast('Chave Pix não encontrada', 'warning');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(pixKey).then(() => {
+      showToast('Chave Pix copiada com sucesso!', 'success');
+    }).catch(() => {
+      legacyCopyPix();
+    });
+  } else {
+    legacyCopyPix();
+  }
+}
+
+function legacyCopyPix() {
+  const inp = document.getElementById('pixKeyDisplay');
+  if (inp) {
+    inp.select();
+    inp.setSelectionRange(0, 99999);
+    try {
+      document.execCommand('copy');
+      showToast('Chave Pix copiada com sucesso!', 'success');
+    } catch(e) {
+      showToast('Selecione e copie a chave manualmente', 'info');
+    }
+  }
 }
 
 // ══════════════════════════════════════════

@@ -335,19 +335,25 @@ function updateOrcPreviewLabels() {
 function populateOrcNotesTemplateSelect() {
   const sel = document.getElementById('orcNotesTemplate');
   if (!sel) return;
+  const list = noteTemplates && noteTemplates.length ? noteTemplates : (typeof INIT_NOTE_TEMPLATES !== 'undefined' ? INIT_NOTE_TEMPLATES : []);
   sel.innerHTML = '<option value="">Selecione uma observação padrão...</option>'
-    + noteTemplates.map(t => `<option value="${t.id}">${t.title}</option>`).join('')
+    + list.map(t => `<option value="${t.id}">${t.title}</option>`).join('')
     + '<option value="limpar">Limpar Observações</option>';
 }
 
 function applyOrcNotesTemplate() {
-  const tSel = document.getElementById('orcNotesTemplate').value;
+  const sel = document.getElementById('orcNotesTemplate');
+  if (!sel) return;
+  const tSel = sel.value;
   const area = document.getElementById('orcNotes');
+  if (!area) return;
+
+  const list = noteTemplates && noteTemplates.length ? noteTemplates : (typeof INIT_NOTE_TEMPLATES !== 'undefined' ? INIT_NOTE_TEMPLATES : []);
 
   if (tSel === 'limpar') {
     area.value = '';
   } else if (tSel) {
-    const t = noteTemplates.find(x => x.id === tSel);
+    const t = list.find(x => x.id === tSel);
     if (t) area.value = t.text;
   }
 

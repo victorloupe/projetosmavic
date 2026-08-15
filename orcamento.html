@@ -128,7 +128,7 @@
     <div class="orc-modal-header-actions" style="display:flex;gap:4px;align-items:center;flex-shrink:0">
       <button class="btn-icon btn-sm" id="btnPdfOrc" onclick="downloadOrcamentoPDFModal()" style="display:none; color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-earmark-pdf"></i></button>
       <button class="btn-icon btn-sm" id="btnDownloadPdfOrc" onclick="downloadOrcamentoPDFFileModal()" style="display:none; color:var(--accent)" title="Baixar arquivo PDF"><i class="bi bi-download"></i></button>
-      <button class="btn-icon btn-sm" id="btnSharePdfOrc" onclick="shareOrcamentoPDFModal()" style="display:none; color:#2563EB" title="Compartilhar no WhatsApp"><i class="bi bi-whatsapp"></i></button>
+      <button class="btn-icon btn-sm" id="btnSharePdfOrc" onclick="shareOrcamentoPDFModal()" style="display:none; color:#2563EB" title="Compartilhar"><i class="bi bi-share"></i></button>
       <button class="btn-icon btn-sm" id="btnPrnOrc" onclick="printOrcamento()" style="display:none" title="Imprimir documento"><i class="bi bi-printer"></i></button>
       <button class="btn-icon btn-sm" onclick="closeOrcamentoModal()" title="Fechar (X)"><i class="bi bi-x-lg"></i></button>
     </div>
@@ -177,29 +177,31 @@
     <!-- CONFIGURAÇÕES DE FORMULÁRIO (OCULTAS NA IMPRESSÃO) -->
     <div class="no-print orc-form-settings" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">
       <input type="hidden" id="orcId">
-      <div class="orc-settings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px">
-        <div>
-          <div class="fld" style="position:relative">
-            <label class="flbl">Cliente *</label>
-            <input class="inp inp-sm" id="orcClient" placeholder="Digite para buscar ou criar um cliente…" autocomplete="off" oninput="handleOrcClientInput(); updateOrcPreviewLabels()" onfocus="handleOrcClientInput()" onblur="handleOrcClientBlur()">
-            <div class="ac-dropdown d-none" id="orcClientSuggest"></div>
-          </div>
-          <div class="row2" style="grid-template-columns:1fr 80px">
-            <div class="fld"><label class="flbl">Nome / Título do Projeto *</label><input class="inp inp-sm" id="orcTitle" placeholder="Ex: Fachada Comercial & Recepção" oninput="updateOrcPreviewLabels()"></div>
-            <div class="fld"><label class="flbl">Número</label><input type="number" class="inp inp-sm" id="orcNumber" min="1" oninput="updateOrcPreviewLabels()"></div>
-          </div>
-          <div class="fld"><div style="display:flex;align-items:center;justify-content:space-between;gap:6px"><label class="flbl" style="margin:0">Tipo de Projeto</label><button class="btn-icon btn-sm" onclick="openManageProjectTypesModal()" title="Gerenciar tipos de projeto" type="button"><i class="bi bi-tags"></i></button></div><select class="inp inp-sm project-type-select" id="orcProjectType" onchange="updateOrcPreviewLabels()"></select></div>
-        </div>
-        <div>
-          <div class="row2">
-            <div class="fld"><label class="flbl">Data de Emissão</label><input type="date" class="inp inp-sm" id="orcDate" onchange="updateOrcPreviewLabels()"></div>
-            <div class="fld"><label class="flbl">Validade</label><input type="date" class="inp inp-sm" id="orcValidUntil" onchange="updateOrcPreviewLabels()"></div>
-          </div>
-          <div class="row2">
-            <div class="fld"><label class="flbl">Desconto (R$)</label><input type="text" inputmode="decimal" class="inp inp-sm" id="orcDiscount" value="0,00" oninput="maskCurrencyInput(this);updateOrcPreviewLabels()"></div>
-            <div class="fld"><label class="flbl">Status</label><select class="inp inp-sm" id="orcStatus"><option value="Pendente">Pendente</option><option value="Aprovado">Aprovado</option><option value="Recusado">Recusado</option><option value="Convertido" disabled>Convertido</option></select></div>
-          </div>
-        </div>
+      
+      <div class="fld" style="position:relative;margin-bottom:8px">
+        <label class="flbl">Cliente *</label>
+        <input class="inp inp-sm" id="orcClient" placeholder="Digite para buscar ou criar um cliente…" autocomplete="off" oninput="handleOrcClientInput(); updateOrcPreviewLabels()" onfocus="handleOrcClientInput()" onblur="handleOrcClientBlur()">
+        <div class="ac-dropdown d-none" id="orcClientSuggest"></div>
+      </div>
+
+      <div class="fld" style="margin-bottom:8px">
+        <label class="flbl">Nome / Título do Projeto *</label>
+        <input class="inp inp-sm" id="orcTitle" placeholder="Ex: Fachada Comercial & Recepção" oninput="updateOrcPreviewLabels()">
+      </div>
+
+      <div class="orc-two-cols" style="display:grid;grid-template-columns:85px 1fr;gap:8px;margin-bottom:8px">
+        <div class="fld" style="margin:0"><label class="flbl">Número</label><input type="number" class="inp inp-sm" id="orcNumber" min="1" oninput="updateOrcPreviewLabels()"></div>
+        <div class="fld" style="margin:0"><div style="display:flex;align-items:center;justify-content:space-between;gap:4px"><label class="flbl" style="margin:0">Tipo de Projeto</label><button class="btn-icon btn-sm" onclick="openManageProjectTypesModal()" title="Gerenciar tipos de projeto" type="button"><i class="bi bi-tags"></i></button></div><select class="inp inp-sm project-type-select" id="orcProjectType" onchange="updateOrcPreviewLabels()"></select></div>
+      </div>
+
+      <div class="orc-two-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="fld" style="margin:0"><label class="flbl">Data de Emissão</label><input type="date" class="inp inp-sm" id="orcDate" onchange="updateOrcPreviewLabels()"></div>
+        <div class="fld" style="margin:0"><label class="flbl">Validade</label><input type="date" class="inp inp-sm" id="orcValidUntil" onchange="updateOrcPreviewLabels()"></div>
+      </div>
+
+      <div class="orc-two-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0">
+        <div class="fld" style="margin:0"><label class="flbl">Desconto (R$)</label><input type="text" inputmode="decimal" class="inp inp-sm" id="orcDiscount" value="0,00" oninput="maskCurrencyInput(this);updateOrcPreviewLabels()"></div>
+        <div class="fld" style="margin:0"><label class="flbl">Status</label><select class="inp inp-sm" id="orcStatus"><option value="Pendente">Pendente</option><option value="Aprovado">Aprovado</option><option value="Recusado">Recusado</option><option value="Convertido" disabled>Convertido</option></select></div>
       </div>
     </div>
     
@@ -263,9 +265,9 @@
         <div class="no-print terms-controls-wrapper" style="margin-top: 14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <label class="flbl" style="margin:0;display:flex;align-items:center;gap:4px"><i class="bi bi-card-text"></i> Observação Padrão</label>
-            <button class="btn-icon btn-sm" onclick="openTermsManagerModal()" title="Gerenciar Modelos de Observações" type="button"><i class="bi bi-sliders"></i></button>
+            <button class="btn-icon btn-sm" onclick="openManageNotesModal()" title="Gerenciar observações padrão" type="button"><i class="bi bi-sliders"></i></button>
           </div>
-          <select class="inp inp-sm" id="selTermsTemplate" onchange="applyTermsTemplate(this.value)">
+          <select class="inp inp-sm" id="orcNotesTemplate" onchange="applyOrcNotesTemplate()">
             <option value="">Selecione uma observação padrão...</option>
           </select>
         </div>
@@ -301,8 +303,8 @@
       <button class="btn btn-ghost" style="color:var(--accent);padding:7px 10px;display:inline-flex;align-items:center;gap:5px" onclick="saveOrcamentoAndDownloadFile()" title="Salvar e Baixar PDF">
         <i class="bi bi-download" style="font-size:14px"></i> <span class="d-none-mobile">Baixar PDF</span>
       </button>
-      <button class="btn btn-ghost" style="color:#2563EB;padding:7px 10px;display:inline-flex;align-items:center;gap:5px" onclick="saveOrcamentoAndShare()" title="Salvar e Compartilhar no WhatsApp">
-        <i class="bi bi-whatsapp" style="font-size:14px"></i> <span class="d-none-mobile">Compartilhar</span>
+      <button class="btn btn-ghost" style="color:#2563EB;padding:7px 10px;display:inline-flex;align-items:center;gap:5px" onclick="saveOrcamentoAndShare()" title="Salvar e Compartilhar">
+        <i class="bi bi-share" style="font-size:14px"></i> <span class="d-none-mobile">Compartilhar</span>
       </button>
       <button class="btn btn-primary" onclick="saveOrcamento()" title="Salvar Orçamento" style="padding:7px 14px;display:inline-flex;align-items:center;gap:5px">
         <i class="bi bi-check-lg" style="font-size:15px"></i> <span>Salvar</span>
@@ -535,7 +537,7 @@
   <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=109"></script>
-<script src="orcamento.js?v=109"></script>
+<script src="common.js?v=110"></script>
+<script src="orcamento.js?v=110"></script>
 </body>
 </html>

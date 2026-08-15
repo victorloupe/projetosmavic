@@ -8,16 +8,22 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="cliente.css?v=102">
+<link rel="stylesheet" href="cliente.css?v=107">
 <!-- supabase-js e config.js removidos: o cliente não acessa o banco diretamente.
      Os dados chegam via Edge Function com autenticação server-side. -->
 </head>
 <body>
 
 <div class="loading" id="loading">
-  <div class="spin"></div>
-  <div style="font-weight:600;font-size:14px">Carregando projetos…</div>
-  <div id="loadingText" style="font-size:12px;color:var(--text3)">Conectando ao MAVIC</div>
+  <div class="loading-card">
+    <img src="LOGO NOVA.png" alt="MAVIC" class="loading-logo" onerror="this.style.display='none'">
+    <div class="loading-welcome">Bem-vindo(a)<span id="loadingClientName"></span>!</div>
+    <div class="loading-status">
+      <div class="loading-spin-ring"></div>
+      <span id="loadingText">Carregando seus projetos…</span>
+    </div>
+    <div class="loading-progress-bar"><div class="loading-progress-fill"></div></div>
+  </div>
 </div>
 
 <div id="errorScreen" class="error-screen d-none">
@@ -68,13 +74,21 @@
   </div>
 </div>
 
-<!-- TOOLBAR -->
-<div class="toolbar">
-  <select class="inp btn-sm" id="fType" onchange="renderBoard()" style="width:auto">
-    <option value="">Todos os Tipos</option>
-  </select>
-  <div style="flex:1"></div>
-  <span id="boardCount" style="font-size:12px;color:var(--text3)"></span>
+<!-- WELCOME BANNER & FILTERS -->
+<div class="client-welcome-wrap" id="clientWelcomeWrap">
+  <div class="client-welcome-card">
+    <div class="client-welcome-avatar" id="welcomeAvatar">?</div>
+    <div class="client-welcome-info">
+      <div class="client-welcome-title">Olá, <span id="welcomeClientName">Cliente</span>! 👋</div>
+      <div class="client-welcome-desc">Acompanhe o andamento dos seus projetos, visualize arquivos e histórico financeiro em tempo real.</div>
+    </div>
+    <div class="client-welcome-tools">
+      <select class="inp btn-sm client-type-filter" id="fType" onchange="renderBoard()">
+        <option value="">Todos os Tipos</option>
+      </select>
+      <span class="client-proj-count-badge" id="boardCount"></span>
+    </div>
+  </div>
 </div>
 
 <!-- NOTIFICATIONS -->
@@ -87,6 +101,46 @@
   <div class="board-outer"><div class="board" id="board"></div></div>
 </div>
 <div class="toast-wrap" id="toastWrap"></div>
+
+<!-- PIX MODAL -->
+<div id="pixModal" class="modal-overlay d-none" onclick="closePixModal()">
+  <div class="modal-card pix-modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h5 style="margin:0;font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px;color:var(--accent)">
+        <i class="bi bi-qr-code"></i> Pagamento via Pix
+      </h5>
+      <button class="btn-icon" onclick="closePixModal()" title="Fechar"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:18px">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:12px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px" id="pixProjName">Projeto</div>
+        <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:monospace" id="pixPendingVal">R$ 0,00</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="font-size:11.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Chave PIX</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" readonly id="pixKeyDisplay" class="inp" style="flex:1;font-family:monospace;font-weight:700;background:var(--surface2);font-size:13px" value="">
+          <button class="btn btn-primary" onclick="copyPixKeyFromModal()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px">
+            <i class="bi bi-copy"></i> Copiar
+          </button>
+        </div>
+      </div>
+
+      <div style="font-size:12.5px;color:var(--text2);background:var(--surface2);padding:10px 14px;border-radius:10px;border:1px solid var(--border);display:flex;flex-direction:column;gap:4px">
+        <div><strong>Favorecido:</strong> <span id="pixNameDisplay">MAVIC Arquitetura</span></div>
+        <div><strong>Banco:</strong> <span id="pixBankDisplay">Principal</span></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        <a id="pixSendWaBtn" href="#" target="_blank" class="btn btn-ghost" style="display:flex;align-items:center;justify-content:center;gap:6px;color:#2563eb;border:1px solid rgba(37,99,235,0.2);padding:9px">
+          <i class="bi bi-whatsapp"></i> Enviar comprovante no WhatsApp
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- FINANCIAL MODAL -->
 <div id="finModal" class="modal-overlay d-none" onclick="closeFinModal()">
   <div class="modal-card" onclick="event.stopPropagation()">
@@ -99,6 +153,7 @@
     </div>
   </div>
 </div>
+
 <!-- CONFIRM MODAL (substitui o confirm() nativo do navegador) -->
 <div id="confirmOverlay" class="modal-overlay d-none" onclick="closeConfirm()">
   <div class="modal-card" style="max-width:380px" onclick="event.stopPropagation()">
@@ -114,6 +169,6 @@
     </div>
   </div>
 </div>
-<script src="cliente.js?v=102"></script>
+<script src="cliente.js?v=107"></script>
 </body>
 </html>

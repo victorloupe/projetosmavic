@@ -51,57 +51,57 @@
   </div>
   
   <!-- KPI Cards Summary -->
-  <div class="pay-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;margin-bottom:16px">
-    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:10px;background:rgba(146,98,58,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-box-seam"></i></div>
-      <div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">Total de Serviços</div>
-        <div style="font-size:18px;font-weight:800;color:var(--text)" id="kpiTotalServicos">0</div>
+  <div class="serv-kpi-grid">
+    <div class="serv-kpi-card">
+      <div class="serv-kpi-icon icon-total"><i class="bi bi-box-seam"></i></div>
+      <div class="serv-kpi-content">
+        <div class="serv-kpi-lbl">Total Serviços</div>
+        <div class="serv-kpi-val" id="kpiTotalServicos">0</div>
       </div>
     </div>
-    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:10px;background:rgba(22,163,74,0.12);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-globe"></i></div>
-      <div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">Serviços Gerais</div>
-        <div style="font-size:18px;font-weight:800;color:var(--green)" id="kpiServicosGerais">0</div>
+    <div class="serv-kpi-card">
+      <div class="serv-kpi-icon icon-gerais"><i class="bi bi-globe"></i></div>
+      <div class="serv-kpi-content">
+        <div class="serv-kpi-lbl">Serviços Gerais</div>
+        <div class="serv-kpi-val text-green" id="kpiServicosGerais">0</div>
       </div>
     </div>
-    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:10px;background:rgba(37,99,235,0.12);color:#2563EB;display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-person-check"></i></div>
-      <div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">Específicos p/ Cliente</div>
-        <div style="font-size:18px;font-weight:800;color:#2563EB" id="kpiServicosEspecificos">0</div>
+    <div class="serv-kpi-card">
+      <div class="serv-kpi-icon icon-espec"><i class="bi bi-person-check"></i></div>
+      <div class="serv-kpi-content">
+        <div class="serv-kpi-lbl">P/ Cliente</div>
+        <div class="serv-kpi-val text-blue" id="kpiServicosEspecificos">0</div>
       </div>
     </div>
-    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:10px;background:rgba(217,119,6,0.12);color:#d97706;display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-tag"></i></div>
-      <div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">Média de Preço</div>
-        <div style="font-size:18px;font-weight:800;color:var(--text);font-family:'Courier New',monospace" id="kpiMediaPreco">R$ 0,00</div>
+    <div class="serv-kpi-card">
+      <div class="serv-kpi-icon icon-preco"><i class="bi bi-tag"></i></div>
+      <div class="serv-kpi-content">
+        <div class="serv-kpi-lbl">Média Preço</div>
+        <div class="serv-kpi-val text-accent" id="kpiMediaPreco">R$ 0,00</div>
       </div>
     </div>
   </div>
 
   <!-- Toolbar de Filtros -->
-  <div class="toolbar" style="margin-bottom:14px">
+  <div class="toolbar serv-toolbar">
     <input type="text" class="inp inp-sm" id="fServSearch" placeholder="Buscar serviço ou escopo…" oninput="pgReset('servicos');renderServicos()">
-    <div class="toolbar-filters">
+    <div class="toolbar-filters serv-filters-grid">
       <select class="inp inp-sm" id="fServCategory" onchange="pgReset('servicos');renderServicos()">
-        <option value="">Todas as Categorias</option>
+        <option value="">Todas Categorias</option>
       </select>
       <select class="inp inp-sm" id="fServTarget" onchange="pgReset('servicos');renderServicos()">
-        <option value="">Todos os Tipos</option>
-        <option value="all">🌐 Apenas Gerais (Todos)</option>
-        <option value="selected">🎯 Apenas por Cliente</option>
+        <option value="">Todos Tipos</option>
+        <option value="all">🌐 Gerais</option>
+        <option value="selected">🎯 Por Cliente</option>
       </select>
       <select class="inp inp-sm" id="fServClient" onchange="pgReset('servicos');renderServicos()">
-        <option value="">Filtrar por Cliente</option>
+        <option value="">Todos Clientes</option>
       </select>
     </div>
   </div>
 
   <!-- Tabela Desktop -->
-  <div class="dash-table serv-desktop-table" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+  <div class="dash-table serv-desktop-table">
     <table style="width:100%;border-collapse:collapse;font-size:13px;text-align:left">
       <thead>
         <tr style="background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:0.5px">
@@ -116,8 +116,8 @@
     </table>
   </div>
 
-  <!-- Lista Mobile (Cards) -->
-  <div class="serv-mobile-list" id="servMobileList" style="display:none;flex-direction:column;gap:10px"></div>
+  <!-- Lista Mobile (Cards Compactos) -->
+  <div class="serv-mobile-list" id="servMobileList"></div>
 
   <!-- Paginação -->
   <div id="servPagination" style="margin-top:14px"></div>
@@ -213,7 +213,7 @@
   <a class="mtab-item active" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=107"></script>
-<script src="servicos.js?v=107"></script>
+<script src="common.js?v=108"></script>
+<script src="servicos.js?v=108"></script>
 </body>
 </html>

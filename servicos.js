@@ -190,23 +190,23 @@ function renderServicos() {
       }
 
       return `
-        <div class="pay-card" style="padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border)">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
-            <div>
-              <div style="font-weight:700;font-size:14px;color:var(--text)">${escapeHtml(s.name)}</div>
-              ${s.category ? `<span class="badge" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:10.5px;margin-top:3px">${escapeHtml(s.category)}</span>` : ''}
+        <div class="serv-card">
+          <div class="serv-card-top">
+            <div class="serv-card-title-wrap">
+              <span class="serv-card-name">${escapeHtml(s.name)}</span>
+              ${s.category ? `<span class="badge" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:10px;padding:1px 5px">${escapeHtml(s.category)}</span>` : ''}
             </div>
-            <div style="font-family:'Courier New',monospace;font-weight:800;font-size:14px;color:var(--accent)">${fmt(s.price || 0)}</div>
+            <div class="serv-card-price">${fmt(s.price || 0)}</div>
           </div>
 
-          ${s.desc ? `<div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.4">${escapeHtml(s.desc)}</div>` : ''}
+          ${s.desc ? `<div class="serv-card-desc">${escapeHtml(s.desc)}</div>` : ''}
 
-          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border)">
+          <div class="serv-card-footer">
             <div>${clientBadge}</div>
-            <div style="display:inline-flex;gap:4px">
-              <button class="btn btn-ghost btn-sm" onclick="openServiceModal(${s.id})" style="padding:5px 8px;font-size:12px"><i class="bi bi-pencil"></i> Editar</button>
-              <button class="btn btn-ghost btn-sm" onclick="duplicateService(${s.id})" style="padding:5px 8px;font-size:12px"><i class="bi bi-copy"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="deleteService(${s.id})" style="padding:5px 8px;color:var(--red);font-size:12px"><i class="bi bi-trash3"></i></button>
+            <div class="serv-card-actions">
+              <button class="btn btn-ghost btn-sm serv-act-btn" onclick="openServiceModal(${s.id})" title="Editar"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-ghost btn-sm serv-act-btn" onclick="duplicateService(${s.id})" title="Duplicar"><i class="bi bi-copy"></i></button>
+              <button class="btn btn-ghost btn-sm serv-act-btn del" onclick="deleteService(${s.id})" title="Excluir"><i class="bi bi-trash3"></i></button>
             </div>
           </div>
         </div>

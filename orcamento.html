@@ -123,14 +123,14 @@
 <!-- ══ ORÇAMENTO MODAL ══ -->
 <div class="overlay" id="orcamentoOverlay" onclick="if(event.target===this)closeOrcamentoModal()">
 <div class="mbox mlg">
-  <div class="mhdr no-print">
-    <h5 id="orcModalTitle" style="color:var(--accent)">Novo Orçamento</h5>
-    <div style="display:flex;gap:6px;align-items:center">
-      <button class="btn btn-ghost btn-sm" id="btnPdfOrc" onclick="downloadOrcamentoPDFModal()" style="display:none; color:var(--red)" title="Visualizar PDF em nova aba"><i class="bi bi-file-pdf"></i> Visualizar</button>
-      <button class="btn btn-ghost btn-sm" id="btnDownloadPdfOrc" onclick="downloadOrcamentoPDFFileModal()" style="display:none; color:var(--accent)" title="Baixar arquivo PDF"><i class="bi bi-download"></i> Baixar PDF</button>
-      <button class="btn btn-ghost btn-sm" id="btnSharePdfOrc" onclick="shareOrcamentoPDFModal()" style="display:none; color:#2563EB" title="Compartilhar PDF"><i class="bi bi-share"></i> Compartilhar</button>
-      <button class="btn btn-primary btn-sm" id="btnPrnOrc" onclick="printOrcamento()" style="display:none" title="Imprimir documento"><i class="bi bi-printer"></i> Imprimir</button>
-      <button class="btn-icon btn-sm" onclick="closeOrcamentoModal()"><i class="bi bi-x-lg"></i></button>
+  <div class="mhdr no-print" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;gap:8px">
+    <h5 id="orcModalTitle" style="color:var(--accent);margin:0;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Novo Orçamento</h5>
+    <div class="orc-modal-header-actions" style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+      <button class="btn-icon btn-sm" id="btnPdfOrc" onclick="downloadOrcamentoPDFModal()" style="display:none; color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-earmark-pdf"></i></button>
+      <button class="btn-icon btn-sm" id="btnDownloadPdfOrc" onclick="downloadOrcamentoPDFFileModal()" style="display:none; color:var(--accent)" title="Baixar arquivo PDF"><i class="bi bi-download"></i></button>
+      <button class="btn-icon btn-sm" id="btnSharePdfOrc" onclick="shareOrcamentoPDFModal()" style="display:none; color:#2563EB" title="Compartilhar no WhatsApp"><i class="bi bi-whatsapp"></i></button>
+      <button class="btn-icon btn-sm" id="btnPrnOrc" onclick="printOrcamento()" style="display:none" title="Imprimir documento"><i class="bi bi-printer"></i></button>
+      <button class="btn-icon btn-sm" onclick="closeOrcamentoModal()" title="Fechar (X)"><i class="bi bi-x-lg"></i></button>
     </div>
   </div>
   <div class="mbody print-area proposal-sheet">
@@ -175,9 +175,9 @@
     </div>
 
     <!-- CONFIGURAÇÕES DE FORMULÁRIO (OCULTAS NA IMPRESSÃO) -->
-    <div class="no-print" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
+    <div class="no-print orc-form-settings" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">
       <input type="hidden" id="orcId">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:10px">
+      <div class="orc-settings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px">
         <div>
           <div class="fld" style="position:relative">
             <label class="flbl">Cliente *</label>
@@ -212,8 +212,8 @@
           <tr>
             <th style="text-align: left;">Produtos / Serviços</th>
             <th style="width: 50px; text-align: center;">Qtd</th>
-            <th style="width: 110px; text-align: right;">Valor Unit.</th>
-            <th style="width: 110px; text-align: right;">Total</th>
+            <th style="width: 100px; text-align: right;">Valor Unit.</th>
+            <th style="width: 100px; text-align: right;">Total</th>
             <th style="width: 50px; text-align: center;" class="no-print"></th>
           </tr>
         </thead>
@@ -224,20 +224,20 @@
     </div>
 
     <!-- ÁREA DE ADICIONAR ITENS (OCULTA NA IMPRESSÃO) -->
-    <div class="no-print" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:15px">
-      <div class="sec" style="margin-bottom:6px" id="orcItemFormLabel">Adicionar Item à Proposta</div>
+    <div class="no-print orc-add-item-box" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px">
+      <div class="sec" style="margin-bottom:6px;font-size:12px" id="orcItemFormLabel"><i class="bi bi-plus-circle"></i> Adicionar Item à Proposta</div>
       <div class="orc-item-grid">
-        <div style="position:relative">
+        <div style="position:relative" class="orc-item-name-wrap">
           <input class="inp inp-sm" id="newOrcItemDesc" placeholder="Nome do produto/serviço (ex: Fachada 3D)" autocomplete="off" oninput="handleOrcItemDescInput()" onfocus="handleOrcItemDescInput()">
           <div class="ac-dropdown d-none" id="orcItemSuggest"></div>
         </div>
-        <div><input type="text" inputmode="decimal" class="inp inp-sm" id="newOrcItemPrice" placeholder="Valor (R$)" oninput="maskCurrencyInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();addOrcItem();}"></div>
-        <div><input type="number" class="inp inp-sm" id="newOrcItemQty" value="1" min="1"></div>
-        <div><button class="btn btn-primary btn-sm" id="btnOrcItemSubmit" onclick="addOrcItem()" style="padding:5px;width:100%" title="Adicionar">+</button></div>
+        <div class="orc-item-price-wrap"><input type="text" inputmode="decimal" class="inp inp-sm" id="newOrcItemPrice" placeholder="Valor (R$)" oninput="maskCurrencyInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();addOrcItem();}"></div>
+        <div class="orc-item-qty-wrap"><input type="number" class="inp inp-sm" id="newOrcItemQty" value="1" min="1" placeholder="Qtd"></div>
+        <div class="orc-item-add-wrap"><button class="btn btn-primary btn-sm" id="btnOrcItemSubmit" onclick="addOrcItem()" style="padding:5px;width:100%;height:32px" title="Adicionar">+</button></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 40px;gap:8px;margin-top:8px">
-        <div><input class="inp inp-sm" id="newOrcItemNote" placeholder="Descrição do item (opcional) — ex: modelagem 3D, texturização e 3 renders 4K"></div>
-        <div><button class="btn btn-ghost btn-sm" id="btnOrcItemCancel" onclick="cancelOrcItemEdit()" style="padding:5px;width:100%;display:none" title="Cancelar edição"><i class="bi bi-x-lg"></i></button></div>
+      <div style="display:grid;grid-template-columns:1fr 36px;gap:6px;margin-top:6px">
+        <div><input class="inp inp-sm" id="newOrcItemNote" placeholder="Descrição do item (opcional) — ex: modelagem 3D e renders 4K"></div>
+        <div><button class="btn btn-ghost btn-sm" id="btnOrcItemCancel" onclick="cancelOrcItemEdit()" style="padding:5px;width:100%;height:32px;display:none" title="Cancelar edição"><i class="bi bi-x-lg"></i></button></div>
       </div>
       <div class="fld" style="margin-top:6px;margin-bottom:0">
         <input type="hidden" id="orcTotalVal">
@@ -258,18 +258,18 @@
       <div class="proposal-notes-panel">
         <div class="proposal-section-lbl">OBSERVAÇÕES</div>
         <div class="notes-content" id="lblOrcNotesPreview">Nenhuma observação informada.</div>
-
-        <!-- Seletor de Observações Prontas -->
-        <div class="no-print" style="margin-top:15px; border-top:1px dashed var(--border); padding-top:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-            <label class="flbl" style="color:var(--accent);margin:0"><i class="bi bi-card-list"></i> Observação Padrão</label>
-            <button class="btn-icon btn-sm" onclick="openManageNotesModal()" title="Gerenciar observações padrão"><i class="bi bi-sliders"></i></button>
+        
+        <!-- Controles de Edição de Termos (Ocultos na Impressão) -->
+        <div class="no-print terms-controls-wrapper" style="margin-top: 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <label class="flbl" style="margin:0;display:flex;align-items:center;gap:4px"><i class="bi bi-card-text"></i> Observação Padrão</label>
+            <button class="btn-icon btn-sm" onclick="openTermsManagerModal()" title="Gerenciar Modelos de Observações" type="button"><i class="bi bi-sliders"></i></button>
           </div>
-          <select class="inp inp-sm" id="orcNotesTemplate" onchange="applyOrcNotesTemplate()">
+          <select class="inp inp-sm" id="selTermsTemplate" onchange="applyTermsTemplate(this.value)">
             <option value="">Selecione uma observação padrão...</option>
           </select>
         </div>
-        <textarea class="inp no-print" id="orcNotes" rows="4" placeholder="Digite termos, prazos ou condições aqui..." oninput="updateOrcPreviewLabels()" style="margin-top: 8px;"></textarea>
+        <textarea class="inp no-print" id="orcNotes" rows="3" placeholder="Digite termos, prazos ou condições aqui..." oninput="updateOrcPreviewLabels()" style="margin-top: 6px;"></textarea>
       </div>
       
       <!-- Totais e Assinatura -->
@@ -293,12 +293,20 @@
     </div>
 
   </div>
-  <div class="mftr no-print" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <button class="btn btn-ghost" onclick="closeOrcamentoModal()">Cancelar</button>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-ghost" style="color:var(--accent)" onclick="saveOrcamentoAndDownloadFile()"><i class="bi bi-download"></i> Salvar e Baixar PDF</button>
-      <button class="btn btn-ghost" style="color:#2563EB" onclick="saveOrcamentoAndShare()"><i class="bi bi-share"></i> Salvar e Compartilhar</button>
-      <button class="btn btn-primary" onclick="saveOrcamento()"><i class="bi bi-check2"></i> Salvar Orçamento</button>
+  <div class="mftr no-print orc-modal-footer" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;gap:8px">
+    <button class="btn btn-ghost btn-icon" onclick="closeOrcamentoModal()" title="Cancelar / Fechar" style="color:var(--text3);padding:7px 10px;display:inline-flex;align-items:center;gap:5px">
+      <i class="bi bi-x-lg" style="font-size:14px"></i> <span class="d-none-mobile">Cancelar</span>
+    </button>
+    <div class="orc-footer-actions" style="display:flex;gap:6px;align-items:center">
+      <button class="btn btn-ghost" style="color:var(--accent);padding:7px 10px;display:inline-flex;align-items:center;gap:5px" onclick="saveOrcamentoAndDownloadFile()" title="Salvar e Baixar PDF">
+        <i class="bi bi-download" style="font-size:14px"></i> <span class="d-none-mobile">Baixar PDF</span>
+      </button>
+      <button class="btn btn-ghost" style="color:#2563EB;padding:7px 10px;display:inline-flex;align-items:center;gap:5px" onclick="saveOrcamentoAndShare()" title="Salvar e Compartilhar no WhatsApp">
+        <i class="bi bi-whatsapp" style="font-size:14px"></i> <span class="d-none-mobile">Compartilhar</span>
+      </button>
+      <button class="btn btn-primary" onclick="saveOrcamento()" title="Salvar Orçamento" style="padding:7px 14px;display:inline-flex;align-items:center;gap:5px">
+        <i class="bi bi-check-lg" style="font-size:15px"></i> <span>Salvar</span>
+      </button>
     </div>
   </div>
 </div>
@@ -527,7 +535,7 @@
   <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=106"></script>
-<script src="orcamento.js?v=106"></script>
+<script src="common.js?v=109"></script>
+<script src="orcamento.js?v=109"></script>
 </body>
 </html>

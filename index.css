@@ -2930,12 +2930,62 @@ textarea.inp {
 
 .orc-item-grid {
   display: grid;
-  grid-template-columns: 1fr 120px 80px 40px;
+  grid-template-columns: 1fr 120px 70px 40px;
   gap: 8px;
 }
+.orc-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 @media (max-width: 640px) {
+  .orc-settings-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
   .orc-item-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 65px 40px !important;
+    gap: 6px !important;
+  }
+  .orc-item-name-wrap {
+    grid-column: 1 / -1 !important;
+  }
+  .proposal-meta-section {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    margin-bottom: 16px !important;
+  }
+  .proposal-meta-col-right {
+    text-align: left !important;
+  }
+  .proposal-date-line {
+    justify-content: flex-start !important;
+  }
+  .proposal-bottom-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  .proposal-totals-panel {
+    width: 100% !important;
+  }
+  .signature-block {
+    align-self: center !important;
+    margin-top: 16px !important;
+  }
+  .proposal-table th, .proposal-table td {
+    padding: 6px 3px !important;
+    font-size: 11.5px !important;
+  }
+  .d-none-mobile {
+    display: none !important;
+  }
+  .orc-modal-footer {
+    padding: 8px 10px !important;
+  }
+  .orc-modal-footer button {
+    padding: 6px 9px !important;
+    font-size: 12px !important;
   }
 }
 .proposal-table-title {
@@ -2954,6 +3004,8 @@ textarea.inp {
   border-radius: 0;
   background: transparent;
   margin-bottom: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .proposal-table {
   width: 100%;

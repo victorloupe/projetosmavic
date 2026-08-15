@@ -1,4 +1,4 @@
-const CACHE = 'mavic-v102';
+const CACHE = 'mavic-v107';
 
 const STATIC = [
   './',
@@ -18,6 +18,8 @@ const STATIC = [
   './relatorio.js',
   './clientes.html',
   './clientes.js',
+  './servicos.html',
+  './servicos.js',
   './config.js',
   './cliente.html',
   './cliente.css',
@@ -51,11 +53,12 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Estratégia: network-first para API / Supabase, cache-first para estáticos
+// Estratégia: Network-first para páginas e scripts (garante atualização imediata nos deploys da Vercel)
+// com fallback para cache se estiver offline.
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Sempre busca da rede para chamadas ao Supabase/Edge Function
+  // Sempre busca da rede para chamadas ao Supabase
   if (url.hostname.includes('supabase.co')) {
     e.respondWith(fetch(e.request).catch(() => new Response('{"error":"offline"}', {
       headers: { 'Content-Type': 'application/json' }
@@ -63,18 +66,16 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Cache-first para todo o resto
+  // Network-first com fallback para cache
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        // Cacheia respostas válidas de recursos estáticos
+    fetch(e.request)
+      .then(res => {
         if (res.ok && e.request.method === 'GET') {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
-      });
-    })
+      })
+      .catch(() => caches.match(e.request))
   );
 });

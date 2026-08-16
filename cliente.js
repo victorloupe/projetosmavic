@@ -42,6 +42,58 @@ function loadHtml2Pdf() {
   });
 }
 
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+         (window.innerWidth <= 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
+}
+
+async function shareOrOpenPdfBlob(pdfBlob, filename, { title = '', text = '', previewTab = null } = {}) {
+  const isMobile = isMobileDevice();
+  const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+  if (isMobile && typeof navigator.share === 'function') {
+    let canShareFile = false;
+    try {
+      canShareFile = typeof navigator.canShare === 'function' && navigator.canShare({ files: [pdfFile] });
+    } catch (e) {
+      canShareFile = false;
+    }
+
+    if (canShareFile) {
+      try {
+        await navigator.share({
+          files: [pdfFile],
+          title: title || filename.replace(/\.pdf$/i, ''),
+          text: text || title || ''
+        });
+        showToast('Recibo pronto!', 'success');
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.warn('Falha no Web Share, aplicando fallback:', err);
+      }
+    }
+  }
+
+  const blobUrl = URL.createObjectURL(pdfBlob);
+  if (previewTab && !previewTab.closed) {
+    previewTab.location.href = blobUrl;
+    showToast('PDF gerado! Confira a pré-visualização na nova aba.', 'success');
+  } else if (isMobile) {
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    showToast('PDF gerado!', 'success');
+  } else {
+    window.open(blobUrl, '_blank');
+    showToast('PDF gerado!', 'success');
+  }
+}
+
 // Máscara de CPF/CNPJ (cópia autônoma — cliente.js não carrega common.js)
 function formatDocMask(v){
   if(!v) return '';
@@ -818,8 +870,13 @@ async function downloadClientReceiptPDF(projId, payId) {
   const pay = (p.payments || []).find(x => x.id === payId);
   if (!pay) return;
 
-  // Abre a aba já aqui (ainda dentro do gesto de clique) pra não ser bloqueada como popup
-  const previewTab = window.open('', '_blank');
+  const isMobile = isMobileDevice();
+  let previewTab = null;
+  if (!isMobile) {
+    try {
+      previewTab = window.open('', '_blank');
+    } catch(e) {}
+  }
 
   const pDate = pay.date ? new Date(pay.date + 'T12:00:00') : new Date();
   const mesesExtenso = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -864,9 +921,11 @@ async function downloadClientReceiptPDF(projId, payId) {
   `;
   document.body.appendChild(wrapper);
 
+  const cleanClient = clientName.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
+  const filename = `Recibo_${pay.id}_${cleanClient || 'Cliente'}.pdf`;
   const opt = {
     margin:       [10, 10, 10, 10],
-    filename:     `Recibo_${pay.id}_${clientName.replace(/\s+/g, '_')}.pdf`,
+    filename:     filename,
     image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true, logging: false },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -876,10 +935,11 @@ async function downloadClientReceiptPDF(projId, payId) {
   try {
     await loadHtml2Pdf();
     const pdfBlob = await html2pdf().from(wrapper.firstElementChild).set(opt).outputPdf('blob');
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    if (previewTab) previewTab.location.href = blobUrl;
-    else window.open(blobUrl, '_blank');
-    showToast('PDF gerado! Confira a pré-visualização na nova aba.', 'success');
+    await shareOrOpenPdfBlob(pdfBlob, filename, {
+      title: `Recibo - ${clientName || 'Cliente'}`,
+      text: `Recibo de Pagamento - ${p.name || 'Projeto'}`,
+      previewTab
+    });
   } catch (err) {
     console.error('Erro ao gerar PDF:', err);
     if (previewTab) previewTab.close();

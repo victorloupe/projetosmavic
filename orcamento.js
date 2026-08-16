@@ -1417,18 +1417,22 @@ async function downloadOrcamentoPDFDirect(id) {
   const b = budgets.find(x => x.id === id);
   if (!b) return;
 
-  const previewTab = window.open('', '_blank');
+  const isMobile = isMobileDevice();
+  let previewTab = null;
+  if (!isMobile) {
+    try {
+      previewTab = window.open('', '_blank');
+    } catch(e) {}
+  }
   showToast('Gerando visualização do PDF...', 'info');
 
   try {
-    const { blob } = await generateOrcamentoPdfBlob(b);
-    const blobUrl = URL.createObjectURL(blob);
-    if (previewTab) {
-      previewTab.location.href = blobUrl;
-    } else {
-      window.open(blobUrl, '_blank');
-    }
-    showToast('PDF aberto para visualização!', 'success');
+    const { blob, filename } = await generateOrcamentoPdfBlob(b);
+    await shareOrOpenPdfBlob(blob, filename, {
+      title: filename.replace(/\.pdf$/i, ''),
+      text: `Olá! Segue a Proposta Comercial referente ao projeto ${b.title || 'MAVIC'}.`,
+      previewTab
+    });
   } catch (err) {
     console.error('Erro ao gerar PDF:', err);
     if (previewTab) previewTab.close();

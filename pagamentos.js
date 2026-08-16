@@ -683,9 +683,9 @@ function renderPagamentos() {
           <td style="font-family:'Courier New',monospace;font-weight:700;color:var(--green)">+${fmt(amountVal)}</td>
           <td style="text-align:right">
             <div style="display:inline-flex;gap:4px;justify-content:flex-end;width:100%;align-items:center">
-              <button class="btn btn-ghost btn-sm" onclick="downloadReceiptPDFDirect('${projId}', '${payId}')" style="padding:4px 8px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="sendPaymentWhatsApp('${projId}', '${payId}')" style="padding:4px 8px;color:#25D366" title="Confirmar Recebimento via WhatsApp"><i class="bi bi-whatsapp"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="generateReceipt('${projId}', '${payId}')" style="padding:4px 8px" title="Gerar Recibo"><i class="bi bi-receipt"></i> Recibo</button>
+              <button class="btn btn-ghost btn-sm" onclick="sendPaymentWhatsApp('${projId}', '${payId}')" style="padding:4px 8px;color:#25D366" title="Confirmar via WhatsApp"><i class="bi bi-whatsapp"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="downloadReceiptPDFDirect('${projId}', '${payId}')" style="padding:4px 8px;color:var(--red)" title="Visualizar / Compartilhar PDF"><i class="bi bi-file-pdf"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="generateReceipt('${projId}', '${payId}')" style="padding:4px 8px;color:var(--accent)" title="Ver Recibo"><i class="bi bi-receipt"></i></button>
               <button class="btn btn-danger btn-sm" onclick="deletePaymentDirect('${projId}', '${payId}')" style="padding:4px 8px" title="Excluir"><i class="bi bi-trash"></i></button>
             </div>
           </td>
@@ -737,9 +737,9 @@ function renderPagamentos() {
 
           <div class="pay-card-actions">
             <div class="pay-card-actions-left">
-              <button class="btn btn-ghost btn-sm" onclick="sendPaymentWhatsApp('${projId}', '${payId}')" style="padding:6px 10px;color:#25D366;font-size:12px"><i class="bi bi-whatsapp"></i> WhatsApp</button>
-              <button class="btn btn-ghost btn-sm" onclick="downloadReceiptPDFDirect('${projId}', '${payId}')" style="padding:6px 9px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i> PDF</button>
-              <button class="btn btn-ghost btn-sm" onclick="generateReceipt('${projId}', '${payId}')" style="padding:6px 9px" title="Ver Recibo"><i class="bi bi-receipt"></i> Recibo</button>
+              <button class="btn btn-ghost btn-sm" onclick="sendPaymentWhatsApp('${projId}', '${payId}')" style="padding:6px 9px;color:#25D366" title="Confirmar via WhatsApp"><i class="bi bi-whatsapp"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="downloadReceiptPDFDirect('${projId}', '${payId}')" style="padding:6px 9px;color:var(--red)" title="Visualizar / Compartilhar PDF"><i class="bi bi-file-pdf"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="generateReceipt('${projId}', '${payId}')" style="padding:6px 9px;color:var(--accent)" title="Ver Recibo"><i class="bi bi-receipt"></i></button>
             </div>
             <div class="pay-card-actions-right">
               <button class="btn btn-danger btn-sm" onclick="deletePaymentDirect('${projId}', '${payId}')" style="padding:6px 8px" title="Excluir"><i class="bi bi-trash"></i></button>
@@ -939,21 +939,17 @@ function saveDirectPayment() {
   showToast(isNew ? `Cliente, projeto e pagamento criados em "${p.column}"!` : 'Pagamento registrado com sucesso!', 'success');
 }
 
-function generateReceipt(projId, payId) {
-  const p = (projects || []).find(x => String(x.id) === String(projId));
-  if (!p) return showToast('Projeto não encontrado', 'error');
-  const pay = (p.payments || []).find(x => String(x.id) === String(payId));
-  if (!pay) return showToast('Pagamento não encontrado', 'error');
-  
+function fillReceiptData(p, pay) {
   const clientName = p.client || '';
   const cl = (clients || []).find(x => x && x.name && x.name.toLowerCase().trim() === clientName.toLowerCase().trim());
   const clientDoc = cl && cl.doc ? formatDocMask(cl.doc) : 'Não informado';
   const clientAddress = cl && cl.address ? cl.address : 'Não informado';
   
   const modal = document.getElementById('reciboOverlay');
-  if (!modal) return;
-  modal.dataset.projId = String(projId);
-  modal.dataset.payId = String(payId);
+  if (modal) {
+    modal.dataset.projId = String(p.id);
+    modal.dataset.payId = String(pay.id);
+  }
   
   const recNum = document.getElementById('recNum'); if (recNum) recNum.textContent = `Nº REC-${pay.id}`;
   const recValNum = document.getElementById('recValNum'); if (recValNum) recValNum.textContent = fmt(pay.amount);
@@ -978,8 +974,17 @@ function generateReceipt(projId, payId) {
   const companyDoc = localStorage.getItem('mavic_companyDoc') || '350.605.018-41';
   const recEmissor = document.getElementById('recEmissorName'); if (recEmissor) recEmissor.textContent = companyName;
   const recEmissorDoc = document.getElementById('recEmissorDoc'); if (recEmissorDoc) recEmissorDoc.textContent = `CPF/CNPJ: ${formatDocMask(companyDoc)}`;
+}
+
+function generateReceipt(projId, payId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return showToast('Projeto não encontrado', 'error');
+  const pay = (p.payments || []).find(x => String(x.id) === String(payId));
+  if (!pay) return showToast('Pagamento não encontrado', 'error');
   
-  modal.classList.add('open');
+  fillReceiptData(p, pay);
+  const modal = document.getElementById('reciboOverlay');
+  if (modal) modal.classList.add('open');
 }
 
 function closeReciboModal() {
@@ -1019,21 +1024,35 @@ async function downloadReceiptPDFDirect(projId, payId) {
   const pay = (p.payments || []).find(x => String(x.id) === String(payId));
   if (!pay) return showToast('Pagamento não encontrado', 'error');
 
-  const previewTab = window.open('', '_blank');
+  const isMobile = isMobileDevice();
+  let previewTab = null;
+  if (!isMobile) {
+    try {
+      previewTab = window.open('', '_blank');
+    } catch(e) {}
+  }
 
-  generateReceipt(projId, payId);
+  fillReceiptData(p, pay);
 
   const element = document.querySelector('#reciboOverlay .mbody.print-area');
-  if (!element) return;
+  if (!element) {
+    if (previewTab) previewTab.close();
+    return;
+  }
+
+  const clientClean = (p.client || 'Cliente').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
+  const projectClean = (p.name || '').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
+  const filename = `Recibo_${pay.id}_${clientClean}${projectClean ? '_' + projectClean : ''}.pdf`;
   const opt = {
     margin:       [10, 10, 10, 10],
-    filename:     `Recibo_${pay.id}_${(p.client || 'Cliente').replace(/\s+/g, '_')}.pdf`,
+    filename:     filename,
     image:        { type: 'jpeg', quality: 0.98 },
     html2canvas:  { scale: 2, useCORS: true, logging: false },
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
   showToast('Gerando PDF...', 'info');
+  let wrapper = null;
   try {
     const clone = element.cloneNode(true);
     clone.classList.remove('mbody');
@@ -1048,43 +1067,35 @@ async function downloadReceiptPDFDirect(projId, payId) {
     clone.style.border = '2px dotted #4b5563';
     clone.style.borderRadius = '8px';
 
-    let wrapper = null;
-    try {
-      wrapper = document.createElement('div');
-      wrapper.style.position = 'fixed';
-      wrapper.style.left = '0';
-      wrapper.style.top = '0';
-      wrapper.style.zIndex = '-9999';
-      wrapper.style.pointerEvents = 'none';
-      wrapper.style.background = '#ffffff';
-      wrapper.style.width = '190mm';
-      wrapper.style.minWidth = '190mm';
-      wrapper.style.maxWidth = '190mm';
-      wrapper.appendChild(clone);
-      document.body.appendChild(wrapper);
+    wrapper = document.createElement('div');
+    wrapper.style.position = 'fixed';
+    wrapper.style.left = '0';
+    wrapper.style.top = '0';
+    wrapper.style.zIndex = '-9999';
+    wrapper.style.pointerEvents = 'none';
+    wrapper.style.background = '#ffffff';
+    wrapper.style.width = '190mm';
+    wrapper.style.minWidth = '190mm';
+    wrapper.style.maxWidth = '190mm';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
 
-      await loadHtml2Pdf();
-      const pdfBlob = await html2pdf().from(clone).set(opt).outputPdf('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      if (previewTab) {
-        previewTab.location.href = blobUrl;
-      } else {
-        window.open(blobUrl, '_blank');
-      }
-      showToast('PDF gerado! Confira a pré-visualização na nova aba.', 'success');
-    } catch (err) {
-      console.error('Erro ao gerar PDF:', err);
-      if (previewTab) previewTab.close();
-      showToast('Erro ao gerar PDF', 'error');
-    } finally {
-      if (wrapper && wrapper.parentNode) {
-        document.body.removeChild(wrapper);
-      }
-    }
-  } catch(e) {
-    console.error('Erro ao preparar PDF:', e);
+    await loadHtml2Pdf();
+    const pdfBlob = await html2pdf().from(clone).set(opt).outputPdf('blob');
+    
+    await shareOrOpenPdfBlob(pdfBlob, filename, {
+      title: `Recibo - ${p.client || 'Cliente'}${p.name ? ' (' + p.name + ')' : ''}`,
+      text: `Recibo de Pagamento - ${p.name || 'Projeto'}`,
+      previewTab
+    });
+  } catch (err) {
+    console.error('Erro ao gerar PDF:', err);
     if (previewTab) previewTab.close();
     showToast('Erro ao gerar PDF', 'error');
+  } finally {
+    if (wrapper && wrapper.parentNode) {
+      document.body.removeChild(wrapper);
+    }
   }
 }
 

@@ -86,6 +86,65 @@ function loadHtml2Pdf() {
   });
 }
 
+// Detecta se o dispositivo é mobile / touchscreen
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+         (window.innerWidth <= 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
+}
+
+// Compartilha o PDF no mobile via Web Share API (WhatsApp, Email, Imprimir...) ou abre/baixa no desktop
+async function shareOrOpenPdfBlob(pdfBlob, filename, { title = '', text = '', previewTab = null } = {}) {
+  const isMobile = isMobileDevice();
+  const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+  // No mobile, tenta abrir a folha nativa de compartilhamento (WhatsApp, Email, Imprimir, Salvar...)
+  if (isMobile && typeof navigator.share === 'function') {
+    let canShareFile = false;
+    try {
+      canShareFile = typeof navigator.canShare === 'function' && navigator.canShare({ files: [pdfFile] });
+    } catch (e) {
+      canShareFile = false;
+    }
+
+    if (canShareFile) {
+      try {
+        await navigator.share({
+          files: [pdfFile],
+          title: title || filename.replace(/\.pdf$/i, ''),
+          text: text || title || ''
+        });
+        showToast('Recibo pronto!', 'success');
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          // Usuário apenas cancelou ou fechou o menu de compartilhamento
+          return;
+        }
+        console.warn('Falha no Web Share, aplicando fallback:', err);
+      }
+    }
+  }
+
+  // Fallback: visualização na nova aba (desktop) ou download direto (mobile sem suporte ao Web Share)
+  const blobUrl = URL.createObjectURL(pdfBlob);
+  if (previewTab && !previewTab.closed) {
+    previewTab.location.href = blobUrl;
+    showToast('PDF gerado! Confira a pré-visualização na nova aba.', 'success');
+  } else if (isMobile) {
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    showToast('PDF gerado!', 'success');
+  } else {
+    window.open(blobUrl, '_blank');
+    showToast('PDF gerado!', 'success');
+  }
+}
+
 // Uma coluna conta como "concluída" se estiver marcada com isFinal.
 // Compatibilidade: configs salvas antes desse campo existir caem no nome
 // literal "Concluído", pra não quebrar dados já sincronizados.

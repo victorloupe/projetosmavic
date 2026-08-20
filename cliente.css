@@ -78,6 +78,41 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Scrollbars discretas e elegantes */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 body, .nav, .fin-bar, .fin-bar-mobile, .toolbar, .kcard, .fin-blk, .modal-card, .notif-accordion {
@@ -95,6 +130,8 @@ html, body {
   line-height: 1.55;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -208,9 +245,10 @@ html, body {
 }
 
 .fin-val {
-  font-weight: 750;
-  font-family: monospace;
-  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14.5px;
+  letter-spacing: -0.01em;
 }
 
 .fin-val.pago { color: var(--green); }
@@ -541,7 +579,7 @@ select.inp {
 }
 
 .fin-row .lbl { color: var(--text2); }
-.fin-row .val { font-weight: 700; font-family: monospace; }
+.fin-row .val { font-weight: 700; font-family: 'Outfit', sans-serif; font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums; }
 
 .fin-hist-btn {
   width: 100%;
@@ -764,67 +802,119 @@ select.inp {
   100% { transform: translateX(250%); width: 50%; }
 }
 
-/* WELCOME BANNER */
+/* WELCOME BANNER BALANCED */
 .client-welcome-wrap {
-  padding: 14px 20px 0;
+  padding: 10px 20px 0;
   flex-shrink: 0;
 }
 .client-welcome-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 14px 18px;
+  border-radius: 14px;
+  padding: 10px 18px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
+  gap: 24px;
   box-shadow: var(--sh);
   position: relative;
-  overflow: hidden;
+}
+.client-welcome-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
 }
 .client-welcome-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   background: var(--accent-bg);
   color: var(--accent);
   font-family: 'Outfit', sans-serif;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(146, 98, 58, 0.08);
+  box-shadow: 0 1px 4px rgba(146, 98, 58, 0.08);
 }
 .client-welcome-info {
-  flex: 1;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 .client-welcome-title {
   font-family: 'Outfit', sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text);
+  white-space: nowrap;
 }
 .client-welcome-desc {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text3);
-  margin-top: 1px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
+
+/* PROGRESS BAR IN THE CENTER */
+.client-global-progress {
+  flex: 1;
+  max-width: 440px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.client-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+}
+.client-progress-label {
+  font-weight: 600;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.client-progress-label i {
+  color: var(--accent);
+}
+.client-progress-pct {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 12px;
+}
+.client-progress-track {
+  height: 7px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.client-progress-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--green) 100%);
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .client-welcome-tools {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
 }
 .client-type-filter {
   width: auto;
-  font-size: 12px;
-  padding: 6px 12px;
-  border-radius: 10px;
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: 8px;
   background: var(--surface2);
   border: 1px solid var(--border2);
   color: var(--text);
@@ -833,18 +923,22 @@ select.inp {
   font-family: inherit;
   font-weight: 500;
   transition: all .2s ease;
+  height: 30px;
 }
 .client-type-filter:hover {
   border-color: var(--accent);
 }
 .client-proj-count-badge {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--accent);
   background: var(--accent-bg);
-  padding: 6px 12px;
-  border-radius: 10px;
+  padding: 5px 10px;
+  border-radius: 8px;
   white-space: nowrap;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
 }
 
 @media (max-width: 768px) {
@@ -1175,7 +1269,8 @@ select.inp {
 .receipt-number {
   font-size: 11px;
   color: #555;
-  font-family: monospace;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
   margin-top: 2px;
 }
 .receipt-value-box {
@@ -1195,9 +1290,10 @@ select.inp {
 }
 .receipt-val-num {
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 700;
   color: #111;
-  font-family: 'Courier New', monospace;
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: -0.02em;
 }
 .receipt-body {
   font-size: 14.5px;

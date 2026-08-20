@@ -516,6 +516,33 @@ function renderBoard(){
   
   document.getElementById('boardCount').textContent=`${myProjs.length} projeto${myProjs.length!==1?'s':''}`;
   
+  // Atualiza barra de progresso global
+  const progWrap = document.getElementById('clientGlobalProgress');
+  const progBar = document.getElementById('clientGlobalProgressBar');
+  const progLbl = document.getElementById('clientGlobalProgressLabel');
+  if (progWrap && progBar && progLbl) {
+    if (myProjs.length > 0) {
+      const visibleCols = appColumns.filter(c => !isHiddenColumn(c.id));
+      const maxColIdx = Math.max(1, visibleCols.length - 1);
+      const totalPossible = myProjs.length * maxColIdx;
+      let totalCompleted = 0;
+      
+      myProjs.forEach(p => {
+        const cIdx = visibleCols.findIndex(c => c.id === p.column);
+        if (cIdx >= 0) {
+          totalCompleted += cIdx;
+        }
+      });
+
+      const globalPct = Math.min(100, Math.round((totalCompleted / totalPossible) * 100));
+      progWrap.style.display = 'block';
+      progBar.style.width = `${globalPct}%`;
+      progLbl.textContent = `${globalPct}% concluído`;
+    } else {
+      progWrap.style.display = 'none';
+    }
+  }
+
   if(!myProjs.length){
     board.innerHTML='<div class="empty-state" style="padding:40px;text-align:center;width:100%"><i class="bi bi-folder-x" style="font-size:48px;color:var(--text3)"></i><p style="margin-top:10px;color:var(--text2)">Nenhum projeto encontrado</p></div>';
     return;
@@ -590,19 +617,26 @@ function createCardHTML(p, cardIdx=0){
   const isExp=expandedFin.has(p.id);
   let finHtml='';
   if(total>0){
-    const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'} · ${pg.method||'Pix'}</span><span class="fv">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
+    const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'} · ${pg.method||'Pix'}</span><span class="fv" style="font-family:'Outfit',sans-serif;font-weight:700">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
     
+    const pixActionBtn = rest > 0 ? `
+      <button class="btn btn-primary btn-sm" onclick="openPixModal('${(p.name||'').replace(/'/g, "\\'")}', ${rest});event.stopPropagation()" style="width:100%;margin-top:8px;padding:8px;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px">
+        <i class="bi bi-qr-code"></i> Pagar Saldo via Pix (${fmt(rest)})
+      </button>
+    ` : '';
+
     finHtml=`<div class="fin-blk">
       <div class="fin-sum">
-        <div class="fin-row"><span class="lbl">Total do contrato</span><span class="val">${fmt(total)}</span></div>
-        <div class="fin-row"><span class="lbl">Valor pago</span><span class="val" style="color:var(--green)">${fmt(paid)}</span></div>
+        <div class="fin-row"><span class="lbl">Total do contrato</span><span class="val" style="font-family:'Outfit',sans-serif;font-weight:700">${fmt(total)}</span></div>
+        <div class="fin-row"><span class="lbl">Valor pago</span><span class="val" style="color:var(--green);font-family:'Outfit',sans-serif;font-weight:700">${fmt(paid)}</span></div>
         <div class="fin-row" style="border-top:1px solid var(--border);padding-top:3px;margin-top:2px">
           <span class="lbl">Saldo restante</span>
-          <span class="val" style="color:${rest>0?'var(--red)':'var(--text3)'}">
+          <span class="val" style="color:${rest>0?'var(--red)':'var(--text3)'};font-family:'Outfit',sans-serif;font-weight:700">
             ${fmt(rest)} <span class="badge ${sClass}" style="font-size:10px">${sLabel}</span>
           </span>
         </div>
       </div>
+      ${pixActionBtn}
       <button class="fin-hist-btn" onclick="toggleFin(${p.id});event.stopPropagation()">
         <i class="bi bi-clock-history"></i> ${pays.length} pagamento${pays.length!==1?'s':''}
         <i class="bi bi-chevron-${isExp?'up':'down'}" style="float:right;margin-top:1px;font-size:10px"></i>
@@ -617,8 +651,8 @@ function createCardHTML(p, cardIdx=0){
   if(prods.length){
     prodsHtml=`<div style="margin-top:8px">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);margin-bottom:4px"><i class="bi bi-tags"></i> Serviços Contratados</div>
-      <table class="prod-table"><thead><tr><th>Serviço</th><th>Valor</th></tr></thead><tbody>
-        ${prods.map(pd=>`<tr><td style="font-weight:500">${pd.name}</td><td style="font-family:'Courier New',monospace;font-weight:700;color:var(--green)">${fmt(pd.price)}</td></tr>`).join('')}
+      <table class="prod-table"><thead><tr><th>Serviço</th><th style="text-align:right">Valor</th></tr></thead><tbody>
+        ${prods.map(pd=>`<tr><td style="font-weight:500">${pd.name}</td><td style="font-family:'Outfit',sans-serif;font-weight:700;color:var(--green);text-align:right">${fmt(pd.price)}</td></tr>`).join('')}
       </tbody></table></div>`;
   }
 
@@ -628,7 +662,7 @@ function createCardHTML(p, cardIdx=0){
     checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px">
       <div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600">
         <span><i class="bi bi-ui-checks"></i> Andamento</span>
-        <span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span>
+        <span style="font-family:'Outfit',sans-serif;font-weight:700">${subDone}/${subs.length}</span>
       </div>
       <div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>
       <div style="max-height:96px;overflow-y:auto">

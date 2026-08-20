@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#92623a">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=102">
+<link rel="stylesheet" href="index.css?v=118">
 <script>
 (function(){
   try {
@@ -64,12 +64,12 @@
 
 <!-- CLIENTES VIEW -->
 <div class="dash-view" id="clientesView" style="display:block">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px">
     <h4 style="font-weight:700;color:var(--accent);margin:0">CRM — Clientes</h4>
   </div>
   
-  <div class="mbody" style="display:grid;grid-template-columns:300px 1fr;gap:18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;min-height:500px">
-    <div>
+  <div class="mbody" style="display:grid;grid-template-columns:310px 1fr;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;min-height:calc(100vh - 160px);box-shadow:var(--sh);">
+    <div style="display:flex;flex-direction:column;height:100%;min-height:0">
       <div class="sec">Novo Cliente</div>
       <div style="display:flex;gap:7px;margin-bottom:14px">
         <input class="inp inp-sm" id="newCliName" placeholder="Nome completo">
@@ -79,8 +79,8 @@
         <span>Cadastrados</span>
         <input type="text" class="inp inp-sm" id="cliSearch" placeholder="Buscar…" oninput="pgReset('clientes');renderCliList()" style="width:120px; padding:2px 6px; font-size:11px;">
       </div>
-      <div id="cliList" style="display:flex;flex-direction:column;gap:3px;max-height:420px;overflow-y:auto;margin-top:8px"></div>
-      <div id="cliPagination" style="margin-top:8px"></div>
+      <div id="cliList" style="flex:1;min-height:120px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;margin-top:8px;padding-right:2px"></div>
+      <div id="cliPagination" style="margin-top:auto;padding-top:14px;border-top:1px solid var(--border)"></div>
     </div>
     
     <div id="cliDetail" class="d-none" style="border-left:1px solid var(--border);padding-left:18px;max-height:calc(100vh - 170px);overflow-y:auto;padding-right:6px">
@@ -88,6 +88,9 @@
         <h6 id="cliDetailName" style="font-size:15px;font-weight:700;color:var(--accent);margin:0"></h6>
         <button class="btn btn-danger btn-sm" id="cliDeleteBtn"><i class="bi bi-trash3"></i> Remover</button>
       </div>
+      
+      <!-- MINI STATS DO CLIENTE (LTV / HISTÓRICO) -->
+      <div class="dash-grid" id="cliStatsGrid" style="grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;margin-bottom:14px"></div>
       
       <!-- CONTATO & DADOS -->
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:15px;margin-bottom:14px">
@@ -336,7 +339,7 @@
   <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=106"></script>
-<script src="clientes.js?v=106"></script>
+<script src="common.js?v=112"></script>
+<script src="clientes.js?v=113"></script>
 </body>
 </html>

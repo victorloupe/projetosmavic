@@ -13,11 +13,11 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=102">
+<link rel="stylesheet" href="index.css?v=118">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <style>
-  /* Estilos específicos da tela de Login */
+  /* Estilos refinados da tela de Login */
   .login-wrapper {
     min-height: 100vh;
     min-height: 100dvh;
@@ -29,24 +29,29 @@
     position: relative;
     overflow: hidden;
     background: var(--bg);
+    background-image: 
+      radial-gradient(var(--border) 1px, transparent 1px),
+      radial-gradient(var(--border) 1px, var(--bg) 1px);
+    background-size: 32px 32px;
+    background-position: 0 0, 16px 16px;
   }
 
-  /* Ambient Glow de fundo */
+  /* Ambient Glow de fundo multi-camadas */
   .login-glow {
     position: absolute;
-    width: 600px;
-    height: 600px;
+    width: 680px;
+    height: 680px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(146, 98, 58, 0.14) 0%, rgba(146, 98, 58, 0) 70%);
+    background: radial-gradient(circle, rgba(146, 98, 58, 0.18) 0%, rgba(146, 98, 58, 0.05) 50%, transparent 75%);
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     pointer-events: none;
     z-index: 0;
-    filter: blur(40px);
+    filter: blur(50px);
   }
   [data-theme="dark"] .login-glow {
-    background: radial-gradient(circle, rgba(197, 147, 95, 0.16) 0%, rgba(197, 147, 95, 0) 70%);
+    background: radial-gradient(circle, rgba(197, 147, 95, 0.22) 0%, rgba(197, 147, 95, 0.06) 50%, transparent 75%);
   }
 
   .login-top-bar {
@@ -67,12 +72,15 @@
     background: var(--surface);
     border: 1px solid var(--border2);
     border-radius: var(--r-lg);
-    box-shadow: var(--sh3);
-    padding: 36px 32px 30px;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 24px 60px rgba(146, 98, 58, 0.12), 0 8px 24px rgba(0,0,0,0.04);
+    padding: 38px 34px 32px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
-    animation: loginFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: loginFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  [data-theme="dark"] .login-card {
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0,0,0,0.4);
   }
 
   @keyframes loginFadeIn {

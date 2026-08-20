@@ -2,12 +2,26 @@
 //  ORÇAMENTO LOGIC
 // ══════════════════════════════════════════
 let editingOrcItemId = null;
+let tempOrcAttachments = [];
+let tempOrcShowAttachments = false; // controla se a seção de anexos entra no PDF/impressão (padrão: desligado)
+let orcDefaultFilterApplied = false; // garante que o filtro padrão "Pendentes" só é aplicado uma vez, na primeira carga
 
 function initPage() {
   ensureOrcNumbers();
   updateClientFilter();
   updateYearFilter();
+
+  // Ao abrir a página pela primeira vez, começa filtrando por "Pendentes" em vez de "Todos".
+  // Só roda uma única vez — chamadas seguintes de initPage() (ex.: depois de restaurar backup
+  // ou editar tipos de projeto) preservam o filtro que o usuário já tiver escolhido na tela.
+  if (!orcDefaultFilterApplied) {
+    orcDefaultFilterApplied = true;
+    const statusSel = document.getElementById('fOrcStatus');
+    if (statusSel) statusSel.value = 'Pendente';
+  }
+
   renderOrcamentos();
+  setupOrcDropzoneEvents();
 }
 
 // Numeração sequencial (#1, #2, #3...) em vez do id interno (timestamp)
@@ -127,6 +141,8 @@ function openOrcamentoModal(id = null) {
     document.getElementById('orcNotes').value = b.notes || '';
     document.getElementById('orcDiscount').value = toBRLInputStr(b.discount || 0);
     tempOrcItems = [...b.items];
+    tempOrcAttachments = Array.isArray(b.attachments) ? JSON.parse(JSON.stringify(b.attachments)) : [];
+    tempOrcShowAttachments = b.showAttachments === true; // padrão: desligado (só liga se foi explicitamente salvo como true)
     document.getElementById('orcModalTitle').textContent = 'Editar Orçamento';
     document.getElementById('btnPrnOrc').style.display = 'inline-flex';
     document.getElementById('btnPdfOrc').style.display = 'inline-flex';
@@ -147,6 +163,8 @@ function openOrcamentoModal(id = null) {
     document.getElementById('orcStatus').value = 'Pendente';
     document.getElementById('orcProjectType').value = 'Residencial';
     tempOrcItems = [];
+    tempOrcAttachments = [];
+    tempOrcShowAttachments = false;
     document.getElementById('orcModalTitle').textContent = 'Novo Orçamento';
     document.getElementById('btnPrnOrc').style.display = 'none';
     document.getElementById('btnPdfOrc').style.display = 'none';
@@ -156,6 +174,7 @@ function openOrcamentoModal(id = null) {
   
   updateOrcItemFormMode();
   renderOrcItems();
+  renderOrcAttachments();
   updateOrcPreviewLabels();
   document.getElementById('orcamentoOverlay').classList.add('open');
 }
@@ -563,8 +582,8 @@ function renderOrcItems() {
         <td style="text-align:center;font-weight:600;color:var(--text2)">
           ${qty}
         </td>
-        <td style="text-align:right;font-weight:600;font-family:'Courier New',monospace;color:var(--text2)">${fmtVal}</td>
-        <td style="text-align:right;font-weight:700;font-family:'Courier New',monospace;color:var(--text)">${fmtSub}</td>
+        <td style="text-align:right;font-weight:600;font-family:'Outfit',sans-serif;color:var(--text2)">${fmtVal}</td>
+        <td style="text-align:right;font-weight:700;font-family:'Outfit',sans-serif;color:var(--text)">${fmtSub}</td>
         <td style="text-align:center" class="no-print">
           <button class="prod-del" onclick="editOrcItem(${item.id})" title="Editar item"><i class="bi bi-pencil"></i></button>
           <button class="prod-del" onclick="removeOrcItem(${item.id})" title="Remover item"><i class="bi bi-trash3"></i></button>
@@ -611,6 +630,8 @@ function saveOrcamento() {
     projectType,
     notes,
     items: tempOrcItems,
+    attachments: tempOrcAttachments || [],
+    showAttachments: tempOrcShowAttachments,
     discount,
     total
   };
@@ -640,6 +661,140 @@ function saveOrcamentoAndDownloadPdf() {
   if (savedId) downloadOrcamentoPDFDirect(savedId);
 }
 
+function renderOrcKpis() {
+  const kpiEl = document.getElementById('orcKpis');
+  if (!kpiEl) return;
+  const total = budgets.reduce((acc, b) => acc + (b.total - (parseFloat(b.discount) || 0)), 0);
+  const pendentes = budgets.filter(b => b.status === 'Pendente');
+  const pendenteTotal = pendentes.reduce((acc, b) => acc + (b.total - (parseFloat(b.discount) || 0)), 0);
+  const convertidos = budgets.filter(b => b.status === 'Convertido' || b.status === 'Aprovado');
+  const convertidoTotal = convertidos.reduce((acc, b) => acc + (b.total - (parseFloat(b.discount) || 0)), 0);
+  const taxa = budgets.length ? Math.round((convertidos.length / budgets.length) * 100) : 0;
+
+  kpiEl.innerHTML = `
+    <div class="orc-kpi-card">
+      <div class="orc-kpi-icon" style="background:var(--accent-bg);color:var(--accent)"><i class="bi bi-file-earmark-text"></i></div>
+      <div>
+        <div class="orc-kpi-lbl">TOTAL EM PROPOSTAS</div>
+        <div class="orc-kpi-val">${fmt(total)}</div>
+        <div class="orc-kpi-sub">${budgets.length} ${budgets.length === 1 ? 'proposta' : 'propostas'} cadastradas</div>
+      </div>
+    </div>
+    <div class="orc-kpi-card">
+      <div class="orc-kpi-icon" style="background:var(--yellow-bg);color:var(--yellow)"><i class="bi bi-hourglass-split"></i></div>
+      <div>
+        <div class="orc-kpi-lbl">AGUARDANDO APROVAÇÃO</div>
+        <div class="orc-kpi-val" style="color:var(--yellow)">${fmt(pendenteTotal)}</div>
+        <div class="orc-kpi-sub">${pendentes.length} ${pendentes.length === 1 ? 'pendente' : 'pendentes'}</div>
+      </div>
+    </div>
+    <div class="orc-kpi-card">
+      <div class="orc-kpi-icon" style="background:var(--green-bg);color:var(--green)"><i class="bi bi-check2-circle"></i></div>
+      <div>
+        <div class="orc-kpi-lbl">APROVADOS / CONVERTIDOS</div>
+        <div class="orc-kpi-val" style="color:var(--green)">${fmt(convertidoTotal)}</div>
+        <div class="orc-kpi-sub">${convertidos.length} ${convertidos.length === 1 ? 'fechado' : 'fechados'} (${taxa}% conversão)</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderOrcChips(currentStatus) {
+  const chipBar = document.getElementById('orcChipsBar');
+  if (!chipBar) return;
+
+  const totalCount = budgets.length;
+  const pendenteCount = budgets.filter(b => b.status === 'Pendente').length;
+  const aprovadoCount = budgets.filter(b => b.status === 'Aprovado').length;
+  const convertidoCount = budgets.filter(b => b.status === 'Convertido').length;
+  const recusadoCount = budgets.filter(b => b.status === 'Recusado').length;
+
+  const chips = [
+    { label: 'Todos', value: '', count: totalCount },
+    { label: 'Pendentes', value: 'Pendente', count: pendenteCount },
+    { label: 'Aprovados', value: 'Aprovado', count: aprovadoCount },
+    { label: 'Convertidos', value: 'Convertido', count: convertidoCount },
+    { label: 'Recusados', value: 'Recusado', count: recusadoCount }
+  ];
+
+  chipBar.innerHTML = chips.map(c => `
+    <button class="orc-chip ${c.value === currentStatus ? 'active' : ''}" onclick="setOrcChipFilter('${c.value}')">
+      ${c.label} <span class="orc-chip-count">${c.count}</span>
+    </button>
+  `).join('');
+}
+
+function setOrcChipFilter(statusVal) {
+  const sel = document.getElementById('fOrcStatus');
+  if (sel) sel.value = statusVal;
+  pgReset('orcamentos');
+  renderOrcamentos();
+}
+
+function toggleOrcActionsMenu(event, budgetId) {
+  event.stopPropagation();
+  const dropdown = document.getElementById('orcTableActionDropdown');
+  if (!dropdown) return;
+
+  if (dropdown.classList.contains('open') && dropdown._activeId === budgetId) {
+    closeOrcActionsMenu();
+    return;
+  }
+
+  const budget = budgets.find(b => b.id === budgetId);
+  if (!budget) return;
+
+  dropdown._activeId = budgetId;
+  dropdown.innerHTML = `
+    <button onclick="closeOrcActionsMenu();downloadOrcamentoPDFDirect(${budgetId})"><i class="bi bi-file-pdf" style="color:var(--red)"></i> Visualizar PDF</button>
+    <button onclick="closeOrcActionsMenu();downloadOrcamentoPDFFile(${budgetId})"><i class="bi bi-download" style="color:var(--accent)"></i> Baixar Arquivo PDF</button>
+    <button onclick="closeOrcActionsMenu();shareOrcamentoPDF(${budgetId})"><i class="bi bi-share" style="color:#2563EB"></i> Compartilhar Link</button>
+    <button onclick="closeOrcActionsMenu();duplicateOrcamento(${budgetId})"><i class="bi bi-copy"></i> Duplicar Proposta</button>
+    <div class="dropdown-sep"></div>
+    <button class="del" onclick="closeOrcActionsMenu();deleteOrcamento(${budgetId})"><i class="bi bi-trash"></i> Excluir Orçamento</button>
+  `;
+
+  const btnRect = event.currentTarget.getBoundingClientRect();
+  const menuWidth = 190;
+  let left = btnRect.right - menuWidth;
+  if (left < 10) left = 10;
+  let top = btnRect.bottom + 6;
+
+  dropdown.style.top = `${top}px`;
+  dropdown.style.left = `${left}px`;
+  dropdown.classList.add('open');
+}
+
+function closeOrcActionsMenu() {
+  const dropdown = document.getElementById('orcTableActionDropdown');
+  if (dropdown) {
+    dropdown.classList.remove('open');
+    dropdown._activeId = null;
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('orcTableActionDropdown');
+  if (dropdown && dropdown.classList.contains('open') && !dropdown.contains(e.target)) {
+    closeOrcActionsMenu();
+  }
+});
+
+function clearOrcFilters() {
+  const srch = document.getElementById('fOrcSearch');
+  const cli = document.getElementById('fOrcClient');
+  const st = document.getElementById('fOrcStatus');
+  const yr = document.getElementById('fOrcYear');
+  const mo = document.getElementById('fOrcMonth');
+  if (srch) srch.value = '';
+  if (cli) cli.value = '';
+  if (st) st.value = '';
+  if (yr) yr.value = '';
+  if (mo) mo.value = '';
+  pgReset('orcamentos');
+  renderOrcamentos();
+}
+
 function renderOrcamentos() {
   const tbody = document.getElementById('orcTableBody');
   const mobileList = document.getElementById('orcMobileList');
@@ -648,7 +803,11 @@ function renderOrcamentos() {
   const clientFilter = document.getElementById('fOrcClient')?.value || '';
   const statusFilter = document.getElementById('fOrcStatus')?.value || '';
   const yearFilter = document.getElementById('fOrcYear')?.value || '';
+  const monthFilter = document.getElementById('fOrcMonth')?.value || '';
   
+  renderOrcKpis();
+  renderOrcChips(statusFilter);
+
   let filtered = [...budgets];
   
   if (search) {
@@ -669,8 +828,20 @@ function renderOrcamentos() {
   }
   
   if (yearFilter) {
-    allPayments = filtered.filter(b => b.date && b.date.startsWith(yearFilter));
-    filtered = filtered.filter(b => b.date && b.date.startsWith(yearFilter));
+    filtered = filtered.filter(b => {
+      const dt = parseDateSafe(b.date || b.validUntil);
+      return dt ? String(dt.getFullYear()) === yearFilter : (b.date && b.date.startsWith(yearFilter));
+    });
+  }
+
+  if (monthFilter) {
+    filtered = filtered.filter(b => {
+      const dt = parseDateSafe(b.date || b.validUntil);
+      if (dt) {
+        return String(dt.getMonth() + 1).padStart(2, '0') === monthFilter;
+      }
+      return b.date && b.date.includes(`-${monthFilter}-`);
+    });
   }
   
   filtered.sort((a, b) => (b.number || b.id) - (a.number || a.id));
@@ -679,8 +850,9 @@ function renderOrcamentos() {
   if (pgEl) pgEl.innerHTML = pgBarHtml('orcamentos', filtered.length, 'renderOrcamentos');
 
   if (!filtered.length) {
-    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px"><i class="bi bi-file-earmark-spreadsheet" style="font-size:24px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum orçamento encontrado</td></tr>`;
-    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-file-earmark-spreadsheet" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum orçamento encontrado</div>`;
+    const isFiltered = Boolean(search || clientFilter || statusFilter || yearFilter || monthFilter);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:28px"><i class="bi bi-file-earmark-spreadsheet" style="font-size:26px;display:block;margin-bottom:8px;opacity:0.5"></i>Nenhum orçamento encontrado para os filtros selecionados${isFiltered ? `<br><button class="btn-clear-filter" onclick="clearOrcFilters()"><i class="bi bi-x-circle"></i> Limpar filtros</button>` : ''}</td></tr>` + pgFillerRowsHtml('orcamentos', 0, 7);
+    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-file-earmark-spreadsheet" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum orçamento encontrado${isFiltered ? `<br><button class="btn-clear-filter" onclick="clearOrcFilters()"><i class="bi bi-x-circle"></i> Limpar filtros</button>` : ''}</div>` + pgFillerCardsHtml('orcamentos', 0, 150);
     return;
   }
 
@@ -694,40 +866,41 @@ function renderOrcamentos() {
       
       const showConvert = b.status !== 'Convertido';
       const convertBtn = showConvert 
-        ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 8px;margin-right:4px" title="Transformar em Fatura (Projeto)"><i class="bi bi-arrow-right-circle"></i> Faturar</button>`
-        : `<span style="font-size:11px;color:var(--text3);margin-right:8px;font-weight:600"><i class="bi bi-check-all" style="color:var(--green)"></i> Faturado</span>`;
+        ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 9px;font-size:11.5px" title="Transformar em Fatura (Projeto)"><i class="bi bi-arrow-right-circle"></i> Faturar</button>`
+        : `<span style="font-size:11px;color:var(--text3);font-weight:600;padding:4px 6px"><i class="bi bi-check-all" style="color:var(--green);font-size:13px"></i> Faturado</span>`;
         
       const netTotal = b.total - (parseFloat(b.discount) || 0);
 
       const isExpired = b.validUntil && b.status !== 'Convertido' && new Date(b.validUntil + 'T23:59:59') < new Date();
-      const expiredBadge = isExpired ? ' <span class="badge b-venc" style="font-size:9px">Vencido</span>' : '';
+      const expiredBadge = isExpired ? ' <span class="badge b-venc" style="font-size:9.5px">Vencido</span>' : '';
 
       return `
         <tr>
-          <td style="font-weight:600">${b.number ? `<span style="color:var(--text3);font-weight:600;font-family:'Courier New',monospace;font-size:11.5px">#${b.number}</span> ` : ''}${b.title || 'Sem título'}</td>
+          <td>
+            <div style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">
+              ${b.number ? `<span style="color:var(--accent);background:var(--accent-bg);padding:1px 6px;border-radius:6px;font-family:'Outfit',sans-serif;font-weight:700;font-size:11px">#${b.number}</span>` : ''}
+              <span>${b.title || 'Sem título'}</span>
+            </div>
+          </td>
           <td>
             <span class="kcard-avatar" style="background:${getClientColor(clientName)};display:inline-flex;margin-right:8px;vertical-align:middle;width:24px;height:24px;font-size:10px">${getInitials(clientName)}</span>
-            ${clientName}
+            <span style="font-weight:500">${clientName}</span>
           </td>
-          <td>${dStr}</td>
-          <td>${vStr}</td>
-          <td style="font-family:'Courier New',monospace;font-weight:700">${fmt(netTotal)}</td>
+          <td style="font-size:12.5px;color:var(--text2)">${dStr}</td>
+          <td style="font-size:12.5px;color:var(--text2)">${vStr}</td>
+          <td style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;color:var(--text);text-align:right;letter-spacing:-0.01em">${fmt(netTotal)}</td>
           <td><span class="b-orc-${b.status}">${b.status}</span>${expiredBadge}</td>
           <td style="text-align:right">
             <div style="display:inline-flex;gap:4px;justify-content:flex-end;width:100%;align-items:center">
               ${convertBtn}
-              <button class="btn btn-ghost btn-sm" onclick="duplicateOrcamento(${b.id})" style="padding:4px 8px" title="Duplicar"><i class="bi bi-copy"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFFile(${b.id})" style="padding:4px 8px;color:var(--accent)" title="Baixar Arquivo PDF"><i class="bi bi-download"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFDirect(${b.id})" style="padding:4px 8px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="shareOrcamentoPDF(${b.id})" style="padding:4px 8px;color:#2563EB" title="Compartilhar PDF"><i class="bi bi-share"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:4px 8px;color:#25D366" title="Enviar Proposta via WhatsApp"><i class="bi bi-whatsapp"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:4px 8px;color:#25D366" title="Enviar WhatsApp"><i class="bi bi-whatsapp"></i></button>
               <button class="btn btn-ghost btn-sm" onclick="openOrcamentoModal(${b.id})" style="padding:4px 8px" title="Editar"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-danger btn-sm" onclick="deleteOrcamento(${b.id})" style="padding:4px 8px" title="Excluir"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="toggleOrcActionsMenu(event, ${b.id})" style="padding:4px 7px" title="Mais Opções"><i class="bi bi-three-dots-vertical"></i></button>
             </div>
           </td>
         </tr>
       `;
-    }).join('');
+    }).join('') + pgFillerRowsHtml('orcamentos', pageItems.length, 7);
   }
 
   if (mobileList) {
@@ -757,41 +930,24 @@ function renderOrcamentos() {
             <span>${clientName}</span>
             ${b.projectType ? `<span class="badge" style="margin-left:auto;font-size:10px;background:${typeBg(b.projectType)};color:${typeColor(b.projectType)}">${b.projectType}</span>` : ''}
           </div>
-
-          <div class="orc-card-grid">
-            <div class="orc-card-grid-item">
-              <span class="orc-grid-lbl"><i class="bi bi-calendar3"></i> Emissão</span>
-              <span class="orc-grid-val">${dStr}</span>
-            </div>
-            <div class="orc-card-grid-item">
-              <span class="orc-grid-lbl"><i class="bi bi-clock-history"></i> Validade</span>
-              <span class="orc-grid-val">${vStr}</span>
-            </div>
-            <div class="orc-card-grid-item full-width">
-              <span class="orc-grid-lbl"><i class="bi bi-cash-stack"></i> Valor Total</span>
-              <span class="orc-grid-val price">${fmt(netTotal)}</span>
-            </div>
+          
+          <div class="orc-card-dates" style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text3);margin:8px 0">
+            <span>Data: <strong>${dStr}</strong></span>
+            <span>Validade: <strong>${vStr}</strong></span>
           </div>
 
-          <div class="orc-card-actions">
-            <div class="orc-card-actions-left">
-              ${showConvert 
-                ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:6px 10px;font-size:12px"><i class="bi bi-arrow-right-circle"></i> Faturar</button>`
-                : `<span style="font-size:11.5px;color:var(--text3);font-weight:600;display:inline-flex;align-items:center;gap:4px;padding:4px 6px"><i class="bi bi-check-all" style="color:var(--green);font-size:16px"></i> Faturado</span>`
-              }
-              <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:6px 9px;color:#25D366" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFDirect(${b.id})" style="padding:6px 9px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="downloadOrcamentoPDFFile(${b.id})" style="padding:6px 9px;color:var(--accent)" title="Baixar PDF"><i class="bi bi-download"></i></button>
-            </div>
-            <div class="orc-card-actions-right">
-              <button class="btn btn-ghost btn-sm" onclick="openOrcamentoModal(${b.id})" style="padding:6px 8px" title="Editar"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-ghost btn-sm" onclick="duplicateOrcamento(${b.id})" style="padding:6px 8px" title="Duplicar"><i class="bi bi-copy"></i></button>
-              <button class="btn btn-danger btn-sm" onclick="deleteOrcamento(${b.id})" style="padding:6px 8px" title="Excluir"><i class="bi bi-trash"></i></button>
+          <div class="orc-card-bottom" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text)">${fmt(netTotal)}</div>
+            <div style="display:inline-flex;gap:4px;align-items:center">
+              ${showConvert ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 8px;font-size:11px"><i class="bi bi-arrow-right-circle"></i> Faturar</button>` : ''}
+              <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:4px 7px;color:#25D366"><i class="bi bi-whatsapp"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="openOrcamentoModal(${b.id})" style="padding:4px 7px"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-ghost btn-sm" onclick="toggleOrcActionsMenu(event, ${b.id})" style="padding:4px 6px"><i class="bi bi-three-dots-vertical"></i></button>
             </div>
           </div>
         </div>
       `;
-    }).join('');
+    }).join('') + pgFillerCardsHtml('orcamentos', pageItems.length, 150);
   }
 }
 
@@ -822,6 +978,8 @@ function duplicateOrcamento(id) {
     projectType: b.projectType || 'Residencial',
     notes: b.notes || '',
     items: (b.items || []).map((it, idx) => ({ ...it, id: Date.now() + idx })),
+    attachments: Array.isArray(b.attachments) ? JSON.parse(JSON.stringify(b.attachments)) : [],
+    showAttachments: b.showAttachments === true,
     discount: b.discount || 0,
     total: b.total || 0
   };
@@ -1210,7 +1368,7 @@ function updateFaturarPlanPreview(keepEdits = false) {
           </div>
         </div>
         <div style="text-align:right">
-          <div style="font-weight:700;font-family:'Courier New',monospace;font-size:13.5px;color:${isPaid ? 'var(--green)' : 'var(--text)'}">${fmt(inst.amount)}</div>
+          <div style="font-weight:700;font-family:'Outfit',sans-serif;font-size:13.5px;color:${isPaid ? 'var(--green)' : 'var(--text)'}">${fmt(inst.amount)}</div>
         </div>
       </div>
     `;
@@ -1379,6 +1537,22 @@ async function generateOrcamentoPdfBlob(b) {
   clone.classList.remove('mbody');
   clone.classList.add('proposal-sheet-pdf');
   clone.querySelectorAll('.no-print').forEach(el => el.remove());
+
+  // Anexos & Fotos de Referência: só entram no PDF se o toggle "Exibir no PDF" estiver
+  // ligado e houver pelo menos um arquivo anexado. Quando entram, vão para uma página
+  // separada (depois do orçamento), via quebra de página forçada no html2pdf.
+  const attachSection = clone.querySelector('#orcAttachmentsSection');
+  if (attachSection) {
+    const hasAttachments = Array.isArray(b.attachments) && b.attachments.length > 0;
+    const includeAttachments = b.showAttachments === true && hasAttachments;
+    if (!includeAttachments) {
+      attachSection.remove();
+    } else {
+      attachSection.style.breakBefore = 'page';
+      attachSection.style.pageBreakBefore = 'always';
+    }
+  }
+
   clone.style.background = '#ffffff';
   clone.style.color = '#1C1B19';
   clone.style.padding = '4mm 4mm';
@@ -1565,3 +1739,257 @@ function updateYearFilter() {
   const sortedYears = Array.from(years).sort((a, b) => b.localeCompare(a));
   ySel.innerHTML = '<option value="">Todos os Anos</option>' + sortedYears.map(y => `<option value="${y}" ${y === cur ? 'selected' : ''}>${y}</option>`).join('');
 }
+
+// ══════════════════════════════════════════
+//  ANEXOS & FOTOS DO ORÇAMENTO
+// ══════════════════════════════════════════
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function getFileIconClass(filename, type) {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext) || (type && type.startsWith('image/'))) {
+    return 'bi-file-earmark-image';
+  }
+  if (ext === 'pdf' || type === 'application/pdf') return 'bi-file-earmark-pdf';
+  if (['doc', 'docx'].includes(ext)) return 'bi-file-earmark-word';
+  if (['xls', 'xlsx'].includes(ext)) return 'bi-file-earmark-excel';
+  if (['dwg', 'dxf', 'skp', 'rvt', 'ifc', '3ds', 'obj', 'blend'].includes(ext)) return 'bi-boxes';
+  if (['zip', 'rar', '7z'].includes(ext)) return 'bi-file-earmark-zip';
+  return 'bi-file-earmark-text';
+}
+
+function compressOrcImage(file, maxDimension = 1200, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleOrcFilesSelected(files) {
+  if (!files || !files.length) return;
+  
+  showToast(`Processando ${files.length} arquivo(s)...`, 'info');
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const isImg = file.type ? file.type.startsWith('image/') : /\.(jpg|jpeg|png|webp|gif)$/i.test(file.name);
+    
+    try {
+      let dataUrl = '';
+      if (isImg) {
+        dataUrl = await compressOrcImage(file, 1200, 0.82);
+      } else {
+        dataUrl = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+      }
+      
+      tempOrcAttachments.push({
+        id: 'att_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        size: formatFileSize(file.size),
+        isImage: isImg,
+        data: dataUrl,
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Erro ao ler arquivo:', err);
+    }
+  }
+  
+  renderOrcAttachments();
+  showToast('Arquivos anexados com sucesso!', 'success');
+  
+  const inp = document.getElementById('orcFileInput');
+  if (inp) inp.value = '';
+}
+
+// Liga/desliga a inclusão da seção de anexos no PDF/impressão do orçamento.
+// Os arquivos continuam anexados e visíveis no editor — o que muda é só o que sai no documento final.
+function toggleOrcShowAttachments() {
+  const chk = document.getElementById('orcShowAttachments');
+  tempOrcShowAttachments = chk ? chk.checked : true;
+  syncOrcAttachmentsVisibilityUI();
+}
+
+function syncOrcAttachmentsVisibilityUI() {
+  const chk = document.getElementById('orcShowAttachments');
+  if (chk) chk.checked = tempOrcShowAttachments;
+
+  const hasAttachments = Array.isArray(tempOrcAttachments) && tempOrcAttachments.length > 0;
+  const includeInOutput = tempOrcShowAttachments && hasAttachments;
+
+  // Classes usadas só pelo @media print (impressão nativa via Ctrl+P / botão Imprimir).
+  // A geração de PDF (html2canvas) trata isso separadamente em generateOrcamentoPdfBlob.
+  const section = document.getElementById('orcAttachmentsSection');
+  if (section) {
+    section.classList.toggle('orc-attach-print-off', !includeInOutput);
+    section.classList.toggle('orc-attach-print-on', includeInOutput);
+  }
+
+  const hint = document.getElementById('orcAttachPdfHint');
+  if (hint) hint.style.display = tempOrcShowAttachments ? 'none' : 'flex';
+}
+
+function renderOrcAttachments() {
+  const grid = document.getElementById('orcAttachmentsGrid');
+  const badge = document.getElementById('orcAttachCountBadge');
+  if (!grid) return;
+  
+  if (badge) {
+    badge.textContent = `${tempOrcAttachments.length} arquivo${tempOrcAttachments.length === 1 ? '' : 's'}`;
+  }
+
+  syncOrcAttachmentsVisibilityUI();
+
+  if (!tempOrcAttachments.length) {
+    grid.innerHTML = `
+      <div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text3);font-size:12px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px">
+        Nenhum arquivo ou foto anexado ainda.
+      </div>
+    `;
+    return;
+  }
+  
+  grid.innerHTML = tempOrcAttachments.map(att => {
+    const iconClass = getFileIconClass(att.name, att.type);
+    const isImg = att.isImage && att.data;
+    
+    return `
+      <div class="orc-attachment-card" data-id="${att.id}">
+        <button type="button" class="orc-attach-del-btn no-print" onclick="removeOrcAttachment('${att.id}')" title="Excluir anexo">
+          <i class="bi bi-trash3"></i>
+        </button>
+        <div class="orc-attach-preview-box" onclick="viewOrcAttachment('${att.id}')" title="Clique para visualizar">
+          ${isImg 
+            ? `<img src="${att.data}" alt="${escapeHtml(att.name)}" class="orc-attach-thumb">`
+            : `<i class="bi ${iconClass} orc-attach-icon"></i>`
+          }
+        </div>
+        <div class="orc-attach-info">
+          <span class="orc-attach-name" title="${escapeHtml(att.name)}">${escapeHtml(att.name)}</span>
+          <div class="orc-attach-meta">
+            <span>${att.size || ''}</span>
+            <span style="color:var(--accent);cursor:pointer" onclick="viewOrcAttachment('${att.id}')"><i class="bi bi-eye"></i> Ver</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function removeOrcAttachment(id) {
+  tempOrcAttachments = tempOrcAttachments.filter(a => a.id !== id);
+  renderOrcAttachments();
+  showToast('Anexo removido.', 'info');
+}
+
+function viewOrcAttachment(id) {
+  const att = tempOrcAttachments.find(a => a.id === id);
+  if (!att) return;
+  
+  const overlay = document.getElementById('orcAttachPreviewOverlay');
+  const title = document.getElementById('orcAttachPreviewTitle');
+  const icon = document.getElementById('orcAttachPreviewIcon');
+  const dlBtn = document.getElementById('orcAttachDownloadBtn');
+  const imgEl = document.getElementById('orcAttachPreviewImg');
+  const docWrap = document.getElementById('orcAttachDocPreview');
+  const docIcon = document.getElementById('orcAttachDocIcon');
+  const docName = document.getElementById('orcAttachDocName');
+  const docSize = document.getElementById('orcAttachDocSize');
+  const docOpenBtn = document.getElementById('orcAttachDocOpenBtn');
+  
+  if (!overlay) return;
+  
+  title.textContent = att.name;
+  dlBtn.href = att.data;
+  dlBtn.download = att.name;
+  
+  if (att.isImage) {
+    icon.className = 'bi bi-image';
+    imgEl.src = att.data;
+    imgEl.style.display = 'block';
+    docWrap.style.display = 'none';
+  } else {
+    const iconClass = getFileIconClass(att.name, att.type);
+    icon.className = `bi ${iconClass}`;
+    imgEl.style.display = 'none';
+    docWrap.style.display = 'block';
+    docIcon.className = `bi ${iconClass}`;
+    docName.textContent = att.name;
+    docSize.textContent = att.size || '';
+    docOpenBtn.href = att.data;
+  }
+  
+  overlay.classList.add('open');
+}
+
+function closeOrcAttachPreviewModal() {
+  const overlay = document.getElementById('orcAttachPreviewOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function setupOrcDropzoneEvents() {
+  const dz = document.getElementById('orcDropzone');
+  if (!dz) return;
+  
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dz.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dz.classList.add('dragover');
+    }, false);
+  });
+  
+  ['dragleave', 'drop'].forEach(eventName => {
+    dz.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dz.classList.remove('dragover');
+    }, false);
+  });
+  
+  dz.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt ? dt.files : null;
+    if (files && files.length) {
+      handleOrcFilesSelected(files);
+    }
+  }, false);
+}
+

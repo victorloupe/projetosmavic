@@ -3,9 +3,14 @@
 // ══════════════════════════════════════════
 function initPage() {
   renderCliList();
-  document.getElementById('cliDetail').classList.add('d-none');
-  document.getElementById('cliPlaceholder').style.display = 'flex';
-  currentCliId = null;
+  if (clients && clients.length > 0) {
+    const sorted = [...clients].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    selectClient(sorted[0].id);
+  } else {
+    document.getElementById('cliDetail').classList.add('d-none');
+    document.getElementById('cliPlaceholder').style.display = 'flex';
+    currentCliId = null;
+  }
 }
 
 function renderCliList(){
@@ -27,9 +32,23 @@ function renderCliList(){
   const pgEl = document.getElementById('cliPagination');
   if (pgEl) pgEl.innerHTML = pgBarHtml('clientes', filtered.length, 'renderCliList', {hideSize:true, compact:true});
 
-  if(!filtered.length){el.innerHTML='<div class="empty-state"><i class="bi bi-people"></i><span>Nenhum cliente cadastrado</span></div>';return;}
+  if(!filtered.length){el.innerHTML='<div class="empty-state"><i class="bi bi-people"></i><span>Nenhum cliente cadastrado</span></div>' + cliFillerRowsHtml(0);return;}
   const pageItems = pgSlice(filtered, 'clientes');
-  el.innerHTML=pageItems.map(c=>`<div class="cli-item ${currentCliId===c.id?'on':''}" onclick="selectClient(${c.id})"><span><i class="bi bi-person"></i> ${c.name}</span><span style="font-size:11px;color:var(--text3)">${c.products?.length||0} itens</span></div>`).join('');
+  el.innerHTML=pageItems.map(c=>{
+    const pCount = (projects || []).filter(p => p && p.client && p.client.toLowerCase().trim() === c.name.toLowerCase().trim()).length;
+    return `<div class="cli-item ${currentCliId===c.id?'on':''}" onclick="selectClient(${c.id})">
+      <span><i class="bi bi-person"></i> ${c.name}</span>
+      <span style="font-size:11px;color:var(--text3)">${pCount} proj · ${c.products?.length||0} serv</span>
+    </div>`;
+  }).join('') + cliFillerRowsHtml(pageItems.length);
+}
+
+// Linhas de preenchimento com o MESMO visual das linhas reais (.cli-item) — em vez do
+// card genérico tracejado, pra não destoar da listagem de clientes.
+function cliFillerRowsHtml(actualCount) {
+  const n = pgFillerCount('clientes', actualCount);
+  if (!n) return '';
+  return '<div class="cli-item cli-filler-row" aria-hidden="true">&nbsp;</div>'.repeat(n);
 }
 
 function createClient(){
@@ -52,6 +71,35 @@ function selectClient(id){
   document.getElementById('cliDoc').classList.remove('inp-invalid');
   document.getElementById('tokenOkMsg').classList.add('d-none');
   document.getElementById('contactOkMsg').classList.add('d-none');
+
+  // Renderizar estatísticas do cliente (LTV e projetos)
+  const cliProjs = (projects || []).filter(p => p && p.client && p.client.toLowerCase().trim() === cl.name.toLowerCase().trim());
+  const cliTotalVal = cliProjs.reduce((s, p) => s + parseFloat(p.value || 0), 0);
+  const cliTotalPaid = cliProjs.reduce((s, p) => s + (Array.isArray(p.payments) ? p.payments : []).reduce((a, x) => a + parseFloat(x.amount || 0), 0), 0);
+  const cliPending = Math.max(0, cliTotalVal - cliTotalPaid);
+  const cliConcl = cliProjs.filter(p => isFinalColumn(p.column)).length;
+
+  const statsEl = document.getElementById('cliStatsGrid');
+  if (statsEl) {
+    statsEl.innerHTML = `
+      <div class="dash-card dc-accent" style="padding:10px 12px">
+        <div class="dc-lbl" style="font-size:9.5px">Total Faturado (LTV)</div>
+        <div class="dc-val" style="font-size:15px;font-family:'Outfit',sans-serif">${fmt(cliTotalVal)}</div>
+        <div class="dc-sub" style="font-size:10px">${cliProjs.length} projeto(s)</div>
+      </div>
+      <div class="dash-card dc-green" style="padding:10px 12px">
+        <div class="dc-lbl" style="font-size:9.5px">Total Recebido</div>
+        <div class="dc-val" style="font-size:15px;font-family:'Outfit',sans-serif;color:var(--green)">${fmt(cliTotalPaid)}</div>
+        <div class="dc-sub" style="font-size:10px">${cliConcl} concluído(s)</div>
+      </div>
+      <div class="dash-card dc-red" style="padding:10px 12px">
+        <div class="dc-lbl" style="font-size:9.5px">Saldo Pendente</div>
+        <div class="dc-val" style="font-size:15px;font-family:'Outfit',sans-serif;color:${cliPending > 0 ? 'var(--red)' : 'var(--text3)'}">${fmt(cliPending)}</div>
+        <div class="dc-sub" style="font-size:10px">${cliPending > 0 ? 'em aberto' : '100% quitado'}</div>
+      </div>
+    `;
+  }
+
   updateCliLink(cl);renderCliProductsTable(cl);renderCliList();
   document.getElementById('cliDeleteBtn').onclick=()=>{
     showConfirm(`Remover "${cl.name}"?`, () => {
@@ -143,7 +191,7 @@ function renderCliProductsTable(cl,editingId=null){
         </div>
         ${p.desc?`<div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4">${escapeHtml(p.desc)}</div>`:''}
       </td>
-      <td style="padding:7px 10px;font-family:'Courier New',monospace;font-weight:700;color:var(--green)">${fmt(p.price)}</td>
+      <td style="padding:7px 10px;font-family:'Outfit',sans-serif;font-weight:700;font-size:13.5px;color:var(--green);text-align:right">${fmt(p.price)}</td>
       <td style="padding:7px 10px;text-align:right;white-space:nowrap">
         <button class="prod-del" onclick="editProdCli(${p.id})" title="Editar"><i class="bi bi-pencil" style="font-size:12px"></i></button>
         <button class="prod-del" onclick="removeProdFromCli(${p.id})" title="Excluir"><i class="bi bi-trash3" style="font-size:12px"></i></button>

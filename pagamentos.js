@@ -17,19 +17,25 @@ function switchPayTab(tab) {
   localStorage.setItem('mavic_pay_tab', tab);
 
   const btnAReceber = document.getElementById('tabBtnAReceber');
+  const btnAReceber2 = document.getElementById('tabBtnAReceber2');
   const btnPagos = document.getElementById('tabBtnPagos');
+  const btnPagos2 = document.getElementById('tabBtnPagos2');
   const viewAReceber = document.getElementById('tabContentAReceber');
   const viewPagos = document.getElementById('tabContentPagos');
 
   if (tab === 'areceber') {
     btnAReceber?.classList.add('active');
+    btnAReceber2?.classList.add('active');
     btnPagos?.classList.remove('active');
+    btnPagos2?.classList.remove('active');
     if (viewAReceber) viewAReceber.style.display = 'block';
     if (viewPagos) viewPagos.style.display = 'none';
     renderPendingInstallments();
   } else {
     btnPagos?.classList.add('active');
+    btnPagos2?.classList.add('active');
     btnAReceber?.classList.remove('active');
+    btnAReceber2?.classList.remove('active');
     if (viewAReceber) viewAReceber.style.display = 'none';
     if (viewPagos) viewPagos.style.display = 'block';
     renderPagamentos();
@@ -220,13 +226,41 @@ function updatePayKPIs() {
   const kpiARec = document.getElementById('kpiTotalAReceber');
   const kpiAtr = document.getElementById('kpiTotalAtrasado');
   const badgeARec = document.getElementById('badgeCountAReceber');
+  const badgeARec2 = document.getElementById('badgeCountAReceber2');
   const badgePagos = document.getElementById('badgeCountPagos');
+  const badgePagos2 = document.getElementById('badgeCountPagos2');
 
   if (kpiRec) kpiRec.textContent = fmt(totalRecebido);
   if (kpiARec) kpiARec.textContent = fmt(totalAReceber);
   if (kpiAtr) kpiAtr.textContent = fmt(totalAtrasado);
   if (badgeARec) badgeARec.textContent = pendingList.length;
+  if (badgeARec2) badgeARec2.textContent = pendingList.length;
   if (badgePagos) badgePagos.textContent = countPagos;
+  if (badgePagos2) badgePagos2.textContent = countPagos;
+}
+
+function clearPendingFilters() {
+  const srch = document.getElementById('fPendingSearch');
+  const cli = document.getElementById('fPendingClient');
+  const st = document.getElementById('fPendingStatus');
+  if (srch) srch.value = '';
+  if (cli) cli.value = '';
+  if (st) st.value = '';
+  pgReset('pending_pays');
+  renderPendingInstallments();
+}
+
+function clearPayFilters() {
+  const srch = document.getElementById('fPaySearch');
+  const cli = document.getElementById('fPayClient');
+  const yr = document.getElementById('fPayYear');
+  const mo = document.getElementById('fPayMonth');
+  if (srch) srch.value = '';
+  if (cli) cli.value = '';
+  if (yr) yr.value = '';
+  if (mo) mo.value = '';
+  pgReset('pagamentos');
+  renderPagamentos();
 }
 
 // ══════════════════════════════════════════
@@ -266,8 +300,9 @@ function renderPendingInstallments() {
   if (pgEl) pgEl.innerHTML = pgBarHtml('pending_pays', list.length, 'renderPendingInstallments');
 
   if (!list.length) {
-    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px"><i class="bi bi-check2-circle" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6;color:var(--green)"></i>Nenhuma parcela pendente encontrada</td></tr>`;
-    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-check2-circle" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6;color:var(--green)"></i>Nenhuma parcela pendente encontrada</div>`;
+    const isFiltered = Boolean(search || clientFilter || statusFilter);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px"><i class="bi bi-check2-circle" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6;color:var(--green)"></i>Nenhuma parcela pendente encontrada${isFiltered ? `<br><button class="btn-clear-filter" onclick="clearPendingFilters()"><i class="bi bi-x-circle"></i> Limpar filtros</button>` : ''}</td></tr>` + pgFillerRowsHtml('pending_pays', 0, 6);
+    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-check2-circle" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6;color:var(--green)"></i>Nenhuma parcela pendente encontrada${isFiltered ? `<br><button class="btn-clear-filter" onclick="clearPendingFilters()"><i class="bi bi-x-circle"></i> Limpar filtros</button>` : ''}</div>` + pgFillerCardsHtml('pending_pays', 0, 195);
     return;
   }
 
@@ -318,7 +353,7 @@ function renderPendingInstallments() {
               <input type="date" class="inp inp-sm" style="padding:1px 4px;font-size:11px;height:22px;border-radius:6px;width:115px;background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer" value="${rawDate}" onchange="updateInstallmentDueDate('${projId}', '${instId}', this.value)" title="Alterar data de vencimento desta parcela">
             </div>
           </td>
-          <td style="font-family:'Courier New',monospace;font-weight:700;color:var(--text)">${fmt(amountVal)}</td>
+          <td style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;color:var(--text)">${fmt(amountVal)}</td>
           <td style="text-align:right">
             <div style="display:inline-flex;gap:4px;justify-content:flex-end;width:100%;align-items:center">
               <button class="btn btn-primary btn-sm" onclick="openDarBaixaModal('${projId}', '${instId}')" style="padding:4px 9px;background:var(--green);border-color:var(--green);font-size:12px" title="Confirmar Recebimento"><i class="bi bi-check2"></i> Dar Baixa</button>
@@ -327,7 +362,7 @@ function renderPendingInstallments() {
           </td>
         </tr>
       `;
-    }).join('');
+    }).join('') + pgFillerRowsHtml('pending_pays', pageItems.length, 6);
   }
 
   if (mobileList) {
@@ -396,7 +431,7 @@ function renderPendingInstallments() {
           </div>
         </div>
       `;
-    }).join('');
+    }).join('') + pgFillerCardsHtml('pending_pays', pageItems.length, 195);
   }
 }
 
@@ -649,8 +684,9 @@ function renderPagamentos() {
   if (pgEl) pgEl.innerHTML = pgBarHtml('pagamentos', allPayments.length, 'renderPagamentos');
 
   if (!allPayments.length) {
-    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px"><i class="bi bi-cash-stack" style="font-size:24px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum pagamento registrado</td></tr>`;
-    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-cash-stack" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum pagamento registrado</div>`;
+    const isFiltered = Boolean(search || clientFilter || yearFilter || monthFilter);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px"><i class="bi bi-cash-stack" style="font-size:24px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum pagamento registrado${isFiltered ? `<br><button class="btn-clear-filter" onclick="clearPayFilters()"><i class="bi bi-x-circle"></i> Limpar filtros</button>` : ''}</td></tr>` + pgFillerRowsHtml('pagamentos', 0, 6);
+    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-cash-stack" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum pagamento registrado${isFiltered ? `<br><button class="btn-clear-filter" onclick="clearPayFilters()"><i class="bi bi-x-circle"></i> Limpar filtros</button>` : ''}</div>` + pgFillerCardsHtml('pagamentos', 0, 170);
     return;
   }
 
@@ -680,7 +716,7 @@ function renderPagamentos() {
           <td>${projectName}</td>
           <td><i class="bi bi-calendar3"></i> ${formattedDate}</td>
           <td><span class="badge" style="background:var(--surface2);color:var(--text2);font-size:11px;font-weight:600;border:1px solid var(--border)">${method}</span></td>
-          <td style="font-family:'Courier New',monospace;font-weight:700;color:var(--green)">+${fmt(amountVal)}</td>
+          <td style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;color:var(--green)">+${fmt(amountVal)}</td>
           <td style="text-align:right">
             <div style="display:inline-flex;gap:4px;justify-content:flex-end;width:100%;align-items:center">
               <button class="btn btn-ghost btn-sm" onclick="sendPaymentWhatsApp('${projId}', '${payId}')" style="padding:4px 8px;color:#25D366" title="Confirmar via WhatsApp"><i class="bi bi-whatsapp"></i></button>
@@ -691,7 +727,7 @@ function renderPagamentos() {
           </td>
         </tr>
       `;
-    }).join('');
+    }).join('') + pgFillerRowsHtml('pagamentos', pageItems.length, 6);
   }
 
   if (mobileList) {
@@ -747,7 +783,7 @@ function renderPagamentos() {
           </div>
         </div>
       `;
-    }).join('');
+    }).join('') + pgFillerCardsHtml('pagamentos', pageItems.length, 170);
   }
 }
 

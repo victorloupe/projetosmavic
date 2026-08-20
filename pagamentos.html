@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#92623a">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=102">
+<link rel="stylesheet" href="index.css?v=118">
 <script>
 (function(){
   try {
@@ -64,60 +64,58 @@
 
 <!-- PAGAMENTOS VIEW -->
 <div class="dash-view" id="pagamentosView" style="display:block">
-  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px">
+  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px">
     <h4 style="font-weight:700;color:var(--accent);margin:0">Pagamentos</h4>
     <button class="btn btn-primary btn-sm" onclick="openAddPaymentDirectModal()" style="white-space:nowrap"><i class="bi bi-plus-lg"></i> Novo Pagamento</button>
   </div>
   
   <!-- KPI Cards Summary -->
   <div class="pay-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;margin-bottom:16px">
-    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:10px;background:rgba(22,163,74,0.12);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-check2-circle"></i></div>
+    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--sh)">
+      <div style="width:42px;height:42px;border-radius:12px;background:var(--green-bg);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-check2-circle"></i></div>
       <div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">Total Recebido</div>
-        <div style="font-size:18px;font-weight:800;color:var(--green);font-family:'Courier New',monospace" id="kpiTotalRecebido">R$ 0,00</div>
+        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--text3);letter-spacing:0.04em">Total Recebido</div>
+        <div style="font-size:20px;font-weight:700;color:var(--green);font-family:'Outfit',sans-serif;letter-spacing:-0.02em" id="kpiTotalRecebido">R$ 0,00</div>
       </div>
     </div>
-    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:10px;background:rgba(37,99,235,0.12);color:#2563EB;display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-hourglass-split"></i></div>
+    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--sh)">
+      <div style="width:42px;height:42px;border-radius:12px;background:var(--blue-bg);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-hourglass-split"></i></div>
       <div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">A Receber (Pendente)</div>
-        <div style="font-size:18px;font-weight:800;color:#2563EB;font-family:'Courier New',monospace" id="kpiTotalAReceber">R$ 0,00</div>
+        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--text3);letter-spacing:0.04em">A Receber (Pendente)</div>
+        <div style="font-size:20px;font-weight:700;color:var(--blue);font-family:'Outfit',sans-serif;letter-spacing:-0.02em" id="kpiTotalAReceber">R$ 0,00</div>
       </div>
     </div>
-    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:10px;background:rgba(220,38,38,0.12);color:var(--red);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-exclamation-triangle"></i></div>
+    <div class="pay-kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:var(--sh)">
+      <div style="width:42px;height:42px;border-radius:12px;background:var(--red-bg);color:var(--red);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="bi bi-exclamation-triangle"></i></div>
       <div>
-        <div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--text3);letter-spacing:0.5px">Vencidos / Atrasados</div>
-        <div style="font-size:18px;font-weight:800;color:var(--red);font-family:'Courier New',monospace" id="kpiTotalAtrasado">R$ 0,00</div>
+        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--text3);letter-spacing:0.04em">Vencidos / Atrasados</div>
+        <div style="font-size:20px;font-weight:700;color:var(--red);font-family:'Outfit',sans-serif;letter-spacing:-0.02em" id="kpiTotalAtrasado">R$ 0,00</div>
       </div>
     </div>
-  </div>
-
-  <!-- Abas de Pagamentos (Segmented Control sem scroll) -->
-  <div class="pay-tabs-wrap">
-    <button class="pay-tab-btn active" id="tabBtnAReceber" onclick="switchPayTab('areceber')">
-      <i class="bi bi-clock-history"></i> <span>A Receber</span> <span class="badge" id="badgeCountAReceber">0</span>
-    </button>
-    <button class="pay-tab-btn" id="tabBtnPagos" onclick="switchPayTab('pagos')">
-      <i class="bi bi-check2-all"></i> <span>Pagos</span> <span class="badge" id="badgeCountPagos">0</span>
-    </button>
   </div>
 
   <!-- ABA 1: A RECEBER / PENDENTES -->
   <div id="tabContentAReceber">
-    <div class="toolbar">
-      <input type="text" class="inp inp-sm" id="fPendingSearch" placeholder="Buscar parcelas pendentes…" oninput="pgReset('pending_pays');renderPendingInstallments()">
-      <div class="toolbar-filters">
-        <select class="inp inp-sm" id="fPendingClient" onchange="pgReset('pending_pays');renderPendingInstallments()">
+    <div class="toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="toolbar-filters" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:280px">
+        <input type="text" class="inp inp-sm" id="fPendingSearch" placeholder="Buscar parcelas pendentes…" oninput="pgReset('pending_pays');renderPendingInstallments()" style="max-width:180px">
+        <select class="inp inp-sm" id="fPendingClient" onchange="pgReset('pending_pays');renderPendingInstallments()" style="width:auto">
           <option value="">Todos os Clientes</option>
         </select>
-        <select class="inp inp-sm" id="fPendingStatus" onchange="pgReset('pending_pays');renderPendingInstallments()">
+        <select class="inp inp-sm" id="fPendingStatus" onchange="pgReset('pending_pays');renderPendingInstallments()" style="width:auto">
           <option value="">Todos os Vencimentos</option>
           <option value="overdue">⚠️ Atrasados</option>
           <option value="today">⏰ Vencem Hoje</option>
           <option value="upcoming">📅 A Vencer (No Prazo)</option>
         </select>
+      </div>
+      <div class="pay-tabs-wrap" style="margin-bottom:0">
+        <button class="pay-tab-btn active" id="tabBtnAReceber" onclick="switchPayTab('areceber')">
+          <i class="bi bi-clock-history"></i> <span>A Receber</span> <span class="badge" id="badgeCountAReceber">0</span>
+        </button>
+        <button class="pay-tab-btn" id="tabBtnPagos" onclick="switchPayTab('pagos')">
+          <i class="bi bi-check2-all"></i> <span>Pagos</span> <span class="badge" id="badgeCountPagos">0</span>
+        </button>
       </div>
     </div>
 
@@ -152,16 +150,16 @@
 
   <!-- ABA 2: RECEBIDOS / PAGOS -->
   <div id="tabContentPagos" style="display:none">
-    <div class="toolbar">
-      <input type="text" class="inp inp-sm" id="fPaySearch" placeholder="Buscar pagamento…" oninput="pgReset('pagamentos');renderPagamentos()">
-      <div class="toolbar-filters">
-        <select class="inp inp-sm" id="fPayClient" onchange="pgReset('pagamentos');renderPagamentos()">
+    <div class="toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="toolbar-filters" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:280px">
+        <input type="text" class="inp inp-sm" id="fPaySearch" placeholder="Buscar pagamento…" oninput="pgReset('pagamentos');renderPagamentos()" style="max-width:180px">
+        <select class="inp inp-sm" id="fPayClient" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
           <option value="">Todos os Clientes</option>
         </select>
-        <select class="inp inp-sm" id="fPayYear" onchange="pgReset('pagamentos');renderPagamentos()">
+        <select class="inp inp-sm" id="fPayYear" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
           <option value="">Todos os Anos</option>
         </select>
-        <select class="inp inp-sm" id="fPayMonth" onchange="pgReset('pagamentos');renderPagamentos()">
+        <select class="inp inp-sm" id="fPayMonth" onchange="pgReset('pagamentos');renderPagamentos()" style="width:auto">
           <option value="">Todos os Meses</option>
           <option value="01">Janeiro</option>
           <option value="02">Fevereiro</option>
@@ -176,6 +174,14 @@
           <option value="11">Novembro</option>
           <option value="12">Dezembro</option>
         </select>
+      </div>
+      <div class="pay-tabs-wrap" style="margin-bottom:0">
+        <button class="pay-tab-btn" id="tabBtnAReceber2" onclick="switchPayTab('areceber')">
+          <i class="bi bi-clock-history"></i> <span>A Receber</span> <span class="badge" id="badgeCountAReceber2">0</span>
+        </button>
+        <button class="pay-tab-btn active" id="tabBtnPagos2" onclick="switchPayTab('pagos')">
+          <i class="bi bi-check2-all"></i> <span>Pagos</span> <span class="badge" id="badgeCountPagos2">0</span>
+        </button>
       </div>
     </div>
     
@@ -227,7 +233,7 @@
       <div style="font-size:12px;color:var(--text3);margin-top:2px" id="baixaInfoClient">—</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
         <span style="font-size:12px;color:var(--accent);font-weight:600" id="baixaInfoDesc">Parcela</span>
-        <strong style="font-size:15px;color:var(--green);font-family:'Courier New',monospace" id="baixaInfoAmount">R$ 0,00</strong>
+        <strong style="font-size:16px;color:var(--green);font-family:'Outfit',sans-serif;font-weight:700" id="baixaInfoAmount">R$ 0,00</strong>
       </div>
     </div>
 
@@ -543,7 +549,7 @@
   <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=109"></script>
-<script src="pagamentos.js?v=109"></script>
+<script src="common.js?v=112"></script>
+<script src="pagamentos.js?v=114"></script>
 </body>
 </html>

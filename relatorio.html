@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#92623a">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=102">
+<link rel="stylesheet" href="index.css?v=118">
 <script>
 (function(){
   try {
@@ -64,13 +64,13 @@
 
 <!-- RELATÓRIOS VIEW -->
 <div class="dash-view" id="relatoriosView" style="display:block">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px">
     <h4 style="font-weight:700;color:var(--accent);margin:0">Relatórios Financeiros & Métricas</h4>
   </div>
   
-  <div class="toolbar">
-    <input type="text" class="inp inp-sm" id="srchRep" placeholder="Buscar cliente ou projeto…" oninput="renderRelatorios()" style="max-width:200px">
-    <div class="toolbar-filters">
+  <div class="toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="toolbar-filters" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:280px">
+      <input type="text" class="inp inp-sm" id="srchRep" placeholder="Buscar cliente ou projeto…" oninput="renderRelatorios()" style="max-width:180px">
       <select class="inp inp-sm" id="fRepClient" onchange="renderRelatorios()" style="width:auto">
         <option value="">Todos os Clientes</option>
       </select>
@@ -108,6 +108,9 @@
         <option value="Média">🟡 Média</option>
         <option value="Baixa">🟢 Baixa</option>
       </select>
+    </div>
+    <div class="pay-tabs-wrap">
+      <button class="pay-tab-btn" onclick="clearRepFilters()" title="Limpar todos os filtros da tela"><i class="bi bi-x-circle"></i> <span>Limpar Filtros</span></button>
     </div>
   </div>
   
@@ -337,7 +340,7 @@
   <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=106"></script>
+<script src="common.js?v=112"></script>
 <script src="relatorio.js?v=106"></script>
 </body>
 </html>

@@ -44,6 +44,24 @@ function filterProjectsByPeriod(projs, yearFilter, monthFilter) {
   });
 }
 
+function clearRepFilters() {
+  const srch = document.getElementById('srchRep');
+  const cli = document.getElementById('fRepClient');
+  const yr = document.getElementById('fRepYear');
+  const mo = document.getElementById('fRepMonth');
+  const tp = document.getElementById('fRepType');
+  const st = document.getElementById('fRepStage');
+  const pr = document.getElementById('fRepPriority');
+  if (srch) srch.value = '';
+  if (cli) cli.value = '';
+  if (yr) yr.value = '';
+  if (mo) mo.value = '';
+  if (tp) tp.value = '';
+  if (st) st.value = '';
+  if (pr) pr.value = '';
+  renderRelatorios();
+}
+
 function renderRelatorios() {
   const clientFilter = document.getElementById('fRepClient').value;
   const yearFilter = document.getElementById('fRepYear').value;

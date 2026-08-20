@@ -54,6 +54,9 @@ function renderBoard(){
     const isMin=minimizedColumns.includes(col.id);
     let colProjs=projects.filter(p=>!p.archived&&p.column===col.id&&(!fType||p.type===fType)&&(!fPrio||p.priority===fPrio)&&(!fCli||p.client===fCli)&&(!srch||p.name?.toLowerCase().includes(srch)||p.client?.toLowerCase().includes(srch)));
     colProjs=sortProjs(colProjs,col.id);total+=colProjs.length;
+    const colVal = colProjs.reduce((s, p) => s + parseFloat(p.value || 0), 0);
+    const colValHtml = colVal > 0 ? `<span class="kcol-val" style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-bg);padding:1px 6px;border-radius:6px;margin-left:4px" title="Faturamento total nesta etapa">${fmt(colVal)}</span>` : '';
+
     const el=document.createElement('div');
     if(isMin){
       el.className='kcol-mini';el.onclick=()=>toggleMinimize(col.id);
@@ -63,7 +66,7 @@ function renderBoard(){
       const sortLabels={default:'Padrão',priority:'Prioridade',deadline:'Prazo',value:'Valor',name:'Nome'};
       el.className='kcol';
       el.innerHTML=`<div class="kcol-hdr">
-        <div class="kcol-title"><i class="bi ${col.icon||DEFAULT_COL_ICON}" style="color:${col.color||DEFAULT_COL_COLOR}"></i> ${col.id} <span class="kcol-cnt">${colProjs.length}</span>${isHiddenColumn(col.id)?'<i class="bi bi-eye-slash-fill kcol-hidden-ic" title="Encerrada — não aparece pro cliente"></i>':''}</div>
+        <div class="kcol-title"><i class="bi ${col.icon||DEFAULT_COL_ICON}" style="color:${col.color||DEFAULT_COL_COLOR}"></i> ${col.id} <span class="kcol-cnt">${colProjs.length}</span>${colValHtml}${isHiddenColumn(col.id)?'<i class="bi bi-eye-slash-fill kcol-hidden-ic" title="Encerrada — não aparece pro cliente"></i>':''}</div>
         <div class="kcol-acts">
           <div style="position:relative">
             <button class="cbtn" title="Ordenar" onclick="toggleSortMenu('${col.id}');event.stopPropagation()"><i class="bi bi-sort-down-alt"></i></button>
@@ -106,12 +109,26 @@ function createCardHTML(p, cardIdx=0){
   const dl=p.date?new Date(p.date+'T12:00:00'):null;
   const diff=dl?Math.ceil((dl-new Date().setHours(0,0,0,0))/86400000):null;
   let dateCls='',dateBadge='';
-  if(dl){if(diff<0){dateCls='b-venc';dateBadge='<span class="badge b-venc">Atrasado</span>';}else if(diff<=7){dateCls='b-urg';dateBadge=`<span class="badge b-urg">${diff}d</span>`;}}
+  if(dl){
+    if(diff<0){
+      dateCls='b-venc';
+      dateBadge=`<span class="badge b-venc" title="Prazo vencido há ${Math.abs(diff)} dias"><i class="bi bi-exclamation-circle"></i> Atrasado (${Math.abs(diff)}d)</span>`;
+    } else if(diff===0){
+      dateCls='b-urg';
+      dateBadge=`<span class="badge b-urg" title="Prazo de entrega hoje!"><i class="bi bi-alarm"></i> Vence hoje</span>`;
+    } else if(diff===1){
+      dateCls='b-urg';
+      dateBadge=`<span class="badge b-urg" title="Vence amanhã"><i class="bi bi-calendar-event"></i> Amanhã</span>`;
+    } else if(diff<=3){
+      dateCls='b-urg';
+      dateBadge=`<span class="badge b-urg" title="Faltam ${diff} dias"><i class="bi bi-hourglass-split"></i> Faltam ${diff}d</span>`;
+    }
+  }
   const dlClass=diff===null?'':(diff<0?'dl-overdue':diff<=7?'dl-urgent':'');
   const pMap={Alta:'b-alta',Média:'b-media',Baixa:'b-baixa'};
   const pIcon={Alta:'🔴',Média:'🟡',Baixa:'🟢'};
   let sClass='',sLabel='';
-  if(total>0){if(rest<=0){sClass='b-pago';sLabel='✓ Pago';}else if(paid>0){sClass='b-parcial';sLabel='Parcial';}else{sClass='b-pendente';sLabel='Pendente';}}
+  if(total>0){if(rest<=0){sClass='b-pago';sLabel='✓ 100% Pago';}else if(paid>0){sClass='b-parcial';sLabel=`Parcial (${Math.round((paid/total)*100)}%)`;}else{sClass='b-pendente';sLabel='Pendente';}}
   // Avatar
   const avatarColor=getClientColor(p.client||'?');
   const initials=getInitials(p.client||'?');
@@ -126,8 +143,8 @@ function createCardHTML(p, cardIdx=0){
   const isExp=expandedFin.has(p.id);
   let finHtml='';
   if(total>0){
-    const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'} · ${pg.method||'Pix'}</span><span class="fv">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
-    finHtml=`<div class="fin-blk"><div class="fin-sum"><div class="fin-row"><span class="lbl">Contrato</span><span class="val">${fmt(total)}</span></div><div class="fin-row"><span class="lbl">Recebido</span><span class="val" style="color:var(--green)">${fmt(paid)}</span></div><div class="fin-row" style="border-top:1px solid var(--border);padding-top:3px;margin-top:2px"><span class="lbl">Saldo</span><span class="val" style="color:${rest>0?'var(--red)':'var(--text3)'}">${fmt(rest)} <span class="badge ${sClass}" style="font-size:10px">${sLabel}</span></span></div></div><button class="fin-hist-btn" onclick="toggleFinHist(${p.id});event.stopPropagation()"><i class="bi bi-clock-history"></i> ${pays.length} pagamento${pays.length!==1?'s':''} <i class="bi bi-chevron-${isExp?'up':'down'}" style="float:right;margin-top:1px;font-size:10px"></i></button><div class="fin-hist-rows ${isExp?'':'d-none'}">${hRows}</div></div>`;
+    const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'} · ${pg.method||'Pix'}</span><span class="fv" style="font-family:'Outfit',sans-serif;font-weight:700">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
+    finHtml=`<div class="fin-blk"><div class="fin-sum"><div class="fin-row"><span class="lbl">Contrato</span><span class="val" style="font-family:'Outfit',sans-serif;font-weight:700">${fmt(total)}</span></div><div class="fin-row"><span class="lbl">Recebido</span><span class="val" style="color:var(--green);font-family:'Outfit',sans-serif;font-weight:700">${fmt(paid)}</span></div><div class="fin-row" style="border-top:1px solid var(--border);padding-top:3px;margin-top:2px"><span class="lbl">Saldo</span><span class="val" style="color:${rest>0?'var(--red)':'var(--text3)'};font-family:'Outfit',sans-serif;font-weight:700">${fmt(rest)} <span class="badge ${sClass}" style="font-size:10px">${sLabel}</span></span></div></div><button class="fin-hist-btn" onclick="toggleFinHist(${p.id});event.stopPropagation()"><i class="bi bi-clock-history"></i> ${pays.length} pagamento${pays.length!==1?'s':''} <i class="bi bi-chevron-${isExp?'up':'down'}" style="float:right;margin-top:1px;font-size:10px"></i></button><div class="fin-hist-rows ${isExp?'':'d-none'}">${hRows}</div></div>`;
   }
   let checkHtml='';
   if(subs.length){
@@ -136,7 +153,7 @@ function createCardHTML(p, cardIdx=0){
       const playIcon = s.done ? '' : `<i class="bi ${s.current?'bi-play-circle-fill':'bi-play-circle'}" style="cursor:pointer;color:${s.current?'var(--accent)':'var(--text3)'};font-size:13px;margin-right:2px" onclick="toggleSubActive(${p.id},${s.id});event.stopPropagation()" title="Definir foco atual"></i>`;
       return `<div class="sub-row ${sIsCurrent?'sub-in-progress':''}">${playIcon}<input type="checkbox" ${s.done?'checked':''} onclick="toggleSub(${p.id},${s.id});event.stopPropagation()"><span class="${s.done?'sub-done':''}">${s.text}</span></div>`;
     }).join('');
-    checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px"><div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span><i class="bi bi-ui-checks"></i> Andamento</span><span style="font-family:'Courier New',monospace">${subDone}/${subs.length}</span></div><div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div><div style="max-height:96px;overflow-y:auto">${rows}</div></div>`;
+    checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px"><div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span><i class="bi bi-ui-checks"></i> Andamento</span><span style="font-family:'Outfit',sans-serif;font-weight:700">${subDone}/${subs.length}</span></div><div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div><div style="max-height:96px;overflow-y:auto">${rows}</div></div>`;
   }
   const noteHtml=p.note?`<p style="font-size:12px;color:var(--text2);margin-top:7px;line-height:1.5;background:var(--surface2);padding:6px 8px;border-radius:6px">${p.note}</p>`:'';
   const driveHtml = p.driveLink ? `
@@ -570,7 +587,7 @@ function renderPaymentsModal(){
               <div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:2px 0">
                 <span>${inst.desc} · <span style="color:var(--text3)">Venc: ${dateStr}</span></span>
                 <span style="display:inline-flex;align-items:center;gap:6px">
-                  <strong style="font-family:'Courier New',monospace">${fmt(inst.amount)}</strong>
+                  <strong style="font-family:'Outfit',sans-serif;font-weight:700">${fmt(inst.amount)}</strong>
                   <span class="badge" style="font-size:9.5px;padding:1px 5px;background:${isPaid ? 'rgba(22,163,74,0.15)' : 'var(--surface)'};color:${isPaid ? 'var(--green)' : 'var(--text3)'}">${isPaid ? '✓ Pago' : '⏳ Pendente'}</span>
                 </span>
               </div>

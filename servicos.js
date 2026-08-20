@@ -11,6 +11,54 @@ function initServicosPage() {
   populateCategoryFilter();
   populateClientFilter();
   updateServKPIs();
+  renderServChips();
+  renderServicos();
+}
+
+function renderServChips() {
+  const bar = document.getElementById('servChipsBar');
+  if (!bar) return;
+
+  const currentTarget = document.getElementById('fServTarget')?.value || '';
+  const total = (services || []).length;
+  const gerais = (services || []).filter(s => !s.targetType || s.targetType === 'all').length;
+  const espec = (services || []).filter(s => s.targetType === 'selected').length;
+
+  bar.innerHTML = `
+    <button type="button" class="serv-chip ${!currentTarget ? 'active' : ''}" onclick="setServTargetFilter('')">
+      <span>Todos</span>
+      <span class="serv-chip-count">${total}</span>
+    </button>
+    <button type="button" class="serv-chip ${currentTarget === 'all' ? 'active' : ''}" onclick="setServTargetFilter('all')">
+      <span>🌐 Gerais</span>
+      <span class="serv-chip-count">${gerais}</span>
+    </button>
+    <button type="button" class="serv-chip ${currentTarget === 'selected' ? 'active' : ''}" onclick="setServTargetFilter('selected')">
+      <span>🎯 Por Cliente</span>
+      <span class="serv-chip-count">${espec}</span>
+    </button>
+  `;
+}
+
+function setServTargetFilter(val) {
+  const sel = document.getElementById('fServTarget');
+  if (sel) sel.value = val;
+  pgReset('servicos');
+  renderServChips();
+  renderServicos();
+}
+
+function clearServFilters() {
+  const srch = document.getElementById('fServSearch');
+  const cat = document.getElementById('fServCategory');
+  const tgt = document.getElementById('fServTarget');
+  const cli = document.getElementById('fServClient');
+  if (srch) srch.value = '';
+  if (cat) cat.value = '';
+  if (tgt) tgt.value = '';
+  if (cli) cli.value = '';
+  pgReset('servicos');
+  renderServChips();
   renderServicos();
 }
 
@@ -116,11 +164,12 @@ function renderServicos() {
   list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   if (list.length === 0) {
-    const emptyRow = `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:32px"><i class="bi bi-box-seam" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.6"></i>Nenhum serviço encontrado</td></tr>`;
+    const isFiltered = Boolean(search || catFilter || targetFilter || clientFilter);
+    const emptyRow = `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:32px"><i class="bi bi-box-seam" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.6"></i>Nenhum serviço encontrado${isFiltered ? `<br><button class="btn-clear-filter" onclick="clearServFilters()"><i class="bi bi-x-circle"></i> Limpar filtros</button>` : ''}</td></tr>` + pgFillerRowsHtml('servicos', 0, 5);
     if (tbody) tbody.innerHTML = emptyRow;
-    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-box-seam" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum serviço encontrado</div>`;
+    if (mobileList) mobileList.innerHTML = `<div style="text-align:center;color:var(--text3);padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:16px"><i class="bi bi-box-seam" style="font-size:28px;display:block;margin-bottom:6px;opacity:0.6"></i>Nenhum serviço encontrado${isFiltered ? `<br><button class="btn-clear-filter" onclick="clearServFilters()"><i class="bi bi-x-circle"></i> Limpar filtros</button>` : ''}</div>` + pgFillerCardsHtml('servicos', 0, 90);
     const pgEl = document.getElementById('servPagination');
-    if (pgEl) pgEl.innerHTML = '';
+    if (pgEl) pgEl.innerHTML = pgBarHtml('servicos', 0, 'renderServicos');
     return;
   }
 
@@ -156,7 +205,7 @@ function renderServicos() {
             ${s.desc ? `<div style="font-size:11.5px;color:var(--text3);margin-top:2px;max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(s.desc)}">${escapeHtml(s.desc)}</div>` : ''}
           </td>
           <td style="padding:12px 14px">${catBadge}</td>
-          <td style="padding:12px 14px;font-family:'Courier New',monospace;font-weight:700;font-size:13.5px;color:var(--accent)">${fmt(s.price || 0)}</td>
+          <td style="padding:12px 14px;font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;color:var(--accent)">${fmt(s.price || 0)}</td>
           <td style="padding:12px 14px">${clientBadge}</td>
           <td style="padding:12px 14px;text-align:right">
             <div style="display:inline-flex;gap:4px;justify-content:flex-end">
@@ -167,7 +216,7 @@ function renderServicos() {
           </td>
         </tr>
       `;
-    }).join('');
+    }).join('') + pgFillerRowsHtml('servicos', pageItems.length, 5);
   }
 
   if (mobileList) {
@@ -211,7 +260,7 @@ function renderServicos() {
           </div>
         </div>
       `;
-    }).join('');
+    }).join('') + pgFillerCardsHtml('servicos', pageItems.length, 90);
   }
 
   const pgEl = document.getElementById('servPagination');

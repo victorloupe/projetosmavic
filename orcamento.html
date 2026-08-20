@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#92623a">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=102">
+<link rel="stylesheet" href="index.css?v=118">
 <script>
 (function(){
   try {
@@ -64,28 +64,41 @@
 
 <!-- ORÇAMENTOS VIEW -->
 <div class="dash-view" id="orcamentosView" style="display:block">
-  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">
+  <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px">
     <h4 style="font-weight:700;color:var(--accent);margin:0">Orçamentos</h4>
     <button class="btn btn-primary btn-sm" onclick="openOrcamentoModal()"><i class="bi bi-plus-lg"></i> Novo Orçamento</button>
   </div>
   
-  <div class="toolbar">
-    <input type="text" class="inp inp-sm" id="fOrcSearch" placeholder="Buscar orçamento…" oninput="pgReset('orcamentos');renderOrcamentos()">
-    <div class="toolbar-filters">
-      <select class="inp inp-sm" id="fOrcClient" onchange="pgReset('orcamentos');renderOrcamentos()">
+  <!-- Mini KPIs de Orçamento -->
+  <div class="orc-kpi-grid" id="orcKpis"></div>
+
+  <div class="toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="toolbar-filters" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:280px">
+      <input type="text" class="inp inp-sm" id="fOrcSearch" placeholder="Buscar orçamento…" oninput="pgReset('orcamentos');renderOrcamentos()" style="max-width:180px">
+      <select class="inp inp-sm" id="fOrcClient" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
         <option value="">Todos os Clientes</option>
       </select>
-      <select class="inp inp-sm" id="fOrcStatus" onchange="pgReset('orcamentos');renderOrcamentos()">
-        <option value="">Todos os Status</option>
-        <option value="Pendente">Pendente</option>
-        <option value="Aprovado">Aprovado</option>
-        <option value="Recusado">Recusado</option>
-        <option value="Convertido">Convertido</option>
-      </select>
-      <select class="inp inp-sm" id="fOrcYear" onchange="pgReset('orcamentos');renderOrcamentos()">
+      <select class="inp inp-sm" id="fOrcYear" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
         <option value="">Todos os Anos</option>
       </select>
+      <select class="inp inp-sm" id="fOrcMonth" onchange="pgReset('orcamentos');renderOrcamentos()" style="width:auto">
+        <option value="">Todos os Meses</option>
+        <option value="01">Janeiro</option>
+        <option value="02">Fevereiro</option>
+        <option value="03">Março</option>
+        <option value="04">Abril</option>
+        <option value="05">Maio</option>
+        <option value="06">Junho</option>
+        <option value="07">Julho</option>
+        <option value="08">Agosto</option>
+        <option value="09">Setembro</option>
+        <option value="10">Outubro</option>
+        <option value="11">Novembro</option>
+        <option value="12">Dezembro</option>
+      </select>
+      <input type="hidden" id="fOrcStatus" value="">
     </div>
+    <div class="orc-chips-bar" id="orcChipsBar"></div>
   </div>
   
   <!-- Tabela Desktop -->
@@ -97,9 +110,9 @@
           <th>Cliente</th>
           <th>Data</th>
           <th>Validade</th>
-          <th>Valor Total</th>
+          <th style="text-align:right">Valor Total</th>
           <th>Status</th>
-          <th style="width:270px;text-align:right">Ações</th>
+          <th style="width:160px;text-align:right">Ações</th>
         </tr>
       </thead>
       <tbody id="orcTableBody">
@@ -117,6 +130,9 @@
 
   <div id="orcPagination"></div>
 </div>
+
+<!-- Floating Action Dropdown Menu -->
+<div class="table-action-dropdown" id="orcTableActionDropdown"></div>
 
 <div class="toast-wrap" id="toastWrap"></div>
 
@@ -291,6 +307,40 @@
           <div class="signature-name" id="lblSigProviderName">Victor Lourenço Pereira</div>
           <div class="signature-title">RESPONSÁVEL TÉCNICO</div>
         </div>
+    </div>
+    
+    <!-- SEÇÃO DE ANEXOS & FOTOS DE REFERÊNCIA -->
+    <div class="orc-attachments-section" id="orcAttachmentsSection" style="margin-top: 22px; border-top: 1px solid var(--border2); padding-top: 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div class="proposal-section-lbl" style="margin:0"><i class="bi bi-paperclip"></i> ANEXOS &amp; FOTOS DE REFERÊNCIA</div>
+        <div class="no-print" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;font-weight:600;color:var(--text2);white-space:nowrap">Exibir no PDF</span>
+            <label class="tgl" title="Quando ativado, os anexos aparecem em uma página separada do PDF/impressão, depois do orçamento">
+              <input type="checkbox" id="orcShowAttachments" onchange="toggleOrcShowAttachments()">
+              <span class="tgl-sl"></span>
+            </label>
+          </div>
+          <span class="badge" id="orcAttachCountBadge" style="font-size:10.5px;background:var(--surface2);color:var(--text2)">0 arquivos</span>
+        </div>
+      </div>
+
+      <!-- Aviso: anexos ocultos no PDF (exibido só quando o toggle está desligado) -->
+      <div class="no-print" id="orcAttachPdfHint" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--text3);background:var(--surface2);border:1px dashed var(--border);border-radius:8px;padding:6px 10px;margin-bottom:10px">
+        <i class="bi bi-eye-slash"></i> Estes anexos não serão incluídos no PDF/impressão do orçamento.
+      </div>
+
+      <div id="orcAttachmentsBody">
+        <!-- Dropzone de Upload (Oculto na Impressão) -->
+        <div class="no-print orc-dropzone" id="orcDropzone" onclick="document.getElementById('orcFileInput').click()">
+          <input type="file" id="orcFileInput" multiple accept="image/*,.pdf,.doc,.docx,.dwg,.skp,.txt,.zip" style="display:none" onchange="handleOrcFilesSelected(this.files)">
+          <i class="bi bi-cloud-arrow-up" style="font-size:26px;color:var(--accent);margin-bottom:4px"></i>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">Clique ou arraste fotos e arquivos aqui</div>
+          <div style="font-size:11px;color:var(--text3)">Fotos da obra, referências, plantas, PDFs ou arquivos 3D</div>
+        </div>
+
+        <!-- Grid de Anexos -->
+        <div id="orcAttachmentsGrid" class="orc-attachments-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:10px;margin-top:12px"></div>
       </div>
     </div>
 
@@ -527,6 +577,33 @@
 </div>
 </div>
 
+<!-- ══ MODAL DE PRÉ-VISUALIZAÇÃO DE ANEXOS / FOTOS ══ -->
+<div class="overlay" id="orcAttachPreviewOverlay" onclick="if(event.target===this)closeOrcAttachPreviewModal()" style="z-index:9999">
+  <div class="mbox mmd" style="max-width:680px;padding:0;overflow:hidden;background:var(--surface)">
+    <div class="mhdr" style="padding:12px 16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+        <i class="bi bi-image" id="orcAttachPreviewIcon" style="color:var(--accent);font-size:16px"></i>
+        <h5 id="orcAttachPreviewTitle" style="margin:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Visualização</h5>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <a id="orcAttachDownloadBtn" href="#" download="" class="btn btn-ghost btn-sm" title="Baixar arquivo"><i class="bi bi-download"></i></a>
+        <button class="btn-icon btn-sm" onclick="closeOrcAttachPreviewModal()"><i class="bi bi-x-lg"></i></button>
+      </div>
+    </div>
+    <div class="mbody" style="padding:16px;display:flex;align-items:center;justify-content:center;min-height:220px;max-height:75vh;overflow:auto;background:var(--bg)">
+      <img id="orcAttachPreviewImg" src="" alt="Prévia" style="max-width:100%;max-height:70vh;object-fit:contain;border-radius:8px;box-shadow:var(--sh);display:none">
+      <div id="orcAttachDocPreview" style="text-align:center;padding:30px 20px;display:none">
+        <i class="bi bi-file-earmark-text" id="orcAttachDocIcon" style="font-size:54px;color:var(--accent)"></i>
+        <div id="orcAttachDocName" style="font-weight:700;font-size:14px;margin-top:10px;color:var(--text)"></div>
+        <div id="orcAttachDocSize" style="font-size:12px;color:var(--text3);margin-top:4px"></div>
+        <a id="orcAttachDocOpenBtn" href="#" target="_blank" class="btn btn-primary btn-sm" style="margin-top:16px;display:inline-flex;align-items:center;gap:6px">
+          <i class="bi bi-box-arrow-up-right"></i> Abrir em Nova Aba
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <nav class="mtab-bar" id="mtabBar">
   <a class="mtab-item" href="index.html" title="Quadro" aria-label="Quadro"><span class="mtab-bubble"><i class="bi bi-kanban"></i></span></a>
   <a class="mtab-item" href="dashboard.html" title="Dashboard" aria-label="Dashboard"><span class="mtab-bubble"><i class="bi bi-speedometer2"></i></span></a>
@@ -537,7 +614,7 @@
   <a class="mtab-item" href="servicos.html" title="Serviços" aria-label="Serviços"><span class="mtab-bubble"><i class="bi bi-box-seam"></i></span></a>
 </nav>
 
-<script src="common.js?v=111"></script>
-<script src="orcamento.js?v=111"></script>
+<script src="common.js?v=112"></script>
+<script src="orcamento.js?v=114"></script>
 </body>
 </html>

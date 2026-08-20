@@ -167,6 +167,30 @@ function isHiddenColumn(colId){
   return col.hideClient===true || (col.hideClient===undefined && col.id==='Finalizado');
 }
 
+function parseDateSafe(dStr) {
+  if (!dStr) return null;
+  const str = String(dStr).trim();
+  if (!str) return null;
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const y = parseInt(parts[2], 10);
+      const dt = new Date(y, m, d, 12, 0, 0);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+  }
+  const clean = str.includes('T') ? str : str + 'T12:00:00';
+  const dt = new Date(clean);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+function formatDateSafe(dStr) {
+  const dt = parseDateSafe(dStr);
+  return dt ? dt.toLocaleDateString('pt-BR') : (dStr || '—');
+}
+
 // ══════════════════════════════════════════
 //  MÁSCARA DE CPF/CNPJ
 // ══════════════════════════════════════════
@@ -552,6 +576,99 @@ function initSupabase(){
   return false;
 }
 
+let sbRealtimeSubscribed = false;
+function setupSupabaseRealtime() {
+  if (!sb || sbRealtimeSubscribed) return;
+  try {
+    sb.channel('mavic_store_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mavic_store' }, async (payload) => {
+        const lastLocalSave = parseInt(sessionStorage.getItem('mavic_last_local_save') || '0', 10);
+        if (Date.now() - lastLocalSave < 2500) return;
+
+        try {
+          const { data, error } = await sb.from('mavic_store').select('key,data');
+          if (!error && data) {
+            const map = {};
+            data.forEach(r => map[r.key] = r.data);
+            projects = map.projects || [];
+            clients = map.clients || [];
+            notifications = map.notifications || [];
+            globalNotices = map.global_notices || (map.global_notice ? [map.global_notice] : []);
+            budgets = map.budgets || [];
+            services = map.services || [];
+            checkAndMigrateLegacyProducts();
+            syncLocal();
+            updateNavAlertBadges();
+
+            if (typeof renderBoard === 'function') renderBoard();
+            if (typeof renderDashboard === 'function') renderDashboard();
+            if (typeof renderOrcamentos === 'function') renderOrcamentos();
+            if (typeof renderPagamentos === 'function') { renderPagamentos(); if (typeof renderPendingInstallments === 'function') renderPendingInstallments(); }
+            if (typeof renderServicos === 'function') { if (typeof updateServKPIs === 'function') updateServKPIs(); renderServicos(); }
+            if (typeof renderRelatorios === 'function') renderRelatorios();
+            if (typeof renderClientList === 'function') renderClientList();
+          }
+        } catch (e) {
+          console.warn('[Realtime] Falha ao recarregar dados', e);
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          sbRealtimeSubscribed = true;
+        }
+      });
+  } catch (err) {
+    console.warn('[Realtime] Falha ao configurar canal', err);
+  }
+}
+
+function updateNavAlertBadges() {
+  const active = (projects || []).filter(p => !p.archived && !isFinalColumn(p.column) && !isHiddenColumn(p.column) && p.date);
+  const now = new Date().setHours(0, 0, 0, 0);
+  const criticalCount = active.filter(p => {
+    const dl = new Date(p.date + 'T12:00:00');
+    const diff = Math.ceil((dl - now) / 86400000);
+    return diff <= 2;
+  }).length;
+
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    if (tab.textContent.includes('Dashboard') || tab.getAttribute('href') === 'dashboard.html') {
+      let badge = tab.querySelector('.nav-alert-badge');
+      if (criticalCount > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'nav-alert-badge';
+          tab.appendChild(badge);
+        }
+        badge.textContent = criticalCount;
+        badge.title = `${criticalCount} projeto(s) com prazo crítico ou vencido`;
+      } else if (badge) {
+        badge.remove();
+      }
+    }
+  });
+
+  document.querySelectorAll('.mtab-item').forEach(item => {
+    if (item.getAttribute('href') === 'dashboard.html' || item.textContent.includes('Dashboard')) {
+      let badge = item.querySelector('.nav-alert-badge');
+      if (criticalCount > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'nav-alert-badge';
+          badge.style.position = 'absolute';
+          badge.style.top = '4px';
+          badge.style.right = 'calc(50% - 16px)';
+          item.style.position = 'relative';
+          item.appendChild(badge);
+        }
+        badge.textContent = criticalCount;
+      } else if (badge) {
+        badge.remove();
+      }
+    }
+  });
+}
+
 async function loadData(){
   let hasSb=false;
   try{hasSb=initSupabase();}catch(e){console.warn('initSupabase falhou',e);hasSb=false;}
@@ -562,6 +679,7 @@ async function loadData(){
     loadLocal();
     if (hasSb) {
       syncCloud(); // trigger cloud sync in background
+      setupSupabaseRealtime();
     }
     return;
   }
@@ -593,6 +711,8 @@ async function loadData(){
     if(cfg.pixName!==undefined) localStorage.setItem('mavic_pixName',cfg.pixName);
     if(cfg.pixBank!==undefined) localStorage.setItem('mavic_pixBank',cfg.pixBank);
     applyTheme(appTheme);syncLocal();
+    updateNavAlertBadges();
+    setupSupabaseRealtime();
   }catch(e){console.warn('Supabase load failed',e);loadLocal();showToast('Modo offline — dados locais','warning');}
 }
 
@@ -677,8 +797,10 @@ async function syncCloud(){
         pixBank:localStorage.getItem('mavic_pixBank')||''
       }}
     ],{onConflict:'key'});
+    sessionStorage.setItem('mavic_last_local_save', String(Date.now()));
     localStorage.removeItem('mavic_pending_sync');
     setSync('ok');
+    updateNavAlertBadges();
   }catch(e){setSync('off');}
 }
 
@@ -893,7 +1015,7 @@ const MOBILE_TABS=[
 const PAGE_SIZES=[5,10,20,50,100];
 const _pgState={};
 
-function pgState(key,defaultSize=20){
+function pgState(key,defaultSize=10){
   if(!_pgState[key]){
     const saved=localStorage.getItem('mavic_pp_'+key);
     // Tela menor (mobile) começa com menos itens por página, se o usuário nunca escolheu um valor.
@@ -957,6 +1079,31 @@ function pgSetSize(key,value,renderFnName){
   st.page=1;
   localStorage.setItem('mavic_pp_'+key,value);
   if(typeof window[renderFnName]==='function') window[renderFnName]();
+}
+
+// Quantas linhas/cards "vazios" faltam pra completar a página até o tamanho de página
+// escolhido (visual mais "cheio" e consistente, mesmo com poucos resultados).
+// Sempre 0 quando "Todos" está selecionado no seletor de itens por página.
+function pgFillerCount(key,actualCount){
+  const st=pgState(key);
+  if(!isFinite(st.perPage)) return 0;
+  return Math.max(0,st.perPage-actualCount);
+}
+
+// Linhas <tr> vazias pra completar uma tabela (.dash-table) até o tamanho de página atual.
+// colspan deve bater com o nº de colunas reais da tabela pra linha ocupar a largura toda.
+function pgFillerRowsHtml(key,actualCount,colspan=12){
+  const n=pgFillerCount(key,actualCount);
+  if(!n) return '';
+  return `<tr class="pg-filler-row" aria-hidden="true"><td colspan="${colspan}">&nbsp;</td></tr>`.repeat(n);
+}
+
+// Cards/itens vazios pras listas mobile (cards de orçamento/pagamento/serviço, itens do CRM etc.).
+// heightPx deve bater aproximadamente com a altura real dos cards daquela tela.
+function pgFillerCardsHtml(key,actualCount,heightPx=72,extraClass=''){
+  const n=pgFillerCount(key,actualCount);
+  if(!n) return '';
+  return `<div class="pg-filler-card${extraClass?' '+extraClass:''}" aria-hidden="true" style="height:${heightPx}px"></div>`.repeat(n);
 }
 
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
@@ -1298,10 +1445,11 @@ function deleteProject(id,fromArch=false){
 }
 
 // ══════════════════════════════════════════
-//  INITIALIZATION & NAV HIGHLIGHT
+//  INITIALIZATION & NAV HIGHLIGHT WITH SLIDING PILL
 // ══════════════════════════════════════════
 function highlightActiveTab() {
-  document.querySelectorAll('.nav-tab').forEach(tab => {
+  const tabs = document.querySelectorAll('.nav-tab');
+  tabs.forEach(tab => {
     const href = tab.getAttribute('href');
     if (href) {
       const match = window.location.pathname.endsWith(href) || 
@@ -1309,6 +1457,100 @@ function highlightActiveTab() {
       tab.classList.toggle('on', match);
     }
   });
+  initNavTabIndicator();
+}
+
+function initNavTabIndicator() {
+  const navTabs = document.querySelector('.nav-tabs');
+  if (!navTabs) return;
+
+  let indicator = navTabs.querySelector('.nav-tab-indicator');
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.className = 'nav-tab-indicator';
+    navTabs.appendChild(indicator);
+  }
+
+  const activeTab = navTabs.querySelector('.nav-tab.on');
+  if (!activeTab) return;
+
+  // Recupera posição anterior salva ao clicar para transição contínua
+  const prevRectStr = sessionStorage.getItem('mavic_nav_prev_pill');
+  let hadPrev = false;
+
+  if (prevRectStr) {
+    try {
+      const prev = JSON.parse(prevRectStr);
+      sessionStorage.removeItem('mavic_nav_prev_pill');
+      if (prev && typeof prev.left === 'number' && typeof prev.width === 'number') {
+        indicator.style.transition = 'none';
+        indicator.style.transform = `translateX(${prev.left}px)`;
+        indicator.style.width = `${prev.width}px`;
+        indicator.classList.add('ready');
+        hadPrev = true;
+      }
+    } catch (e) {}
+  }
+
+  function moveIndicatorTo(tab, animate = true) {
+    if (!tab) return;
+    const targetLeft = tab.offsetLeft;
+    const targetWidth = tab.offsetWidth;
+
+    if (!animate) {
+      indicator.style.transition = 'none';
+      indicator.style.transform = `translateX(${targetLeft}px)`;
+      indicator.style.width = `${targetWidth}px`;
+      indicator.classList.add('ready');
+    } else {
+      indicator.style.transition = 'transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.15), width 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.15), opacity 0.2s ease';
+      indicator.style.transform = `translateX(${targetLeft}px)`;
+      indicator.style.width = `${targetWidth}px`;
+      indicator.classList.add('ready');
+    }
+  }
+
+  if (hadPrev) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        moveIndicatorTo(activeTab, true);
+      });
+    });
+  } else {
+    moveIndicatorTo(activeTab, false);
+    setTimeout(() => {
+      indicator.style.transition = 'transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.15), width 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.15), opacity 0.2s ease';
+    }, 50);
+  }
+
+  // Intercepta cliques para iniciar o deslizamento antes da troca de página
+  const allTabs = navTabs.querySelectorAll('.nav-tab');
+  allTabs.forEach(tab => {
+    if (tab._navIndicatorBound) return;
+    tab._navIndicatorBound = true;
+
+    tab.addEventListener('click', () => {
+      const currentTab = navTabs.querySelector('.nav-tab.on');
+      if (currentTab) {
+        sessionStorage.setItem('mavic_nav_prev_pill', JSON.stringify({
+          left: currentTab.offsetLeft,
+          width: currentTab.offsetWidth
+        }));
+      }
+
+      allTabs.forEach(t => t.classList.remove('on'));
+      tab.classList.add('on');
+      moveIndicatorTo(tab, true);
+    });
+  });
+
+  if (!window._navResizeBound) {
+    window._navResizeBound = true;
+    window.addEventListener('resize', () => {
+      const curr = navTabs.querySelector('.nav-tab.on');
+      if (curr) moveIndicatorTo(curr, false);
+    });
+  }
 }
 
 // Ping Supabase every 30 mins to prevent database pausing
@@ -1338,6 +1580,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Bind default values to theme
   applyTheme(localStorage.getItem('mavic_theme') || 'light');
+  highlightActiveTab();
 
   await reloadPageData();
   document.body.classList.remove('preload');
@@ -1350,6 +1593,7 @@ function renderCurrentPage(){
   highlightActiveTab();
   updateGnNavBtn();
   populateProjectTypeSelects();
+  updateNavAlertBadges();
   try {
     if (typeof initPage === 'function') {
       initPage();
@@ -1375,13 +1619,29 @@ async function reloadPageData(){
     loadLocal();
     renderCurrentPage();
     if (loadingEl) loadingEl.style.display = 'none';
+    
+    // Snapshot para checar se os dados remotos realmente mudaram
+    const localSnap = JSON.stringify({
+      p: projects, c: clients, b: budgets, s: services, n: notifications, gn: globalNotices,
+      cols: appColumns, vCols: visibleColumns, minCols: minimizedColumns
+    });
+
     try {
       await loadData();
     } catch(e) {
       console.error('Atualização em segundo plano falhou, mantendo dados locais', e);
       return;
     }
-    renderCurrentPage();
+
+    const cloudSnap = JSON.stringify({
+      p: projects, c: clients, b: budgets, s: services, n: notifications, gn: globalNotices,
+      cols: appColumns, vCols: visibleColumns, minCols: minimizedColumns
+    });
+
+    // Só re-renderiza se os dados da nuvem forem diferentes do cache local
+    if (localSnap !== cloudSnap) {
+      renderCurrentPage();
+    }
     return;
   }
 
@@ -1529,4 +1789,79 @@ function importBackup(event) {
   reader.readAsText(file);
   event.target.value = '';
 }
+
+// ══════════════════════════════════════════
+//  CSV EXPORT HELPER (UTF-8 BOM para Excel)
+// ══════════════════════════════════════════
+function exportToCSV(filename, headers, rows) {
+  try {
+    const csvContent = '\uFEFF' + [
+      headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(';'),
+      ...rows.map(row => row.map(v => `"${String(v !== undefined && v !== null ? v : '').replace(/"/g, '""')}"`).join(';'))
+    ].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('Planilha CSV exportada!', 'success');
+  } catch(e) {
+    console.error('Erro ao exportar CSV:', e);
+    showToast('Erro ao exportar planilha', 'error');
+  }
+}
+
+// ══════════════════════════════════════════
+//  GLOBAL KEYBOARD SHORTCUTS
+// ══════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+
+  // 1. Focar busca: "/" ou "Ctrl+K" / "Cmd+K"
+  if ((e.key === '/' && !isInput) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')) {
+    e.preventDefault();
+    const searchInp = document.getElementById('srch') || 
+                      document.getElementById('fOrcSearch') || 
+                      document.getElementById('fPaySearch') || 
+                      document.getElementById('fPendingSearch') || 
+                      document.getElementById('fServSearch') || 
+                      document.getElementById('srchRep') || 
+                      document.getElementById('cliSearch');
+    if (searchInp) {
+      searchInp.focus();
+      searchInp.select?.();
+    }
+  }
+
+  // 2. Novo item com tecla "N" (fora de inputs)
+  if (e.key.toLowerCase() === 'n' && !isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (typeof openProjectModal === 'function' && document.getElementById('boardView')) {
+      e.preventDefault();
+      openProjectModal();
+    } else if (typeof openCreateOrcModal === 'function' && document.getElementById('orcamentosView')) {
+      e.preventDefault();
+      openCreateOrcModal();
+    } else if (typeof openCreatePaymentModal === 'function' && document.getElementById('pagamentosView')) {
+      e.preventDefault();
+      openCreatePaymentModal();
+    } else if (typeof openNewServiceModal === 'function' && document.getElementById('servicosView')) {
+      e.preventDefault();
+      openNewServiceModal();
+    }
+  }
+
+  // 3. Escape para fechar modais e dropdowns
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.overlay.open, .overlay[style*="display: flex"], .overlay[style*="display: block"]').forEach(ov => {
+      ov.classList.remove('open');
+      ov.style.display = 'none';
+    });
+    document.querySelectorAll('.sort-menu.open, .table-action-dropdown.open').forEach(dd => dd.classList.remove('open'));
+  }
+});
 

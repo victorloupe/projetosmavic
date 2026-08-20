@@ -2377,7 +2377,7 @@ textarea.inp {
 
 @media(max-width:768px){
   html, body{overflow-x:hidden!important;max-width:100vw!important;width:100%!important}
-  body{overflow:auto;height:auto;padding-bottom:70px}
+  body{overflow:auto;height:auto;padding-bottom:calc(76px + env(safe-area-inset-bottom, 12px))!important}
   .nav{height:56px;padding:0 16px;flex-wrap:nowrap;justify-content:flex-start;gap:2px;max-width:100vw;overflow:hidden}
   .nav-brand{width:auto;justify-content:flex-start;flex-direction:row;align-items:center;gap:7px;min-width:0;flex-shrink:1;overflow:hidden}
   .nav-brand .nav-logo{height:34px;flex-shrink:0}
@@ -2392,6 +2392,25 @@ textarea.inp {
   .nav #gnNavBtn{margin-left:auto}
   .fab{display:none!important}
   
+  /* Ocultar fillers vazios no mobile para lista limpa e compacta */
+  .pg-filler-card, .pg-filler-item {
+    display: none !important;
+  }
+  
+  /* Toque responsivo com feedback tátil */
+  .btn, .btn-icon, .mtab-item, .kcard, .orc-card, .pay-card, .btn-clear-filter, .board-col-pill, .pay-tab-btn, .orc-chip {
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: manipulation !important;
+  }
+  .btn:active, .btn-icon:active, .orc-chip:active, .pay-tab-btn:active, .board-col-pill:active {
+    transform: scale(0.96) !important;
+  }
+  .orc-card-bottom button, .pay-card-actions button {
+    min-height: 32px !important;
+    padding: 5px 9px !important;
+    font-size: 11.5px !important;
+  }
+
   .board-header{
     display:flex!important;
     align-items:center!important;
@@ -2415,7 +2434,56 @@ textarea.inp {
     flex-shrink:0!important;
   }
 
-  .board-outer{overflow:visible;padding:8px 16px 20px}
+  /* Seletor de colunas Kanban no mobile (Pills) */
+  .board-col-pills {
+    display: flex !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 2px 16px 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .board-col-pills::-webkit-scrollbar {
+    display: none !important;
+  }
+  .board-col-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 6px 12px !important;
+    border-radius: 999px !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text2) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+  .board-col-pill.active {
+    background: var(--accent) !important;
+    color: #ffffff !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 2px 8px rgba(146, 98, 58, 0.3) !important;
+  }
+  .board-col-pill .pill-badge {
+    background: rgba(0,0,0,0.08) !important;
+    color: inherit !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    padding: 1px 6px !important;
+    border-radius: 999px !important;
+  }
+  .board-col-pill.active .pill-badge {
+    background: rgba(255,255,255,0.25) !important;
+    color: #ffffff !important;
+  }
+
+  .board-outer{overflow:visible;padding:4px 16px 20px}
   .board{flex-direction:column;height:auto;gap:12px}
   .kcol{width:100%}
   .kcol-mini{width:100%;flex-direction:row;height:auto;padding:9px 13px;justify-content:space-between}
@@ -2470,6 +2538,50 @@ textarea.inp {
     padding:6px 8px!important;
   }
 
+  /* Abas de pagamentos ocupam 100% de largura com botões centralizados e divididos igualmente (50%/50%) */
+  .pay-tabs-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    padding: 3px !important;
+    gap: 4px !important;
+    box-sizing: border-box !important;
+    margin-bottom: 2px !important;
+    border-radius: 999px !important;
+    background: var(--surface2) !important;
+  }
+  .pay-tabs-wrap .pay-tab-btn {
+    flex: 1 1 50% !important;
+    width: 50% !important;
+    min-width: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 7px 10px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Barras de chips horizontais com scroll suave no mobile */
+  .orc-chips-bar, .serv-chips-bar {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 3px 2px !important;
+    box-sizing: border-box !important;
+    margin-bottom: 2px !important;
+  }
+  .orc-chips-bar::-webkit-scrollbar, .serv-chips-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+  .orc-chip, .serv-chip {
+    flex-shrink: 0 !important;
+  }
+
   .dash-grid{grid-template-columns:1fr 1fr}
   .dash-card{padding:11px}
   .dash-card .dc-val{font-size:16.5px}
@@ -2493,7 +2605,7 @@ textarea.inp {
     box-sizing:border-box!important;
   }
 
-  .mxl,.mlg,.mmd,.msm{max-width:100%;margin:0;border-radius:12px 12px 0 0}
+  .mxl,.mlg,.mmd,.msm{max-width:100%;margin:0;border-radius:16px 16px 0 0}
   .overlay{align-items:flex-end;padding:0}
   .mbody > div[style*="grid"]{display:flex!important;flex-direction:column!important}
   .row2{grid-template-columns:1fr!important}
@@ -4272,22 +4384,53 @@ textarea.inp {
   }
   .overlay .mbox {
     max-width: 100% !important;
-    max-height: 88vh !important;
+    max-height: 90vh !important;
+    height: auto !important;
     border-radius: 24px 24px 0 0 !important;
     transform: translateY(100%) scale(1) !important;
     transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
     margin: 0 !important;
     border-bottom: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
   }
   .overlay.open .mbox {
     transform: translateY(0) scale(1) !important;
   }
   .mhdr {
     border-radius: 24px 24px 0 0 !important;
+    flex-shrink: 0 !important;
+    position: sticky !important;
+    top: 0 !important;
+    background: var(--surface) !important;
+    z-index: 20 !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 14px 16px !important;
+  }
+  .mbody {
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-height: none !important;
+    padding: 14px 16px !important;
   }
   .mftr {
     border-radius: 0 !important;
-    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    flex-shrink: 0 !important;
+    position: sticky !important;
+    bottom: 0 !important;
+    background: var(--surface) !important;
+    z-index: 20 !important;
+    border-top: 1px solid var(--border) !important;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.06) !important;
+    padding: 10px 14px !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 12px)) !important;
+  }
+
+  /* Prevenção de auto-zoom indesejado no Safari iOS ao focar inputs */
+  .inp, select.inp, textarea.inp {
+    font-size: 14px !important;
   }
 }
 

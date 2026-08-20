@@ -2,6 +2,37 @@
 //  BOARD / KANBAN LOGIC
 // ══════════════════════════════════════════
 let touchTimer=null, touchDragId=null, touchGhost=null;
+let activeMobileCol = sessionStorage.getItem('board_active_col') || 'all';
+
+function setMobileColFilter(colId){
+  activeMobileCol = colId;
+  sessionStorage.setItem('board_active_col', colId);
+  renderBoard();
+}
+
+function renderBoardColPills(columnsWithCounts, totalCount){
+  const pillsEl = document.getElementById('boardColPills');
+  if(!pillsEl) return;
+  const isMobile = Boolean(window.matchMedia && window.matchMedia('(max-width:768px)').matches);
+  if(!isMobile) {
+    pillsEl.innerHTML = '';
+    return;
+  }
+  
+  let html = `<button class="board-col-pill ${activeMobileCol === 'all' ? 'active' : ''}" onclick="setMobileColFilter('all')">
+    <i class="bi bi-kanban"></i> <span>Todas</span> <span class="pill-badge">${totalCount}</span>
+  </button>`;
+  
+  columnsWithCounts.forEach(c => {
+    const isActive = activeMobileCol === c.id;
+    html += `<button class="board-col-pill ${isActive ? 'active' : ''}" onclick="setMobileColFilter('${c.id}')">
+      <i class="bi ${c.icon || DEFAULT_COL_ICON}" style="color:${isActive ? '#fff' : (c.color || DEFAULT_COL_COLOR)}"></i>
+      <span>${c.id}</span>
+      <span class="pill-badge">${c.count}</span>
+    </button>`;
+  });
+  pillsEl.innerHTML = html;
+}
 
 function initPage() {
   updateProjColSelect();
@@ -49,11 +80,26 @@ function renderBoard(){
   sessionStorage.setItem('board_srch', srchEl ? srchEl.value : '');
 
   let total=0;
+  const visibleCols = appColumns.filter(c=>visibleColumns.includes(c.id));
+  const isMobile = Boolean(window.matchMedia && window.matchMedia('(max-width:768px)').matches);
+
+  // Calcular contagens para os pills mobile
+  const columnsWithCounts = visibleCols.map(col => {
+    const colProjs = projects.filter(p=>!p.archived&&p.column===col.id&&(!fType||p.type===fType)&&(!fPrio||p.priority===fPrio)&&(!fCli||p.client===fCli)&&(!srch||p.name?.toLowerCase().includes(srch)||p.client?.toLowerCase().includes(srch)));
+    total += colProjs.length;
+    return { id: col.id, icon: col.icon, color: col.color, count: colProjs.length };
+  });
+
+  renderBoardColPills(columnsWithCounts, total);
+
+  const colsToRender = (isMobile && activeMobileCol !== 'all')
+    ? visibleCols.filter(c => c.id === activeMobileCol)
+    : visibleCols;
   
-  appColumns.filter(c=>visibleColumns.includes(c.id)).forEach(col=>{
+  colsToRender.forEach(col=>{
     const isMin=minimizedColumns.includes(col.id);
     let colProjs=projects.filter(p=>!p.archived&&p.column===col.id&&(!fType||p.type===fType)&&(!fPrio||p.priority===fPrio)&&(!fCli||p.client===fCli)&&(!srch||p.name?.toLowerCase().includes(srch)||p.client?.toLowerCase().includes(srch)));
-    colProjs=sortProjs(colProjs,col.id);total+=colProjs.length;
+    colProjs=sortProjs(colProjs,col.id);
     const colVal = colProjs.reduce((s, p) => s + parseFloat(p.value || 0), 0);
     const colValHtml = colVal > 0 ? `<span class="kcol-val" style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-bg);padding:1px 6px;border-radius:6px;margin-left:4px" title="Faturamento total nesta etapa">${fmt(colVal)}</span>` : '';
 

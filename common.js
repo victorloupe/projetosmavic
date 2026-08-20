@@ -994,6 +994,7 @@ const MOBILE_TABS=[
   {href:'pagamentos.html',  icon:'bi-credit-card',                label:'Pagamentos',  match:['pagamentos.html']},
   {href:'relatorio.html',   icon:'bi-graph-up-arrow',             label:'Relatórios',  match:['relatorio.html']},
   {href:'clientes.html',    icon:'bi-people',                     label:'Clientes',    match:['clientes.html']},
+  {href:'servicos.html',    icon:'bi-box-seam',                   label:'Serviços',    match:['servicos.html']},
 ];
 (function injectMobileTabBar(){
   if(document.getElementById('mtabBar')) return;
@@ -1016,13 +1017,14 @@ const PAGE_SIZES=[5,10,20,50,100];
 const _pgState={};
 
 function pgState(key,defaultSize=10){
-  if(!_pgState[key]){
-    const saved=localStorage.getItem('mavic_pp_'+key);
-    // Tela menor (mobile) começa com menos itens por página, se o usuário nunca escolheu um valor.
-    const isMobile=window.matchMedia && window.matchMedia('(max-width:768px)').matches;
+  const isMobile=Boolean(window.matchMedia && window.matchMedia('(max-width:768px)').matches);
+  const storageKey = isMobile ? 'mavic_pp_m_'+key : 'mavic_pp_'+key;
+  if(!_pgState[key] || _pgState[key]._isMobile !== isMobile){
+    const saved=localStorage.getItem(storageKey);
+    // Tela menor (mobile) começa com 5 itens por página por padrão
     const fallback=isMobile?5:defaultSize;
     const perPage=saved==='all'?Infinity:(parseInt(saved)||fallback);
-    _pgState[key]={page:1,perPage};
+    _pgState[key]={page:1,perPage,_isMobile:isMobile};
   }
   return _pgState[key];
 }
@@ -1074,10 +1076,13 @@ function pgGo(key,page,renderFnName){
   if(typeof window[renderFnName]==='function') window[renderFnName]();
 }
 function pgSetSize(key,value,renderFnName){
+  const isMobile=Boolean(window.matchMedia && window.matchMedia('(max-width:768px)').matches);
+  const storageKey = isMobile ? 'mavic_pp_m_'+key : 'mavic_pp_'+key;
   const st=pgState(key);
   st.perPage=value==='all'?Infinity:parseInt(value);
   st.page=1;
-  localStorage.setItem('mavic_pp_'+key,value);
+  st._isMobile=isMobile;
+  localStorage.setItem(storageKey,value);
   if(typeof window[renderFnName]==='function') window[renderFnName]();
 }
 

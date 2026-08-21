@@ -32,23 +32,24 @@ function renderCliList(){
   const pgEl = document.getElementById('cliPagination');
   if (pgEl) pgEl.innerHTML = pgBarHtml('clientes', filtered.length, 'renderCliList', {hideSize:true, compact:true});
 
-  if(!filtered.length){el.innerHTML='<div class="empty-state"><i class="bi bi-people"></i><span>Nenhum cliente cadastrado</span></div>' + cliFillerRowsHtml(0);return;}
+  if(!filtered.length){el.innerHTML='<div class="empty-state"><i class="bi bi-people"></i><span>Nenhum cliente cadastrado</span></div>';return;}
   const pageItems = pgSlice(filtered, 'clientes');
   el.innerHTML=pageItems.map(c=>{
     const pCount = (projects || []).filter(p => p && p.client && p.client.toLowerCase().trim() === c.name.toLowerCase().trim()).length;
-    return `<div class="cli-item ${currentCliId===c.id?'on':''}" onclick="selectClient(${c.id})">
-      <span><i class="bi bi-person"></i> ${c.name}</span>
-      <span style="font-size:11px;color:var(--text3)">${pCount} proj · ${c.products?.length||0} serv</span>
+    const servCount = c.products?.length || 0;
+    return `<div class="cli-item ${currentCliId===c.id?'on':''}" onclick="selectClient(${c.id}, true)">
+      <div style="display:flex;align-items:center;gap:9px;min-width:0;overflow:hidden">
+        <span class="kcard-avatar" style="background:${getClientColor(c.name)};width:28px;height:28px;font-size:11px;flex-shrink:0">${getInitials(c.name)}</span>
+        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600">${escapeHtml(c.name)}</span>
+      </div>
+      <span style="font-size:11px;color:var(--text3);flex-shrink:0;margin-left:6px">${pCount}p · ${servCount}s</span>
     </div>`;
-  }).join('') + cliFillerRowsHtml(pageItems.length);
+  }).join('');
 }
 
-// Linhas de preenchimento com o MESMO visual das linhas reais (.cli-item) — em vez do
-// card genérico tracejado, pra não destoar da listagem de clientes.
+// Linhas de preenchimento desativadas para layout limpo
 function cliFillerRowsHtml(actualCount) {
-  const n = pgFillerCount('clientes', actualCount);
-  if (!n) return '';
-  return '<div class="cli-item cli-filler-row" aria-hidden="true">&nbsp;</div>'.repeat(n);
+  return '';
 }
 
 function createClient(){
@@ -59,12 +60,19 @@ function createClient(){
   renderCliList();selectClient(cl.id);scheduleSync();showToast('Cliente cadastrado!','success');
 }
 
-function selectClient(id){
+function selectClient(id, userClick=false){
   currentCliId=id;const cl=clients.find(x=>x.id===id);if(!cl)return;
   if(!cl.token){cl.token=genTokenStr();scheduleSync();}
   document.getElementById('cliDetail').classList.remove('d-none');document.getElementById('cliPlaceholder').style.display='none';
   document.getElementById('cliDetailName').textContent=cl.name;document.getElementById('cliToken').value=cl.token;
-  document.getElementById('cliPhone').value=cl.phone||'';
+  
+  const avatarEl = document.getElementById('cliAvatar');
+  if (avatarEl) {
+    avatarEl.textContent = getInitials(cl.name);
+    avatarEl.style.background = getClientColor(cl.name);
+  }
+
+  document.getElementById('cliPhone').value=formatPhoneMask(cl.phone||'');
   document.getElementById('cliAddress').value=cl.address||'';
   document.getElementById('cliEmail').value=cl.email||'';
   document.getElementById('cliDoc').value=formatDocMask(cl.doc||'');
@@ -79,23 +87,28 @@ function selectClient(id){
   const cliPending = Math.max(0, cliTotalVal - cliTotalPaid);
   const cliConcl = cliProjs.filter(p => isFinalColumn(p.column)).length;
 
+  const subtitleEl = document.getElementById('cliSubtitle');
+  if (subtitleEl) {
+    subtitleEl.textContent = `${cliProjs.length} projeto(s) cadastrado(s) · ${(cl.products || []).length} serviço(s) personalizado(s)`;
+  }
+
   const statsEl = document.getElementById('cliStatsGrid');
   if (statsEl) {
     statsEl.innerHTML = `
-      <div class="dash-card dc-accent" style="padding:10px 12px">
-        <div class="dc-lbl" style="font-size:9.5px">Total Faturado (LTV)</div>
-        <div class="dc-val" style="font-size:15px;font-family:'Outfit',sans-serif">${fmt(cliTotalVal)}</div>
-        <div class="dc-sub" style="font-size:10px">${cliProjs.length} projeto(s)</div>
+      <div class="dash-card dc-accent cli-stat-card">
+        <div class="dc-lbl">Total Faturado (LTV)</div>
+        <div class="dc-val">${fmt(cliTotalVal)}</div>
+        <div class="dc-sub">${cliProjs.length} projeto(s)</div>
       </div>
-      <div class="dash-card dc-green" style="padding:10px 12px">
-        <div class="dc-lbl" style="font-size:9.5px">Total Recebido</div>
-        <div class="dc-val" style="font-size:15px;font-family:'Outfit',sans-serif;color:var(--green)">${fmt(cliTotalPaid)}</div>
-        <div class="dc-sub" style="font-size:10px">${cliConcl} concluído(s)</div>
+      <div class="dash-card dc-green cli-stat-card">
+        <div class="dc-lbl">Total Recebido</div>
+        <div class="dc-val" style="color:var(--green)">${fmt(cliTotalPaid)}</div>
+        <div class="dc-sub">${cliConcl} concluído(s)</div>
       </div>
-      <div class="dash-card dc-red" style="padding:10px 12px">
-        <div class="dc-lbl" style="font-size:9.5px">Saldo Pendente</div>
-        <div class="dc-val" style="font-size:15px;font-family:'Outfit',sans-serif;color:${cliPending > 0 ? 'var(--red)' : 'var(--text3)'}">${fmt(cliPending)}</div>
-        <div class="dc-sub" style="font-size:10px">${cliPending > 0 ? 'em aberto' : '100% quitado'}</div>
+      <div class="dash-card dc-red cli-stat-card">
+        <div class="dc-lbl">Saldo Pendente</div>
+        <div class="dc-val" style="color:${cliPending > 0 ? 'var(--red)' : 'var(--text3)'}">${fmt(cliPending)}</div>
+        <div class="dc-sub">${cliPending > 0 ? 'em aberto' : '100% quitado'}</div>
       </div>
     `;
   }
@@ -107,16 +120,48 @@ function selectClient(id){
       initPage();scheduleSync();showToast('Cliente removido','info');
     });
   };
+
+  // Scroll suave no mobile para visualizar os detalhes do cliente selecionado
+  if (userClick && window.innerWidth <= 768) {
+    const detailWrap = document.getElementById('cliDetailWrap');
+    if (detailWrap) {
+      setTimeout(() => {
+        detailWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }
+}
+
+function openClientWaDirect() {
+  const cl = clients.find(x => x.id === currentCliId);
+  if (!cl) return;
+  const rawPhone = (cl.phone || '').replace(/\D/g, '');
+  if (!rawPhone) {
+    showToast('Cadastre o telefone do cliente primeiro', 'warning');
+    const phoneInput = document.getElementById('cliPhone');
+    if (phoneInput) {
+      phoneInput.focus();
+      phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
+  const cleanPhone = rawPhone.length <= 11 ? '55' + rawPhone : rawPhone;
+  const firstName = (cl.name || 'Cliente').trim().split(' ')[0];
+  const msg = encodeURIComponent(`Olá ${firstName}, tudo bem?`);
+  window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
 }
 
 function updateCliLink(cl){document.getElementById('cliLinkBox').textContent=cl.token?buildLink(cl.name,cl.token):'⚠️ Defina um token';}
 
 function saveClientContact(){
   const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
-  cl.phone=document.getElementById('cliPhone').value.trim();
+  const rawPhone = document.getElementById('cliPhone').value.trim();
+  cl.phone = formatPhoneMask(rawPhone);
+  document.getElementById('cliPhone').value = cl.phone;
   cl.address=document.getElementById('cliAddress').value.trim();
   cl.email=document.getElementById('cliEmail').value.trim();
-  cl.doc=document.getElementById('cliDoc').value.trim();
+  cl.doc=formatDocMask(document.getElementById('cliDoc').value.trim());
+  document.getElementById('cliDoc').value = cl.doc;
   scheduleSync();
   const ok=document.getElementById('contactOkMsg');ok.classList.remove('d-none');
   setTimeout(()=>ok.classList.add('d-none'),2500);
@@ -136,17 +181,41 @@ function genToken(){document.getElementById('cliToken').value=genTokenStr();show
 
 function copyCliLink(){
   const text = document.getElementById('cliLinkBox').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('Link copiado!', 'success');
-  }).catch(() => {
-    const dummy = document.createElement('textarea');
-    document.body.appendChild(dummy);
-    dummy.value = text;
-    dummy.select();
-    document.execCommand('copy');
-    document.body.removeChild(dummy);
-    showToast('Link copiado!', 'success');
-  });
+  const btn = document.getElementById('btnCopyCliLink');
+
+  const onSuccess = () => {
+    showToast('Link do painel copiado!', 'success');
+    if (btn) {
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="bi bi-check-lg" style="color:var(--green)"></i> <span style="color:var(--green);font-weight:700">Link Copiado!</span>';
+      btn.style.borderColor = 'var(--green)';
+      setTimeout(() => {
+        btn.innerHTML = origHtml;
+        btn.style.borderColor = '';
+      }, 2000);
+    }
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onSuccess).catch(() => {
+      fallbackCopyText(text);
+      onSuccess();
+    });
+  } else {
+    fallbackCopyText(text);
+    onSuccess();
+  }
+}
+
+function fallbackCopyText(text) {
+  const dummy = document.createElement('textarea');
+  dummy.style.position = 'fixed';
+  dummy.style.opacity = '0';
+  document.body.appendChild(dummy);
+  dummy.value = text;
+  dummy.select();
+  document.execCommand('copy');
+  document.body.removeChild(dummy);
 }
 
 function renderCliProductsTable(cl,editingId=null){

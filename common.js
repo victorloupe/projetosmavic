@@ -1086,29 +1086,17 @@ function pgSetSize(key,value,renderFnName){
   if(typeof window[renderFnName]==='function') window[renderFnName]();
 }
 
-// Quantas linhas/cards "vazios" faltam pra completar a página até o tamanho de página
-// escolhido (visual mais "cheio" e consistente, mesmo com poucos resultados).
-// Sempre 0 quando "Todos" está selecionado no seletor de itens por página.
+// Linhas/cards vazios desativados para layout limpo com rodapé fixo/flexível
 function pgFillerCount(key,actualCount){
-  const st=pgState(key);
-  if(!isFinite(st.perPage)) return 0;
-  return Math.max(0,st.perPage-actualCount);
+  return 0;
 }
 
-// Linhas <tr> vazias pra completar uma tabela (.dash-table) até o tamanho de página atual.
-// colspan deve bater com o nº de colunas reais da tabela pra linha ocupar a largura toda.
 function pgFillerRowsHtml(key,actualCount,colspan=12){
-  const n=pgFillerCount(key,actualCount);
-  if(!n) return '';
-  return `<tr class="pg-filler-row" aria-hidden="true"><td colspan="${colspan}">&nbsp;</td></tr>`.repeat(n);
+  return '';
 }
 
-// Cards/itens vazios pras listas mobile (cards de orçamento/pagamento/serviço, itens do CRM etc.).
-// heightPx deve bater aproximadamente com a altura real dos cards daquela tela.
 function pgFillerCardsHtml(key,actualCount,heightPx=72,extraClass=''){
-  const n=pgFillerCount(key,actualCount);
-  if(!n) return '';
-  return `<div class="pg-filler-card${extraClass?' '+extraClass:''}" aria-hidden="true" style="height:${heightPx}px"></div>`.repeat(n);
+  return '';
 }
 
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}

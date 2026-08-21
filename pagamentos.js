@@ -28,7 +28,7 @@ function switchPayTab(tab) {
     btnAReceber2?.classList.add('active');
     btnPagos?.classList.remove('active');
     btnPagos2?.classList.remove('active');
-    if (viewAReceber) viewAReceber.style.display = 'block';
+    if (viewAReceber) viewAReceber.style.display = 'flex';
     if (viewPagos) viewPagos.style.display = 'none';
     renderPendingInstallments();
   } else {
@@ -37,7 +37,7 @@ function switchPayTab(tab) {
     btnAReceber?.classList.remove('active');
     btnAReceber2?.classList.remove('active');
     if (viewAReceber) viewAReceber.style.display = 'none';
-    if (viewPagos) viewPagos.style.display = 'block';
+    if (viewPagos) viewPagos.style.display = 'flex';
     renderPagamentos();
   }
 

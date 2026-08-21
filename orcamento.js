@@ -1216,6 +1216,7 @@ function calculateFaturarPlan(netTotal, deadline) {
     if (isEntryPaid) {
       payments.push({
         id: inst1Id,
+        installmentId: inst1Id,
         amount: halfVal,
         date: entryDate,
         method: entryMethod,
@@ -1242,6 +1243,7 @@ function calculateFaturarPlan(netTotal, deadline) {
     if (isPaid) {
       payments.push({
         id: instId,
+        installmentId: instId,
         amount: netTotal,
         date: vDate,
         method: method,
@@ -1275,6 +1277,7 @@ function calculateFaturarPlan(netTotal, deadline) {
       if (isEntryPaid) {
         payments.push({
           id: entryInstId,
+          installmentId: entryInstId,
           amount: validEntry,
           date: today(),
           method: entryMethod,

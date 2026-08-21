@@ -329,7 +329,7 @@ let sb=null, projects=[], clients=[], appColumns=[...INIT_COLS], budgets=[], ser
 let globalNotices=[];
 let visibleColumns=INIT_COLS.map(c=>c.id), minimizedColumns=[], colSorts={};
 let notifications=[], appTheme='light', currentView='board';
-let tempSubs=[], tempPayments=[], tempProds=[];
+let tempSubs=[], tempPayments=[], tempProds=[], tempInstallments=[], tempPaymentCondition='';
 let tempOrcItems=[];
 let pinnedCards=new Set(), expandedFin=new Set();
 let openGnIds = new Set();
@@ -513,6 +513,100 @@ function checkAndMigrateLegacyProducts() {
 }
 
 // ══════════════════════════════════════════
+//  FINANCIAL DATA INTEGRITY & RECONCILIATION
+// ══════════════════════════════════════════
+function reconcileProjectFinancials(p) {
+  if (!p) return false;
+  let changed = false;
+
+  // Garante que pagamentos seja um array válido
+  if (typeof p.payments === 'string') {
+    try { p.payments = JSON.parse(p.payments); changed = true; } catch(e) { p.payments = []; changed = true; }
+  }
+  if (!Array.isArray(p.payments)) {
+    p.payments = [];
+  }
+
+  // Recalcula o total pago a partir do array de pagamentos real
+  const calculatedPaid = p.payments.reduce((s, x) => s + parseFloat(x?.amount || 0), 0);
+  if (parseFloat(p.paid || 0) !== calculatedPaid) {
+    p.paid = calculatedPaid;
+    changed = true;
+  }
+
+  // Se o projeto tiver cronograma de parcelas (installments)
+  if (typeof p.installments === 'string') {
+    try { p.installments = JSON.parse(p.installments); changed = true; } catch(e) { p.installments = []; }
+  }
+
+  if (Array.isArray(p.installments) && p.installments.length > 0) {
+    if (p.payments.length === 0 || calculatedPaid <= 0.001) {
+      // Se não há nenhum pagamento registrado, TODAS as parcelas devem estar Pendentes
+      p.installments.forEach(inst => {
+        if (inst && inst.status === 'Pago') {
+          inst.status = 'Pendente';
+          delete inst.paidDate;
+          delete inst.method;
+          changed = true;
+        }
+      });
+    } else {
+      // Há pagamentos registrados: concilia cada parcela com os pagamentos existentes
+      const usedPayIds = new Set();
+
+      p.installments.forEach(inst => {
+        if (!inst) return;
+
+        // Tenta associar com um pagamento existente não utilizado
+        let matchingPay = p.payments.find(pay => pay && !usedPayIds.has(pay.id) && (
+          (pay.installmentId && String(pay.installmentId) === String(inst.id)) ||
+          String(pay.id) === String(inst.id) ||
+          (pay.desc && inst.desc && pay.desc === inst.desc)
+        ));
+
+        if (!matchingPay) {
+          matchingPay = p.payments.find(pay => pay && !usedPayIds.has(pay.id) && Math.abs(parseFloat(pay.amount || 0) - parseFloat(inst.amount || 0)) < 0.01);
+        }
+
+        if (matchingPay) {
+          usedPayIds.add(matchingPay.id);
+          if (inst.status !== 'Pago') {
+            inst.status = 'Pago';
+            inst.paidDate = matchingPay.date || today();
+            inst.method = matchingPay.method || 'Pix';
+            changed = true;
+          }
+        } else {
+          // Parcela sem pagamento correspondente registrado: deve ser Pendente!
+          if (inst.status === 'Pago') {
+            inst.status = 'Pendente';
+            delete inst.paidDate;
+            delete inst.method;
+            changed = true;
+          }
+        }
+      });
+    }
+  }
+
+  return changed;
+}
+
+function reconcileAllProjectsFinancials() {
+  if (!Array.isArray(projects)) return false;
+  let anyChanged = false;
+  projects.forEach(p => {
+    if (reconcileProjectFinancials(p)) {
+      anyChanged = true;
+    }
+  });
+  if (anyChanged) {
+    syncLocal();
+  }
+  return anyChanged;
+}
+
+// ══════════════════════════════════════════
 //  ADMIN AUTHENTICATION & ACCESS GUARD
 // ══════════════════════════════════════════
 function getAdminSession() {
@@ -597,6 +691,7 @@ function setupSupabaseRealtime() {
             budgets = map.budgets || [];
             services = map.services || [];
             checkAndMigrateLegacyProducts();
+            reconcileAllProjectsFinancials();
             syncLocal();
             updateNavAlertBadges();
 
@@ -696,6 +791,7 @@ async function loadData(){
     budgets=map.budgets||[];
     services=map.services||[];
     checkAndMigrateLegacyProducts();
+    reconcileAllProjectsFinancials();
     const cfg=map.config||{};
     appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
     visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
@@ -724,6 +820,7 @@ function loadLocal(){
   budgets=JSON.parse(localStorage.getItem('mavic_budgets')||'[]') || [];
   services=JSON.parse(localStorage.getItem('mavic_services')||'[]') || [];
   checkAndMigrateLegacyProducts();
+  reconcileAllProjectsFinancials();
   const cfg=JSON.parse(localStorage.getItem('mavic_config')||'{}') || {};
   appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
   visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
@@ -910,7 +1007,7 @@ let _confirmCallback=null;
 function showConfirm(message,onConfirm,opts={}){
   const overlay=document.getElementById('confirmOverlay');
   if(!overlay){ onConfirm(); return; } // fallback de segurança, nunca deve cair aqui
-  document.getElementById('confirmTitle').innerHTML=`<i class="bi bi-question-circle"></i> ${opts.title||'Confirmar ação'}`;
+  document.getElementById('confirmTitle').innerHTML=`<i class="${opts.icon||'bi bi-question-circle'}"></i> ${opts.title||'Confirmar ação'}`;
   document.getElementById('confirmMsg').textContent=message;
   const btn=document.getElementById('confirmBtnOk');
   btn.textContent=opts.okText||'Confirmar';
@@ -927,6 +1024,104 @@ document.addEventListener('click',(e)=>{
     const cb=_confirmCallback;
     closeConfirm();
     if(cb) cb();
+  }
+});
+
+// ══════════════════════════════════════════
+//  PROMPT MODAL PADRÃO DO SISTEMA
+// ══════════════════════════════════════════
+(function injectPromptModal(){
+  if(document.getElementById('promptOverlay')) return;
+  const wrap=document.createElement('div');
+  wrap.innerHTML=`<div class="overlay" id="promptOverlay" onclick="if(event.target===this)closePrompt()">
+    <div class="mbox msm" style="max-width:440px">
+      <div class="mhdr">
+        <h5 id="promptTitle" style="color:var(--accent)"><i class="bi bi-pencil-square"></i> Entrada de Dados</h5>
+        <button class="btn-icon btn-sm" onclick="closePrompt()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="mbody" style="padding:14px 18px">
+        <p id="promptMsg" style="font-size:13.5px;color:var(--text2);margin-bottom:12px;line-height:1.4"></p>
+        <div class="fld">
+          <label class="flbl" id="promptInputLabel" style="display:none"></label>
+          <input type="text" class="inp" id="promptInput" style="width:100%;font-size:14px">
+          <div id="promptHelp" style="font-size:11.5px;color:var(--text3);margin-top:4px;display:none"></div>
+        </div>
+      </div>
+      <div class="mftr">
+        <button class="btn btn-ghost" onclick="closePrompt()">Cancelar</button>
+        <button class="btn btn-primary" id="promptBtnOk" style="background:var(--accent);border-color:var(--accent)">Confirmar</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap.firstElementChild);
+})();
+
+let _promptCallback=null;
+function showPrompt(message, onConfirm, opts={}){
+  const overlay=document.getElementById('promptOverlay');
+  if(!overlay){ 
+    const val = prompt(message, opts.defaultValue || '');
+    if(val !== null && onConfirm) onConfirm(val);
+    return;
+  }
+  document.getElementById('promptTitle').innerHTML=`<i class="${opts.icon||'bi bi-pencil-square'}"></i> ${opts.title||'Entrada de Dados'}`;
+  document.getElementById('promptMsg').textContent=message;
+  
+  const inp=document.getElementById('promptInput');
+  inp.value=opts.defaultValue!==undefined?opts.defaultValue:'';
+  inp.placeholder=opts.placeholder||'';
+  inp.type=opts.type||'text';
+  if(opts.inputMode) inp.inputMode=opts.inputMode; else inp.removeAttribute('inputmode');
+
+  const lbl=document.getElementById('promptInputLabel');
+  if(opts.label){ lbl.textContent=opts.label; lbl.style.display='block'; } else lbl.style.display='none';
+
+  const help=document.getElementById('promptHelp');
+  if(opts.helpText){ help.textContent=opts.helpText; help.style.display='block'; } else help.style.display='none';
+
+  if(opts.isCurrency){
+    inp.oninput=function(){ maskCurrencyInput(this); };
+  } else {
+    inp.oninput=null;
+  }
+
+  const btn=document.getElementById('promptBtnOk');
+  btn.textContent=opts.okText||'Confirmar';
+  btn.className=opts.danger?'btn btn-danger':'btn btn-primary';
+  if(!opts.danger) { btn.style.background='var(--accent)'; btn.style.borderColor='var(--accent)'; }
+  else { btn.style.background=''; btn.style.borderColor=''; }
+
+  _promptCallback=onConfirm;
+  overlay.classList.add('open');
+  setTimeout(()=>{ inp.focus(); if(inp.select) inp.select(); }, 100);
+}
+
+function closePrompt(){
+  document.getElementById('promptOverlay')?.classList.remove('open');
+  _promptCallback=null;
+}
+
+document.addEventListener('click',(e)=>{
+  if(e.target && e.target.id==='promptBtnOk'){
+    const val=document.getElementById('promptInput')?.value;
+    const cb=_promptCallback;
+    closePrompt();
+    if(cb) cb(val);
+  }
+});
+
+document.addEventListener('keydown',(e)=>{
+  const overlay=document.getElementById('promptOverlay');
+  if(overlay && overlay.classList.contains('open')){
+    if(e.key==='Enter'){
+      e.preventDefault();
+      const val=document.getElementById('promptInput')?.value;
+      const cb=_promptCallback;
+      closePrompt();
+      if(cb) cb(val);
+    } else if(e.key==='Escape'){
+      closePrompt();
+    }
   }
 });
 

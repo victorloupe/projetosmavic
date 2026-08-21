@@ -112,6 +112,7 @@ function getAllPendingInstallments() {
 
   (projects || []).forEach(p => {
     if (!p || p.archived) return;
+    if (typeof reconcileProjectFinancials === 'function') reconcileProjectFinancials(p);
 
     // Se o projeto tem array de installments configurado
     if (Array.isArray(p.installments) && p.installments.length > 0) {
@@ -132,6 +133,8 @@ function getAllPendingInstallments() {
             timingStatus = 'overdue';
           } else if (daysDiff === 0) {
             timingStatus = 'today';
+          } else if (daysDiff <= 2) {
+            timingStatus = 'soon';
           } else {
             timingStatus = 'upcoming';
           }
@@ -165,6 +168,7 @@ function getAllPendingInstallments() {
 
           if (daysDiff < 0) timingStatus = 'overdue';
           else if (daysDiff === 0) timingStatus = 'today';
+          else if (daysDiff <= 2) timingStatus = 'soon';
           else timingStatus = 'upcoming';
         }
 
@@ -277,6 +281,38 @@ function renderPendingInstallments() {
 
   let list = getAllPendingInstallments();
 
+  // Renderiza o Banner de Alerta se houver parcelas que precisam de atenção
+  const bannerEl = document.getElementById('pendingAlertBanner');
+  if (bannerEl) {
+    const urgentItems = list.filter(x => x.timingStatus === 'overdue' || x.timingStatus === 'today' || x.timingStatus === 'soon');
+    if (urgentItems.length > 0 && !statusFilter) {
+      const overdueCount = urgentItems.filter(x => x.timingStatus === 'overdue').length;
+      const todayCount = urgentItems.filter(x => x.timingStatus === 'today').length;
+      const soonCount = urgentItems.filter(x => x.timingStatus === 'soon').length;
+      
+      let parts = [];
+      if (overdueCount > 0) parts.push(`<strong style="color:var(--red)">${overdueCount} atrasada(s)</strong>`);
+      if (todayCount > 0) parts.push(`<strong style="color:var(--yellow)">${todayCount} vencendo hoje</strong>`);
+      if (soonCount > 0) parts.push(`<strong style="color:#ea580c">${soonCount} a vencer em até 2 dias</strong>`);
+
+      bannerEl.style.display = 'block';
+      bannerEl.innerHTML = `
+        <div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.25);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text)">
+            <i class="bi bi-bell-fill" style="color:#ea580c;font-size:16px"></i>
+            <span>Atenção aos vencimentos: ${parts.join(', ')}.</span>
+          </div>
+          <button class="btn btn-sm btn-ghost" onclick="filterUrgentPending()" style="border:1px solid var(--border);background:var(--surface);font-size:11.5px;padding:3px 10px;cursor:pointer">
+            <i class="bi bi-funnel"></i> Filtrar Atenção
+          </button>
+        </div>
+      `;
+    } else {
+      bannerEl.style.display = 'none';
+      bannerEl.innerHTML = '';
+    }
+  }
+
   if (search) {
     list = list.filter(item => {
       const cli = (item.client || '').toLowerCase();
@@ -293,7 +329,11 @@ function renderPendingInstallments() {
   }
 
   if (statusFilter) {
-    list = list.filter(item => item.timingStatus === statusFilter);
+    if (statusFilter === 'soon') {
+      list = list.filter(item => item.timingStatus === 'soon' || item.timingStatus === 'today' || item.timingStatus === 'overdue');
+    } else {
+      list = list.filter(item => item.timingStatus === statusFilter);
+    }
   }
 
   const pgEl = document.getElementById('pendingPagination');
@@ -330,9 +370,12 @@ function renderPendingInstallments() {
         badgeHtml = `<span class="badge badge-overdue"><i class="bi bi-exclamation-triangle"></i> Atrasado (${d}d) · ${dateFormatted}</span>`;
       } else if (item.timingStatus === 'today') {
         badgeHtml = `<span class="badge badge-today"><i class="bi bi-alarm"></i> Vence Hoje (${dateFormatted})</span>`;
+      } else if (item.timingStatus === 'soon') {
+        const d = item.daysDiff;
+        badgeHtml = `<span class="badge" style="background:rgba(249,115,22,0.15);color:#ea580c;border:1px solid rgba(249,115,22,0.3);font-size:11px;padding:3px 8px;font-weight:600"><i class="bi bi-bell"></i> ${d === 1 ? 'Vence Amanhã' : 'Vence em 2d'} (${dateFormatted})</span>`;
       } else {
         const d = item.daysDiff;
-        badgeHtml = `<span class="badge badge-upcoming"><i class="bi bi-calendar3"></i> ${d === 1 ? 'Amanhã' : 'Em ' + d + 'd'} (${dateFormatted})</span>`;
+        badgeHtml = `<span class="badge badge-upcoming"><i class="bi bi-calendar3"></i> Em ${d}d (${dateFormatted})</span>`;
       }
 
       return `
@@ -342,9 +385,9 @@ function renderPendingInstallments() {
             ${clientName}
           </td>
           <td>
-            <a href="index.html" style="color:var(--text);text-decoration:none;font-weight:600" title="Ver no Kanban">
-              ${projectName}
-            </a>
+            <span role="button" onclick="openProjectFinanceModal('${projId}')" style="cursor:pointer;color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:5px" title="Clique para abrir e gerenciar parcelas / financeiro deste projeto">
+              <i class="bi bi-folder2-open"></i> ${projectName} <i class="bi bi-pencil-square" style="font-size:11px;opacity:0.7"></i>
+            </span>
           </td>
           <td><span style="font-weight:600;color:var(--accent)">${desc}</span></td>
           <td>
@@ -387,6 +430,9 @@ function renderPendingInstallments() {
         badgeHtml = `<span class="badge badge-overdue"><i class="bi bi-exclamation-triangle"></i> Atrasado (${d}d)</span>`;
       } else if (item.timingStatus === 'today') {
         badgeHtml = `<span class="badge badge-today"><i class="bi bi-alarm"></i> Vence Hoje</span>`;
+      } else if (item.timingStatus === 'soon') {
+        const d = item.daysDiff;
+        badgeHtml = `<span class="badge" style="background:rgba(249,115,22,0.15);color:#ea580c;border:1px solid rgba(249,115,22,0.3);font-size:11px;padding:3px 8px;font-weight:600"><i class="bi bi-bell"></i> ${d === 1 ? 'Amanhã' : 'Em 2d'}</span>`;
       } else {
         const d = item.daysDiff;
         badgeHtml = `<span class="badge badge-upcoming"><i class="bi bi-calendar3"></i> Em ${d}d</span>`;
@@ -402,9 +448,9 @@ function renderPendingInstallments() {
             ${badgeHtml}
           </div>
 
-          <div class="pay-card-project">
+          <div class="pay-card-project" onclick="openProjectFinanceModal('${projId}')" style="cursor:pointer" title="Gerenciar financeiro e parcelas deste projeto">
             <i class="bi bi-folder2-open" style="color:var(--accent);margin-right:4px"></i>
-            <strong>${projectName}</strong>
+            <strong style="color:var(--accent)">${projectName}</strong> <i class="bi bi-pencil-square" style="font-size:11.5px;opacity:0.8;margin-left:4px"></i>
           </div>
 
           <div class="pay-card-grid">
@@ -432,6 +478,15 @@ function renderPendingInstallments() {
         </div>
       `;
     }).join('') + pgFillerCardsHtml('pending_pays', pageItems.length, 195);
+  }
+}
+
+function filterUrgentPending() {
+  const st = document.getElementById('fPendingStatus');
+  if (st) {
+    st.value = 'soon';
+    pgReset('pending_pays');
+    renderPendingInstallments();
   }
 }
 
@@ -496,10 +551,18 @@ function openDarBaixaModal(projId, instId) {
 
   document.getElementById('baixaAmount').value = toBRLInputStr(inst.amount);
   document.getElementById('baixaDate').value = today();
-  document.getElementById('baixaMethod').value = 'Pix';
+  
+  const lastMethod = localStorage.getItem('mavic_lastPayMethod') || 'Pix';
+  const methodEl = document.getElementById('baixaMethod');
+  if (methodEl) methodEl.value = lastMethod;
   
   const chkReceipt = document.getElementById('baixaOpenReceipt');
-  if (chkReceipt) chkReceipt.checked = true;
+  if (chkReceipt) chkReceipt.checked = false;
+
+  const chkWhatsApp = document.getElementById('baixaSendWhatsApp');
+  if (chkWhatsApp) {
+    chkWhatsApp.checked = localStorage.getItem('mavic_sendWhatsAppOnBaixa') !== 'false';
+  }
 
   document.getElementById('darBaixaOverlay').classList.add('open');
 }
@@ -518,12 +581,18 @@ function confirmDarBaixa() {
   const date = document.getElementById('baixaDate')?.value || today();
   const method = document.getElementById('baixaMethod')?.value || 'Pix';
   const openReceipt = document.getElementById('baixaOpenReceipt')?.checked;
+  const sendWhatsApp = document.getElementById('baixaSendWhatsApp')?.checked;
 
   if (isNaN(amount) || amount <= 0) return showToast('Valor recebido inválido', 'warning');
   if (!date) return showToast('Informe a data do recebimento', 'warning');
 
+  // Lembra a última forma de pagamento e preferência de WhatsApp
+  localStorage.setItem('mavic_lastPayMethod', method);
+  localStorage.setItem('mavic_sendWhatsAppOnBaixa', sendWhatsApp ? 'true' : 'false');
+
   // Atualiza ou marca a parcela como paga
   let instDesc = 'Parcela';
+  let matchedInstId = null;
   if (Array.isArray(p.installments)) {
     const inst = p.installments.find(x => String(x.id) === String(instId));
     if (inst) {
@@ -531,6 +600,7 @@ function confirmDarBaixa() {
       inst.paidDate = date;
       inst.method = method;
       instDesc = inst.desc;
+      matchedInstId = inst.id;
     }
   }
 
@@ -539,6 +609,7 @@ function confirmDarBaixa() {
   const newPayId = Date.now();
   p.payments.push({
     id: newPayId,
+    installmentId: matchedInstId || instId,
     amount: amount,
     date: date,
     method: method,
@@ -563,10 +634,16 @@ function confirmDarBaixa() {
       downloadReceiptPDFDirect(projId, newPayId);
     }, 400);
   }
+
+  if (sendWhatsApp) {
+    setTimeout(() => {
+      sendPaymentWhatsApp(projId, newPayId);
+    }, openReceipt ? 800 : 250);
+  }
 }
 
 // ══════════════════════════════════════════
-//  WHATSAPP: COBRANÇA DE PARCELA PENDENTE
+//  WHATSAPP: COBRANÇA / LEMBRETE DE PARCELA PENDENTE
 // ══════════════════════════════════════════
 function sendCobrarWhatsApp(projId, instId) {
   const p = (projects || []).find(x => String(x.id) === String(projId));
@@ -590,9 +667,25 @@ function sendCobrarWhatsApp(projId, instId) {
   const dateFormatted = inst.dueDate ? new Date(inst.dueDate + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
   const firstName = (p.client || 'Cliente').split(' ')[0];
 
+  let daysDiff = 0;
+  if (inst.dueDate) {
+    const dDue = new Date(inst.dueDate + 'T12:00:00');
+    const dToday = new Date(today() + 'T12:00:00');
+    daysDiff = Math.round((dDue.getTime() - dToday.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  let introLine = `Passando para informar sobre o pagamento referente ao projeto *${p.name}*:`;
+  if (daysDiff < 0) {
+    introLine = `Passando para lembrar sobre a parcela referente ao projeto *${p.name}*, que venceu em *${dateFormatted}*:`;
+  } else if (daysDiff === 0) {
+    introLine = `Passando para lembrar que a parcela referente ao projeto *${p.name}* vence hoje (*${dateFormatted}*):`;
+  } else if (daysDiff <= 2) {
+    introLine = `Passando para lembrar que a parcela referente ao projeto *${p.name}* vencerá em breve (${daysDiff === 1 ? 'amanhã' : 'em 2 dias'}, *${dateFormatted}*):`;
+  }
+
   const msg = `Olá, *${firstName}*! Tudo bem?
 
-Passando para informar sobre o pagamento referente ao projeto *${p.name}*:
+${introLine}
 
 📌 *Referente a:* ${descStr}
 💰 *Valor:* ${amountStr}
@@ -713,7 +806,11 @@ function renderPagamentos() {
             <span class="kcard-avatar" style="background:${getClientColor(clientName)};display:inline-flex;margin-right:8px;vertical-align:middle;width:24px;height:24px;font-size:10px">${getInitials(clientName)}</span>
             ${clientName}
           </td>
-          <td>${projectName}</td>
+          <td>
+            <span role="button" onclick="openProjectFinanceModal('${projId}')" style="cursor:pointer;color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:5px" title="Clique para ver o financeiro e parcelas deste projeto">
+              <i class="bi bi-folder2-open"></i> ${projectName} <i class="bi bi-pencil-square" style="font-size:11px;opacity:0.7"></i>
+            </span>
+          </td>
           <td><i class="bi bi-calendar3"></i> ${formattedDate}</td>
           <td><span class="badge" style="background:var(--surface2);color:var(--text2);font-size:11px;font-weight:600;border:1px solid var(--border)">${method}</span></td>
           <td style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;color:var(--green)">+${fmt(amountVal)}</td>
@@ -755,9 +852,9 @@ function renderPagamentos() {
             <span class="badge" style="background:var(--surface2);color:var(--text2);font-size:11px;font-weight:600;border:1px solid var(--border)">${method}</span>
           </div>
 
-          <div class="pay-card-project">
+          <div class="pay-card-project" onclick="openProjectFinanceModal('${projId}')" style="cursor:pointer" title="Gerenciar financeiro do projeto">
             <i class="bi bi-folder2-open" style="color:var(--accent);margin-right:4px"></i>
-            <strong>${projectName}</strong>
+            <strong style="color:var(--accent)">${projectName}</strong> <i class="bi bi-pencil-square" style="font-size:11.5px;opacity:0.8;margin-left:4px"></i>
           </div>
 
           <div class="pay-card-grid">
@@ -791,13 +888,42 @@ function deletePaymentDirect(projId, payId) {
   showConfirm('Deseja excluir este pagamento definitivamente?', () => {
     const p = (projects || []).find(x => String(x.id) === String(projId));
     if (p) {
+      const payToDelete = (p.payments || []).find(pay => String(pay.id) === String(payId));
+
+      // Se o projeto possuir parcelas (installments), reabre a parcela correspondente para 'Pendente'
+      if (Array.isArray(p.installments) && payToDelete) {
+        let inst = null;
+        if (payToDelete.installmentId) {
+          inst = p.installments.find(x => String(x.id) === String(payToDelete.installmentId));
+        }
+        if (!inst) {
+          inst = p.installments.find(x => String(x.id) === String(payToDelete.id));
+        }
+        if (!inst && payToDelete.desc) {
+          inst = p.installments.find(x => x.desc === payToDelete.desc && x.status === 'Pago');
+        }
+        if (!inst) {
+          inst = p.installments.find(x => x.status === 'Pago' && Math.abs(parseFloat(x.amount || 0) - parseFloat(payToDelete.amount || 0)) < 0.01)
+              || p.installments.slice().reverse().find(x => x.status === 'Pago');
+        }
+
+        if (inst) {
+          inst.status = 'Pendente';
+          delete inst.paidDate;
+          delete inst.method;
+        }
+      }
+
       p.payments = (p.payments || []).filter(pay => String(pay.id) !== String(payId));
       p.paid = p.payments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
       scheduleSync();
       updatePayKPIs();
+      updateClientFilter();
+      updatePendingClientFilter();
+      updateYearFilter();
       renderPagamentos();
       renderPendingInstallments();
-      showToast('Pagamento excluído!', 'info');
+      showToast('Pagamento excluído e parcela reaberta em "A Receber"!', 'info');
     }
   });
 }
@@ -814,6 +940,11 @@ function openAddPaymentDirectModal() {
   document.getElementById('directPayProject').innerHTML = '<option value="">Selecione o cliente primeiro…</option>';
   document.getElementById('directPayAmount').value = '';
   document.getElementById('directPayDate').value = today();
+  
+  const lastMethod = localStorage.getItem('mavic_lastPayMethod') || 'Pix';
+  const methodEl = document.getElementById('directPayMethod');
+  if (methodEl) methodEl.value = lastMethod;
+
   const newMode = document.getElementById('directPayNewMode');
   if (newMode) newMode.checked = false;
   const newClient = document.getElementById('directPayNewClient'); if (newClient) newClient.value = '';
@@ -924,6 +1055,7 @@ function saveDirectPayment() {
     }
 
     const finalCol = (appColumns || []).find(c => isHiddenColumn(c.id)) || (appColumns && appColumns.length ? appColumns[appColumns.length - 1] : { id: 'Finalizado' });
+    const instId = now + 2;
     p = {
       id: now + 1,
       name: projectName,
@@ -933,7 +1065,7 @@ function saveDirectPayment() {
       payments: [],
       paid: 0,
       installments: [{
-        id: now + 2,
+        id: instId,
         number: 1,
         desc: 'Pagamento Único',
         amount: amount,
@@ -962,7 +1094,23 @@ function saveDirectPayment() {
   }
 
   if (!p.payments || !Array.isArray(p.payments)) p.payments = [];
-  p.payments.push({ id: Date.now() + 2, amount, date, method, desc: 'Pagamento Avulso' });
+  let matchedInstId = null;
+  let instDesc = 'Pagamento Avulso';
+  if (isNew) {
+    matchedInstId = now + 2;
+    instDesc = 'Pagamento Único';
+  } else if (Array.isArray(p.installments) && p.installments.length > 0) {
+    const pendingInst = p.installments.find(x => x.status !== 'Pago' && Math.abs(parseFloat(x.amount || 0) - amount) < 0.01)
+                     || p.installments.find(x => x.status !== 'Pago');
+    if (pendingInst) {
+      pendingInst.status = 'Pago';
+      pendingInst.paidDate = date;
+      pendingInst.method = method;
+      matchedInstId = pendingInst.id;
+      instDesc = pendingInst.desc;
+    }
+  }
+  p.payments.push({ id: Date.now() + 2, installmentId: matchedInstId, amount, date, method, desc: instDesc });
   p.paid = p.payments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
   scheduleSync();
   updatePayKPIs();
@@ -1048,7 +1196,25 @@ function sendPaymentWhatsApp(projId, payId) {
   }
 
   const firstName = clientName ? clientName.split(' ')[0] : 'Cliente';
-  const msg = `Olá, *${firstName}*!\n\nConfirmamos o recebimento do pagamento no valor de *${fmt(pay.amount)}* realizado em *${formattedDate}* referente ao projeto *${p.name || 'Projeto'}*.\n\nAgradecemos pela parceria!`;
+  const totalVal = parseFloat(p.value || 0);
+  const totalPaid = (p.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const rest = Math.max(0, totalVal - totalPaid);
+
+  let statusLine = rest <= 0.01 
+    ? `✨ *Status:* Projeto 100% quitado!` 
+    : `⏳ *Saldo Restante:* ${fmt(rest)}`;
+
+  const msg = `Olá, *${firstName}*! Tudo bem?
+
+Confirmamos com sucesso o recebimento do pagamento:
+
+📁 *Projeto:* ${p.name || 'Projeto'}
+💰 *Valor Recebido:* ${fmt(pay.amount)}
+📅 *Data:* ${formattedDate}
+💳 *Forma:* ${pay.method || 'Pix'}
+${statusLine}
+
+Muito obrigado pela parceria e confiança! 🤝`;
 
   const url = `https://api.whatsapp.com/send?phone=${phone ? '55' + phone : ''}&text=${encodeURIComponent(msg)}`;
   window.open(url, '_blank');
@@ -1219,3 +1385,570 @@ function valorPorExtenso(v) {
   }
   return textoReais || textoCentavos || 'zero reais';
 }
+
+// ══════════════════════════════════════════
+//  MODAL: GESTÃO FINANCEIRA E PARCELAS DO PROJETO
+// ══════════════════════════════════════════
+let currentPfProjId = null;
+
+function openProjectFinanceModal(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return showToast('Projeto não encontrado', 'error');
+
+  currentPfProjId = projId;
+  renderProjectFinanceModalContent(projId);
+  const overlay = document.getElementById('projFinanceOverlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeProjectFinanceModal() {
+  currentPfProjId = null;
+  const overlay = document.getElementById('projFinanceOverlay');
+  if (overlay) overlay.classList.remove('open');
+  updatePayKPIs();
+  updateClientFilter();
+  updatePendingClientFilter();
+  renderPagamentos();
+  renderPendingInstallments();
+}
+
+function renderProjectFinanceModalContent(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return;
+
+  if (typeof reconcileProjectFinancials === 'function') reconcileProjectFinancials(p);
+
+  const titleEl = document.getElementById('pfModalProjName');
+  const clientEl = document.getElementById('pfModalClientName');
+  const bodyEl = document.getElementById('pfModalBody');
+
+  if (titleEl) titleEl.innerHTML = `<i class="bi bi-folder2-open" style="color:var(--accent)"></i> ${p.name || 'Projeto'}`;
+  if (clientEl) clientEl.innerHTML = `Cliente: <strong style="color:var(--text)">${p.client || 'Sem cliente'}</strong> · Etapa: <span class="badge" style="font-size:11px;background:var(--surface2)">${p.column || 'Briefing'}</span>`;
+
+  const totalContract = parseFloat(p.value || 0);
+  const pays = Array.isArray(p.payments) ? p.payments : [];
+  const totalPaid = pays.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const totalPending = Math.max(0, totalContract - totalPaid);
+  const insts = Array.isArray(p.installments) ? p.installments : [];
+
+  let html = `
+    <!-- CARDS DE RESUMO DO PROJETO -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:10px">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+          <span>Contrato Total</span>
+          <button class="btn btn-ghost btn-sm" onclick="promptEditContractValue('${projId}')" style="padding:1px 6px;font-size:11px" title="Alterar valor total do contrato"><i class="bi bi-pencil"></i> Editar</button>
+        </div>
+        <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:var(--text)">${fmt(totalContract)}</div>
+      </div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:4px">Total Recebido</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:var(--green)">+${fmt(totalPaid)}</div>
+      </div>
+
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:700;color:${totalPending > 0 ? 'var(--yellow)' : 'var(--text3)'};text-transform:uppercase;margin-bottom:4px">Saldo a Receber</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:${totalPending > 0 ? 'var(--yellow)' : 'var(--text3)'}">${fmt(totalPending)}</div>
+      </div>
+    </div>
+
+    <!-- AÇÕES RÁPIDAS & REORGANIZAÇÃO -->
+    <div style="background:rgba(var(--accent-rgb, 196,145,92), 0.08);border:1px dashed var(--accent);border-radius:12px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+        <i class="bi bi-lightning-charge-fill"></i> Ações Rápidas & Reconfiguração de Parcelamento:
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${totalPending > 0 ? `
+          <button class="btn btn-sm btn-primary" onclick="quickPayoffAll('${projId}')" style="background:var(--green);border-color:var(--green);padding:6px 12px;font-size:12px" title="Quitar todo o saldo pendente de uma só vez">
+            <i class="bi bi-check2-all"></i> Quitar Saldo Total (${fmt(totalPending)})
+          </button>
+          <button class="btn btn-sm btn-ghost" onclick="unifyPendingInstallments('${projId}')" style="border:1px solid var(--border);padding:6px 12px;font-size:12px;background:var(--surface)" title="Juntar todas as parcelas pendentes em 1 parcela única à vista">
+            <i class="bi bi-layers"></i> Unificar em 1 Parcela Única À Vista
+          </button>
+          <button class="btn btn-sm btn-ghost" onclick="openReparcelarModal('${projId}')" style="border:1px solid var(--border);padding:6px 12px;font-size:12px;background:var(--surface)" title="Redividir o saldo pendente em várias parcelas iguais">
+            <i class="bi bi-grid-3x2-gap"></i> Re-dividir Saldo
+          </button>
+        ` : `
+          <span style="font-size:12px;color:var(--green);font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="bi bi-check-circle-fill"></i> Este projeto está 100% quitado!</span>
+        `}
+        <button class="btn btn-sm btn-ghost" onclick="openAddNewInstallmentForm('${projId}')" style="border:1px solid var(--border);padding:6px 12px;font-size:12px;background:var(--surface);margin-left:auto">
+          <i class="bi bi-plus-lg"></i> Nova Parcela
+        </button>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 1: CRONOGRAMA DE PARCELAS -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <span><i class="bi bi-calendar-event"></i> Cronograma de Parcelas (${insts.length})</span>
+        <span style="font-size:11px;color:var(--text3);font-weight:400">Edite descrições, vencimentos e valores diretamente</span>
+      </div>
+
+      ${insts.length === 0 ? `
+        <div style="text-align:center;padding:18px;color:var(--text3);font-size:13px">
+          Nenhuma parcela configurada neste projeto.<br>
+          <button class="btn btn-sm btn-primary" onclick="initProjectInstallments('${projId}')" style="margin-top:8px">
+            <i class="bi bi-magic"></i> Gerar Cronograma Automático
+          </button>
+        </div>
+      ` : `
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${insts.map((inst, idx) => {
+            const isPaid = inst.status === 'Pago';
+            return `
+              <div style="display:flex;align-items:flex-end;gap:8px;padding:8px 10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);flex-wrap:wrap">
+                <div style="flex:1;min-width:150px">
+                  <span style="font-size:10px;color:var(--text3);display:block;font-weight:600;margin-bottom:2px">Descrição:</span>
+                  <input type="text" class="inp inp-sm" style="width:100%;font-size:12px;font-weight:600;height:28px;padding:2px 8px;border-radius:6px" value="${inst.desc || ''}" onchange="updateInstField('${projId}', '${inst.id}', 'desc', this.value)">
+                </div>
+
+                <div style="width:125px;min-width:110px">
+                  <span style="font-size:10px;color:var(--text3);display:block;font-weight:600;margin-bottom:2px">Vencimento:</span>
+                  <input type="date" class="inp inp-sm" style="width:100%;font-size:11.5px;height:28px;padding:2px 6px;border-radius:6px" value="${inst.dueDate || ''}" onchange="updateInstField('${projId}', '${inst.id}', 'dueDate', this.value)">
+                </div>
+
+                <div style="width:110px;min-width:95px">
+                  <span style="font-size:10px;color:var(--text3);display:block;font-weight:600;margin-bottom:2px">Valor (R$):</span>
+                  <input type="text" inputmode="decimal" class="inp inp-sm" style="width:100%;font-size:12px;font-family:'Outfit',sans-serif;font-weight:700;height:28px;padding:2px 8px;border-radius:6px" value="${toBRLInputStr(inst.amount)}" oninput="maskCurrencyInput(this)" onchange="updateInstField('${projId}', '${inst.id}', 'amount', this.value)">
+                </div>
+
+                <div style="width:90px;text-align:center">
+                  <span style="font-size:10px;color:var(--text3);display:block;font-weight:600;margin-bottom:2px">Status:</span>
+                  <div style="height:28px;display:flex;align-items:center;justify-content:center">
+                    ${isPaid 
+                      ? `<span class="badge" style="background:rgba(22,163,74,0.15);color:var(--green);font-size:11px;padding:0 8px;height:26px;display:inline-flex;align-items:center;gap:3px;font-weight:600;border-radius:6px"><i class="bi bi-check2"></i> Pago</span>` 
+                      : `<span class="badge" style="background:rgba(234,179,8,0.15);color:var(--yellow);font-size:11px;padding:0 8px;height:26px;display:inline-flex;align-items:center;gap:3px;font-weight:600;border-radius:6px"><i class="bi bi-clock"></i> Pendente</span>`
+                    }
+                  </div>
+                </div>
+
+                <div style="display:flex;gap:5px;align-items:center;margin-left:auto;height:28px">
+                  ${!isPaid ? `
+                    <button class="btn btn-primary btn-sm" onclick="openDarBaixaModal('${projId}', '${inst.id}')" style="height:26px;padding:0 9px;background:var(--green);border-color:var(--green);font-size:11.5px;display:inline-flex;align-items:center;gap:3px;border-radius:6px;font-weight:600" title="Confirmar Recebimento">
+                      <i class="bi bi-check2"></i> Baixa
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="deleteProjectInstallment('${projId}', '${inst.id}')" style="height:26px;width:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:var(--red);border:1px solid rgba(239,68,68,0.25);background:var(--red-bg);border-radius:6px" title="Excluir Parcela">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  ` : `
+                    <button class="btn btn-ghost btn-sm" onclick="reopenProjectInstallment('${projId}', '${inst.id}')" style="height:26px;padding:0 9px;font-size:11.5px;color:var(--yellow);border:1px solid var(--border);display:inline-flex;align-items:center;gap:3px;border-radius:6px" title="Reabrir / Estornar Parcela">
+                      <i class="bi bi-arrow-counterclockwise"></i> Reabrir
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `}
+    </div>
+
+    <!-- SEÇÃO 2: HISTÓRICO DE PAGAMENTOS REALIZADOS -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <span><i class="bi bi-receipt"></i> Pagamentos Registrados (${pays.length})</span>
+        <button class="btn btn-sm btn-ghost" onclick="toggleAddQuickPayForm()" style="padding:3px 8px;font-size:11.5px;border:1px solid var(--border)">
+          <i class="bi bi-plus-lg"></i> Registrar Pagamento
+        </button>
+      </div>
+
+      <!-- FORMULÁRIO RÁPIDO PARA ADICIONAR PAGAMENTO DIRETO NO MODAL -->
+      <div id="pfAddPayBox" style="display:none;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">Novo Pagamento para este Projeto:</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;align-items:flex-end">
+          <div>
+            <label style="font-size:10.5px;color:var(--text3);display:block">Valor (R$) *</label>
+            <input type="text" inputmode="decimal" class="inp inp-sm" id="pfNewPayAmount" placeholder="R$ 0,00" oninput="maskCurrencyInput(this)">
+          </div>
+          <div>
+            <label style="font-size:10.5px;color:var(--text3);display:block">Data *</label>
+            <input type="date" class="inp inp-sm" id="pfNewPayDate" value="${today()}">
+          </div>
+          <div>
+            <label style="font-size:10.5px;color:var(--text3);display:block">Forma</label>
+            <select class="inp inp-sm" id="pfNewPayMethod">
+              <option value="Pix">Pix</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Cartão">Cartão</option>
+              <option value="Transferência">Transferência</option>
+              <option value="Boleto">Boleto</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn btn-primary btn-sm" onclick="savePfDirectPayment('${projId}')" style="background:var(--green);border-color:var(--green);padding:5px 10px">
+              <i class="bi bi-check2"></i> Salvar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      ${pays.length === 0 ? `
+        <div style="text-align:center;padding:14px;color:var(--text3);font-size:12.5px">Nenhum pagamento registrado para este projeto ainda.</div>
+      ` : `
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${pays.map(pay => {
+            const rawDate = pay.date || '';
+            let formattedDate = '—';
+            if (rawDate) {
+              const parsed = new Date(rawDate + (String(rawDate).includes('T') ? '' : 'T12:00:00'));
+              formattedDate = isNaN(parsed.getTime()) ? rawDate : parsed.toLocaleDateString('pt-BR');
+            }
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">
+                <div>
+                  <div style="font-size:13px;font-weight:700;font-family:'Outfit',sans-serif;color:var(--green)">
+                    + ${fmt(pay.amount)} <span style="font-size:11.5px;color:var(--text3);font-weight:400;font-family:inherit">· ${formattedDate} · ${pay.method || 'Pix'}</span>
+                  </div>
+                  <div style="font-size:11.5px;color:var(--text2)">${pay.desc || 'Pagamento'}</div>
+                </div>
+                <div style="display:flex;gap:4px">
+                  <button class="btn btn-ghost btn-sm" onclick="downloadReceiptPDFDirect('${projId}', '${pay.id}')" style="padding:4px 8px;color:var(--red)" title="Visualizar PDF"><i class="bi bi-file-pdf"></i></button>
+                  <button class="btn btn-danger btn-sm" onclick="deletePaymentDirect('${projId}', '${pay.id}');setTimeout(()=>renderProjectFinanceModalContent('${projId}'),150)" style="padding:4px 8px" title="Excluir Pagamento"><i class="bi bi-trash"></i></button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `}
+    </div>
+  `;
+
+  if (bodyEl) bodyEl.innerHTML = html;
+}
+
+function promptEditContractValue(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return;
+  const currentVal = parseFloat(p.value || 0);
+
+  showPrompt('Informe o novo valor total contratado para este projeto:', (rawInput) => {
+    if (rawInput === null || rawInput === undefined || String(rawInput).trim() === '') return;
+    const newVal = parseCurrencyInput(rawInput);
+    if (isNaN(newVal) || newVal < 0) return showToast('Valor inválido', 'warning');
+
+    p.value = newVal;
+    reconcileProjectFinancials(p);
+    scheduleSync();
+    updatePayKPIs();
+    renderPagamentos();
+    renderPendingInstallments();
+    renderProjectFinanceModalContent(projId);
+    showToast(`Valor do contrato atualizado para ${fmt(newVal)}!`, 'success');
+  }, {
+    title: 'Alterar Valor do Contrato',
+    icon: 'bi bi-cash-stack',
+    label: 'Novo Valor do Contrato (R$)',
+    defaultValue: toBRLInputStr(currentVal),
+    isCurrency: true,
+    inputMode: 'decimal',
+    okText: 'Salvar Valor'
+  });
+}
+
+function quickPayoffAll(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return;
+  const totalContract = parseFloat(p.value || 0);
+  const paid = (p.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const pending = Math.max(0, totalContract - paid);
+  if (pending <= 0) return showToast('Este projeto já está 100% quitado!', 'info');
+
+  const lastMethod = localStorage.getItem('mavic_lastPayMethod') || 'Pix';
+
+  showConfirm(`Confirmar quitação integral no valor de ${fmt(pending)} via ${lastMethod}?`, () => {
+    const payDate = today();
+    const newPayId = Date.now();
+    if (!Array.isArray(p.payments)) p.payments = [];
+    p.payments.push({
+      id: newPayId,
+      amount: pending,
+      date: payDate,
+      method: lastMethod,
+      desc: 'Quitação Integral'
+    });
+    p.paid = p.payments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+
+    if (Array.isArray(p.installments) && p.installments.length > 0) {
+      p.installments.forEach(inst => {
+        if (inst.status !== 'Pago') {
+          inst.status = 'Pago';
+          inst.paidDate = payDate;
+          inst.method = lastMethod;
+        }
+      });
+    } else {
+      p.installments = [{
+        id: newPayId,
+        number: 1,
+        desc: 'Pagamento Único À Vista',
+        amount: totalContract,
+        dueDate: payDate,
+        status: 'Pago',
+        paidDate: payDate,
+        method: lastMethod
+      }];
+    }
+
+    scheduleSync();
+    updatePayKPIs();
+    renderPagamentos();
+    renderPendingInstallments();
+    renderProjectFinanceModalContent(projId);
+    showToast(`Projeto quitado com sucesso no valor de ${fmt(pending)}!`, 'success');
+
+    // Opção de enviar WhatsApp de quitação
+    setTimeout(() => {
+      showConfirm(`Deseja enviar o comprovante de quitação no WhatsApp do cliente?`, () => {
+        sendPaymentWhatsApp(projId, newPayId);
+      }, {
+        title: 'Enviar Confirmação WhatsApp',
+        icon: 'bi bi-whatsapp',
+        okText: 'Enviar WhatsApp',
+        danger: false
+      });
+    }, 450);
+  }, {
+    title: 'Confirmar Quitação Integral',
+    icon: 'bi bi-check2-all',
+    okText: 'Confirmar Quitação',
+    danger: false
+  });
+}
+
+function unifyPendingInstallments(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return;
+  const totalContract = parseFloat(p.value || 0);
+  const paid = (p.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const pending = Math.max(0, totalContract - paid);
+  if (pending <= 0) return showToast('Não há saldo pendente para unificar.', 'info');
+
+  showConfirm(`Deseja unificar todas as parcelas pendentes em 1 única parcela à vista de ${fmt(pending)}?`, () => {
+    const paidInsts = (p.installments || []).filter(inst => inst.status === 'Pago');
+    paidInsts.push({
+      id: Date.now(),
+      number: paidInsts.length + 1,
+      desc: 'Pagamento Único À Vista',
+      amount: pending,
+      dueDate: today(),
+      status: 'Pendente'
+    });
+    p.installments = paidInsts;
+
+    scheduleSync();
+    updatePayKPIs();
+    renderPagamentos();
+    renderPendingInstallments();
+    renderProjectFinanceModalContent(projId);
+    showToast('Parcelas unificadas em 1 única parcela à vista!', 'success');
+  });
+}
+
+function openReparcelarModal(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return;
+  const totalContract = parseFloat(p.value || 0);
+  const paid = (p.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const pending = Math.max(0, totalContract - paid);
+  if (pending <= 0) return showToast('Não há saldo pendente para re-dividir.', 'info');
+
+  showPrompt(`O saldo atual em aberto é de ${fmt(pending)}. Em quantas parcelas deseja dividir?`, (countStr) => {
+    if (!countStr) return;
+    const count = parseInt(countStr, 10);
+    if (isNaN(count) || count <= 0 || count > 36) return showToast('Número de parcelas inválido (informe de 1 a 36)', 'warning');
+
+    const paidInsts = (p.installments || []).filter(inst => inst.status === 'Pago');
+    const perParc = Math.round((pending / count) * 100) / 100;
+    let accum = 0;
+    let runningId = Date.now();
+
+    for (let i = 1; i <= count; i++) {
+      const pVal = (i === count) ? Math.round((pending - accum) * 100) / 100 : perParc;
+      accum += pVal;
+      const pDate = addDays(today(), (i - 1) * 30);
+      paidInsts.push({
+        id: runningId++,
+        number: paidInsts.length + 1,
+        desc: count === 1 ? 'Saldo À Vista' : `Parcela ${i}/${count}`,
+        amount: pVal,
+        dueDate: pDate,
+        status: 'Pendente'
+      });
+    }
+
+    p.installments = paidInsts;
+    scheduleSync();
+    updatePayKPIs();
+    renderPagamentos();
+    renderPendingInstallments();
+    renderProjectFinanceModalContent(projId);
+    showToast(`Saldo redividido em ${count}x com sucesso!`, 'success');
+  }, {
+    title: 'Re-dividir Saldo em Parcelas',
+    icon: 'bi bi-grid-3x2-gap',
+    label: 'Quantidade de Parcelas (ex: 2, 3, 4)',
+    defaultValue: '2',
+    inputMode: 'numeric',
+    helpText: 'O sistema gerará as parcelas (a cada 30 dias) e dividirá os valores automaticamente.',
+    okText: 'Re-dividir'
+  });
+}
+
+function openAddNewInstallmentForm(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return;
+  if (!Array.isArray(p.installments)) p.installments = [];
+
+  const newId = Date.now();
+  p.installments.push({
+    id: newId,
+    number: p.installments.length + 1,
+    desc: `Parcela ${p.installments.length + 1}`,
+    amount: 0,
+    dueDate: today(),
+    status: 'Pendente'
+  });
+
+  scheduleSync();
+  renderProjectFinanceModalContent(projId);
+  showToast('Nova parcela adicionada! Ajuste a descrição, vencimento e valor.', 'info');
+}
+
+function initProjectInstallments(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return;
+  const total = parseFloat(p.value || 0);
+  const half = Math.round((total / 2) * 100) / 100;
+  const rest = Math.round((total - half) * 100) / 100;
+  const now = Date.now();
+
+  p.installments = [
+    { id: now, number: 1, desc: 'Entrada (50%)', amount: half, dueDate: today(), status: 'Pendente' },
+    { id: now + 1, number: 2, desc: 'Saldo na Entrega (50%)', amount: rest, dueDate: addDays(today(), 15), status: 'Pendente' }
+  ];
+
+  reconcileProjectFinancials(p);
+  scheduleSync();
+  renderProjectFinanceModalContent(projId);
+  renderPendingInstallments();
+  showToast('Cronograma gerado com sucesso!', 'success');
+}
+
+function updateInstField(projId, instId, field, value) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p || !Array.isArray(p.installments)) return;
+  const inst = p.installments.find(x => String(x.id) === String(instId));
+  if (!inst) return;
+
+  if (field === 'desc') {
+    inst.desc = String(value || '').trim() || 'Parcela';
+  } else if (field === 'dueDate') {
+    inst.dueDate = value || today();
+  } else if (field === 'amount') {
+    const val = parseCurrencyInput(value);
+    if (!isNaN(val) && val >= 0) inst.amount = val;
+  }
+
+  reconcileProjectFinancials(p);
+  scheduleSync();
+  updatePayKPIs();
+  renderPagamentos();
+  renderPendingInstallments();
+  renderProjectFinanceModalContent(projId);
+}
+
+function deleteProjectInstallment(projId, instId) {
+  showConfirm('Deseja realmente excluir esta parcela do cronograma?', () => {
+    const p = (projects || []).find(x => String(x.id) === String(projId));
+    if (!p || !Array.isArray(p.installments)) return;
+
+    p.installments = p.installments.filter(x => String(x.id) !== String(instId));
+    reconcileProjectFinancials(p);
+    scheduleSync();
+    updatePayKPIs();
+    renderPagamentos();
+    renderPendingInstallments();
+    renderProjectFinanceModalContent(projId);
+    showToast('Parcela removida!', 'info');
+  });
+}
+
+function reopenProjectInstallment(projId, instId) {
+  showConfirm('Deseja reabrir esta parcela como Pendente (estornando a quitação)?', () => {
+    const p = (projects || []).find(x => String(x.id) === String(projId));
+    if (!p || !Array.isArray(p.installments)) return;
+    const inst = p.installments.find(x => String(x.id) === String(instId));
+    if (!inst) return;
+
+    inst.status = 'Pendente';
+    delete inst.paidDate;
+    delete inst.method;
+
+    // Remove o pagamento correspondente se houver
+    if (Array.isArray(p.payments)) {
+      const matchIdx = p.payments.findIndex(pay => 
+        (pay.installmentId && String(pay.installmentId) === String(inst.id)) ||
+        String(pay.id) === String(inst.id) ||
+        (pay.desc && inst.desc && pay.desc === inst.desc)
+      );
+      if (matchIdx > -1) {
+        p.payments.splice(matchIdx, 1);
+      }
+      p.paid = p.payments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+    }
+
+    scheduleSync();
+    updatePayKPIs();
+    renderPagamentos();
+    renderPendingInstallments();
+    renderProjectFinanceModalContent(projId);
+    showToast('Parcela reaberta como Pendente!', 'info');
+  });
+}
+
+function toggleAddQuickPayForm() {
+  const box = document.getElementById('pfAddPayBox');
+  if (box) {
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+function savePfDirectPayment(projId) {
+  const p = (projects || []).find(x => String(x.id) === String(projId));
+  if (!p) return;
+
+  const amount = parseCurrencyInput(document.getElementById('pfNewPayAmount')?.value || '0');
+  const date = document.getElementById('pfNewPayDate')?.value || today();
+  const method = document.getElementById('pfNewPayMethod')?.value || 'Pix';
+
+  if (isNaN(amount) || amount <= 0) return showToast('Valor recebido inválido', 'warning');
+
+  if (!Array.isArray(p.payments)) p.payments = [];
+  const newPayId = Date.now();
+  
+  let matchedInstId = null;
+  let instDesc = 'Pagamento Avulso';
+  if (Array.isArray(p.installments) && p.installments.length > 0) {
+    const pendingInst = p.installments.find(x => x.status !== 'Pago' && Math.abs(parseFloat(x.amount || 0) - amount) < 0.01)
+                     || p.installments.find(x => x.status !== 'Pago');
+    if (pendingInst) {
+      pendingInst.status = 'Pago';
+      pendingInst.paidDate = date;
+      pendingInst.method = method;
+      matchedInstId = pendingInst.id;
+      instDesc = pendingInst.desc;
+    }
+  }
+
+  p.payments.push({ id: newPayId, installmentId: matchedInstId, amount, date, method, desc: instDesc });
+  p.paid = p.payments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+
+  scheduleSync();
+  updatePayKPIs();
+  renderPagamentos();
+  renderPendingInstallments();
+  renderProjectFinanceModalContent(projId);
+  showToast(`Pagamento de ${fmt(amount)} registrado com sucesso!`, 'success');
+}
+

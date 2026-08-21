@@ -383,6 +383,7 @@ function openProjectModal(id=null){
     document.getElementById('projCol').value=p.column;
     document.getElementById('projDate').value=p.date||'';
     document.getElementById('projNote').value=p.note||'';
+    if (typeof reconcileProjectFinancials === 'function') reconcileProjectFinancials(p);
     tempSubs=[...(p.subtasks||[])];
     tempPayments=[...(p.payments||[])];
     tempProds=[...(p.products||[])];
@@ -609,10 +610,48 @@ function addPayment(){
   const amount=parseCurrencyInput(document.getElementById('newPayAmount').value),date=document.getElementById('newPayDate').value;
   const method=document.getElementById('newPayMethod')?.value||'Pix';
   if(isNaN(amount)||amount<=0||!date)return showToast('Preencha valores corretos','warning');
-  tempPayments.push({id:Date.now(),amount,date,method});
+
+  let matchedInstId = null;
+  let instDesc = 'Pagamento';
+  if (tempInstallments && tempInstallments.length > 0) {
+    const pendingInst = tempInstallments.find(x => x.status !== 'Pago' && Math.abs(parseFloat(x.amount || 0) - amount) < 0.01)
+                     || tempInstallments.find(x => x.status !== 'Pago');
+    if (pendingInst) {
+      pendingInst.status = 'Pago';
+      pendingInst.paidDate = date;
+      pendingInst.method = method;
+      matchedInstId = pendingInst.id;
+      instDesc = pendingInst.desc;
+    }
+  }
+  tempPayments.push({id:Date.now(), installmentId: matchedInstId, amount, date, method, desc: instDesc});
   document.getElementById('newPayAmount').value='';renderPaymentsModal();
 }
-function delPayment(id){tempPayments=tempPayments.filter(x=>x.id!==id);renderPaymentsModal();}
+function delPayment(id){
+  const payToDelete = tempPayments.find(x => x.id === id);
+  if (tempInstallments && tempInstallments.length > 0 && payToDelete) {
+    let inst = null;
+    if (payToDelete.installmentId) {
+      inst = tempInstallments.find(x => String(x.id) === String(payToDelete.installmentId));
+    }
+    if (!inst) {
+      inst = tempInstallments.find(x => String(x.id) === String(payToDelete.id));
+    }
+    if (!inst && payToDelete.desc) {
+      inst = tempInstallments.find(x => x.desc === payToDelete.desc && x.status === 'Pago');
+    }
+    if (!inst) {
+      inst = tempInstallments.find(x => x.status === 'Pago' && Math.abs(parseFloat(x.amount || 0) - parseFloat(payToDelete.amount || 0)) < 0.01)
+          || tempInstallments.slice().reverse().find(x => x.status === 'Pago');
+    }
+    if (inst) {
+      inst.status = 'Pendente';
+      delete inst.paidDate;
+      delete inst.method;
+    }
+  }
+  tempPayments=tempPayments.filter(x=>x.id!==id);renderPaymentsModal();
+}
 function renderPaymentsModal(){
   const c=document.getElementById('paysContainer');
   const total=tempPayments.reduce((s,x)=>s+parseFloat(x.amount||0),0);

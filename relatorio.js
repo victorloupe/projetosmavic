@@ -119,7 +119,12 @@ function renderRelatorios() {
   });
   
   const totalPaid = receivedSum;
-  const totalRest = totalBilled - totalPaid;
+  // Saldo pendente real dos projetos contratados no período selecionado (nunca negativo)
+  const totalRest = billingProjects.reduce((s, p) => {
+    const v = parseFloat(p.value || 0);
+    const pd = (Array.isArray(p.payments) ? p.payments : []).reduce((a, x) => a + parseFloat(x.amount || 0), 0);
+    return s + Math.max(0, v - pd);
+  }, 0);
   
   const paidPct = totalBilled ? Math.round((totalPaid / totalBilled) * 100) : 0;
   const restPct = totalBilled ? Math.round((totalRest / totalBilled) * 100) : 0;

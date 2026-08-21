@@ -106,6 +106,7 @@
           <option value="">Todos os Vencimentos</option>
           <option value="overdue">⚠️ Atrasados</option>
           <option value="today">⏰ Vencem Hoje</option>
+          <option value="soon">🔔 Vencem em até 2 dias</option>
           <option value="upcoming">📅 A Vencer (No Prazo)</option>
         </select>
       </div>
@@ -118,6 +119,9 @@
         </button>
       </div>
     </div>
+
+    <!-- Banner de Alerta de Vencimentos Próximos -->
+    <div id="pendingAlertBanner" style="display:none;margin-bottom:12px"></div>
 
     <!-- Tabela Desktop A Receber -->
     <div class="dash-table pay-desktop-table">
@@ -261,16 +265,47 @@
       </select>
     </div>
 
-    <div class="fld" style="margin-top:6px">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;font-weight:600">
-        <input type="checkbox" id="baixaOpenReceipt" checked style="accent-color:var(--accent)">
-        Emitir e abrir recibo PDF após confirmação
+    <div class="fld" style="margin-top:8px;display:flex;flex-direction:column;gap:8px;background:var(--surface2);padding:8px 10px;border-radius:8px;border:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;font-weight:600;margin:0">
+        <input type="checkbox" id="baixaOpenReceipt" style="accent-color:var(--accent);width:15px;height:15px">
+        Emitir e visualizar recibo PDF
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--green);margin:0">
+        <input type="checkbox" id="baixaSendWhatsApp" checked style="accent-color:var(--green);width:15px;height:15px">
+        <i class="bi bi-whatsapp"></i> Enviar confirmação de pagamento no WhatsApp
       </label>
     </div>
   </div>
   <div class="mftr">
     <button class="btn btn-ghost" onclick="closeDarBaixaModal()">Cancelar</button>
     <button class="btn btn-primary" onclick="confirmDarBaixa()" style="background:var(--green);border-color:var(--green)"><i class="bi bi-check2"></i> Confirmar Recebimento</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ GERENCIAR FINANCEIRO / PARCELAS DO PROJETO MODAL ══ -->
+<div class="overlay" id="projFinanceOverlay" onclick="if(event.target===this)closeProjectFinanceModal()">
+<div class="mbox mlg" style="max-width:860px;width:95%">
+  <div class="mhdr" style="padding:14px 18px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:36px;height:36px;border-radius:10px;background:var(--accent-bg);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px"><i class="bi bi-wallet2"></i></div>
+      <div>
+        <h5 style="margin:0;font-size:16px;font-weight:700;display:flex;align-items:center;gap:6px" id="pfModalProjName">Financeiro do Projeto</h5>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px" id="pfModalClientName">Cliente: —</div>
+      </div>
+    </div>
+    <button class="btn-icon btn-sm" onclick="closeProjectFinanceModal()" title="Fechar"><i class="bi bi-x-lg"></i></button>
+  </div>
+  
+  <div class="mbody" id="pfModalBody" style="max-height:calc(85vh - 130px);overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:16px 18px">
+    <!-- Conteúdo gerado dinamicamente -->
+  </div>
+  
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px">
+    <button class="btn btn-ghost" onclick="closeProjectFinanceModal()">Fechar</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="closeProjectFinanceModal()" style="background:var(--accent);border-color:var(--accent)"><i class="bi bi-check2"></i> Salvar e Concluir</button>
+    </div>
   </div>
 </div>
 </div>

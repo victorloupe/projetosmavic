@@ -540,6 +540,8 @@ function reconcileProjectFinancials(p) {
   }
 
   if (Array.isArray(p.installments) && p.installments.length > 0) {
+    const totalInstsVal = p.installments.reduce((s, inst) => s + parseFloat(inst?.amount || 0), 0);
+
     if (p.payments.length === 0 || calculatedPaid <= 0.001) {
       // Se não há nenhum pagamento registrado, TODAS as parcelas devem estar Pendentes
       p.installments.forEach(inst => {
@@ -550,23 +552,33 @@ function reconcileProjectFinancials(p) {
           changed = true;
         }
       });
+    } else if (calculatedPaid >= totalInstsVal - 0.01 || calculatedPaid >= parseFloat(p.value || 0) - 0.01) {
+      // SE O TOTAL PAGO COBRE 100% DO PROJETO / PARCELAS (ex: Quitação total de 800 cobrindo 2x 400)
+      // TODAS as parcelas devem ser marcadas como 'Pago'!
+      const latestPay = p.payments[p.payments.length - 1] || {};
+      p.installments.forEach(inst => {
+        if (!inst) return;
+        if (inst.status !== 'Pago') {
+          inst.status = 'Pago';
+          inst.paidDate = inst.paidDate || latestPay.date || today();
+          inst.method = inst.method || latestPay.method || 'Pix';
+          changed = true;
+        }
+      });
     } else {
       // Há pagamentos registrados: concilia cada parcela com os pagamentos existentes
       const usedPayIds = new Set();
+      const unmatchedInsts = [];
 
+      // 1. Match direto por ID, installmentId ou descrição
       p.installments.forEach(inst => {
         if (!inst) return;
 
-        // Tenta associar com um pagamento existente não utilizado
         let matchingPay = p.payments.find(pay => pay && !usedPayIds.has(pay.id) && (
           (pay.installmentId && String(pay.installmentId) === String(inst.id)) ||
           String(pay.id) === String(inst.id) ||
           (pay.desc && inst.desc && pay.desc === inst.desc)
         ));
-
-        if (!matchingPay) {
-          matchingPay = p.payments.find(pay => pay && !usedPayIds.has(pay.id) && Math.abs(parseFloat(pay.amount || 0) - parseFloat(inst.amount || 0)) < 0.01);
-        }
 
         if (matchingPay) {
           usedPayIds.add(matchingPay.id);
@@ -577,7 +589,42 @@ function reconcileProjectFinancials(p) {
             changed = true;
           }
         } else {
-          // Parcela sem pagamento correspondente registrado: deve ser Pendente!
+          unmatchedInsts.push(inst);
+        }
+      });
+
+      // 2. Match por valor exato 1-para-1
+      const stillUnmatched = [];
+      unmatchedInsts.forEach(inst => {
+        const matchingPay = p.payments.find(pay => pay && !usedPayIds.has(pay.id) && Math.abs(parseFloat(pay.amount || 0) - parseFloat(inst.amount || 0)) < 0.01);
+        if (matchingPay) {
+          usedPayIds.add(matchingPay.id);
+          if (inst.status !== 'Pago') {
+            inst.status = 'Pago';
+            inst.paidDate = matchingPay.date || today();
+            inst.method = matchingPay.method || 'Pix';
+            changed = true;
+          }
+        } else {
+          stillUnmatched.push(inst);
+        }
+      });
+
+      // 3. Distribuição cumulativa para pagamentos agrupados/restantes
+      let remainingPool = p.payments.filter(pay => !usedPayIds.has(pay.id)).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+      stillUnmatched.forEach(inst => {
+        const instVal = parseFloat(inst.amount || 0);
+        if (remainingPool >= instVal - 0.01 && instVal > 0) {
+          remainingPool -= instVal;
+          if (inst.status !== 'Pago') {
+            const latestPay = p.payments[p.payments.length - 1] || {};
+            inst.status = 'Pago';
+            inst.paidDate = inst.paidDate || latestPay.date || today();
+            inst.method = inst.method || latestPay.method || 'Pix';
+            changed = true;
+          }
+        } else {
+          // Não foi coberta: deve ser Pendente
           if (inst.status === 'Pago') {
             inst.status = 'Pendente';
             delete inst.paidDate;

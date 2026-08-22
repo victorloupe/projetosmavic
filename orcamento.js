@@ -1532,7 +1532,7 @@ async function generateOrcamentoPdfBlob(b) {
     margin:       [4, 4, 4, 4],
     filename:     filename,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0 },
+    html2canvas:  pdfCanvasOpts(),
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 

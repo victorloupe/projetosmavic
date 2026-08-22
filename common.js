@@ -68,6 +68,22 @@ function populateProjectTypeSelects(){
 // ══════════════════════════════════════════
 //  LAZY LOADER: HTML2PDF (Carrega sob demanda)
 // ══════════════════════════════════════════
+// Opções de captura usadas por TODOS os PDFs do app.
+// scrollX/scrollY zerados são obrigatórios: o html2pdf renderiza o conteúdo dentro
+// de um container `position:fixed`, e sem isso o html2canvas soma o scroll da página
+// ao recorte, capturando uma área vazia — o PDF sai totalmente em branco sempre que
+// a página está rolada (o que é a regra no mobile, onde a lista é longa).
+function pdfCanvasOpts(extra) {
+  return Object.assign({
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+    scrollX: 0,
+    scrollY: 0
+  }, extra || {});
+}
+
 function loadHtml2Pdf() {
   if (window.html2pdf) return Promise.resolve(window.html2pdf);
   return new Promise((resolve, reject) => {

@@ -141,7 +141,15 @@
           <div class="fld"><label class="flbl">Prazo de Entrega</label><input type="date" class="inp inp-sm" id="projDate"></div>
         </div>
         <div class="fld"><label class="flbl">Capa (URL da Imagem)</label><input class="inp inp-sm" id="projImage" placeholder="https://imagem.jpg"></div>
-        <div class="fld"><label class="flbl">Pasta de Arquivos (Link do Drive/Nuvem)</label><input class="inp inp-sm" id="projDriveLink" placeholder="https://drive.google.com/drive/folders/..."></div>
+        <div class="fld">
+          <label class="flbl"><i class="bi bi-folder2-open"></i> Pasta no Computador (Windows Explorer)</label>
+          <div style="display:flex;gap:6px">
+            <input class="inp inp-sm" id="projLocalPath" placeholder="Ex: D:\COISAS\Projetos\NomeDoProjeto" style="flex:1">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="testProjLocalPath()" title="Testar abertura no Windows Explorer" style="white-space:nowrap;display:flex;align-items:center;gap:4px">
+              <i class="bi bi-folder2-open"></i> Testar
+            </button>
+          </div>
+        </div>
         <div class="fld"><label class="flbl">Observações do Projeto</label><textarea class="inp" id="projNote" rows="3" placeholder="Dados técnicos, observações de obra..."></textarea></div>
       </div>
       

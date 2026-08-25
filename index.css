@@ -873,12 +873,60 @@ textarea.inp {
   padding: 12px 12px 10px 16px;
 }
 
+.kcard-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 .kcard-name {
   font-weight: 700;
   font-size: 13.5px;
   line-height: 1.35;
-  margin-bottom: 4px;
+  margin-bottom: 0;
   color: var(--text);
+  flex: 1;
+  word-break: break-word;
+}
+
+.kcard-folder-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text3);
+  cursor: pointer;
+  transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.kcard-folder-btn:hover {
+  background: var(--accent);
+  color: #fff !important;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(146, 98, 58, 0.25);
+}
+
+.kcard-folder-btn.has-local {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-color: var(--border2);
+}
+
+.kcard-folder-btn.has-local:hover {
+  background: var(--accent);
+  color: #fff !important;
+  border-color: var(--accent);
 }
 
 .kcard-client {

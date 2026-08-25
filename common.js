@@ -1383,6 +1383,22 @@ function getInitials(name){
   return (name && typeof name === 'string' ? name : '?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase() || '?';
 }
 
+function abrirPastaLocal(caminho) {
+  if (!caminho || !caminho.trim()) {
+    showToast('Nenhum caminho de pasta configurado para este projeto.', 'warning');
+    return;
+  }
+  let clean = caminho.trim().replace(/^["']|["']$/g, '');
+  
+  if (/^https?:\/\//i.test(clean)) {
+    window.open(clean, '_blank');
+    return;
+  }
+
+  showToast('Abrindo pasta no Windows Explorer…', 'info');
+  window.location.href = 'mavic-folder://' + encodeURIComponent(clean);
+}
+
 // ══════════════════════════════════════════
 //  SETTINGS MODAL (GLOBAL)
 // ══════════════════════════════════════════

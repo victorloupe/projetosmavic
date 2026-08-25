@@ -202,19 +202,24 @@ function createCardHTML(p, cardIdx=0){
     checkHtml=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:7px"><div style="padding:5px 8px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span><i class="bi bi-ui-checks"></i> Andamento</span><span style="font-family:'Outfit',sans-serif;font-weight:700">${subDone}/${subs.length}</span></div><div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div><div style="max-height:96px;overflow-y:auto">${rows}</div></div>`;
   }
   const noteHtml=p.note?`<p style="font-size:12px;color:var(--text2);margin-top:7px;line-height:1.5;background:var(--surface2);padding:6px 8px;border-radius:6px">${p.note}</p>`:'';
-  const driveHtml = p.driveLink ? `
+  const folderHtml = p.localPath ? `
     <div style="margin-top:8px">
-      <a href="${p.driveLink}" target="_blank" class="drive-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);text-decoration:none;font-size:11.5px;font-weight:600;transition:all .2s" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'" onclick="event.stopPropagation()">
-        <i class="bi bi-folder2-open" style="color:var(--accent)"></i> Pasta de Arquivos
-      </a>
+      <button type="button" class="drive-btn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11.5px;font-weight:600;cursor:pointer;transition:all .2s" onclick="abrirPastaLocal('${escapeHtml(p.localPath)}');event.stopPropagation()" title="Abrir pasta no Windows Explorer">
+        <i class="bi bi-folder2-open" style="color:var(--accent)"></i> Abrir Pasta no Computador
+      </button>
     </div>
   ` : '';
   return `<div class="kcard ${dlClass} ${pinnedCards.has(p.id)?'pinned':''}" data-id="${p.id}" draggable="true" onclick="togglePin(event,${p.id})" style="animation-delay:${cardIdx*0.04}s;--type-color:${typeColor(p.type)}">
     ${subs.length?`<div class="kcard-prog-bar"><div class="kcard-prog-fill" style="width:${subPct}%;background:${progColor}"></div></div>`:''}
     ${p.image?`<img src="${p.image}" class="kcard-cover" onerror="this.style.display='none'">`:''}
     <div class="kcard-body">
-      <div class="kcard-name">${p.name}</div>
-      ${p.client?`<div class="kcard-client"><span class="kcard-avatar" style="background:${avatarColor}">${initials}</span>${p.client}</div>`:''}
+      <div class="kcard-top-row">
+        <div class="kcard-name">${escapeHtml(p.name)}</div>
+        <button type="button" class="kcard-folder-btn ${p.localPath ? 'has-local' : ''}" onclick="openCardFolder(event, ${p.id})" title="${p.localPath ? 'Abrir pasta no PC: ' + escapeHtml(p.localPath) : 'Vincular pasta no computador'}">
+          <i class="bi ${p.localPath ? 'bi-folder2-open' : 'bi-folder-plus'}"></i>
+        </button>
+      </div>
+      ${p.client?`<div class="kcard-client"><span class="kcard-avatar" style="background:${avatarColor}">${initials}</span>${escapeHtml(p.client)}</div>`:''}
       ${currSubs.length?`<div class="kcard-current-task" title="Foco atual"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow)"></i> <span>${currSubs.map(cs => cs.text).join(', ')}</span></div>`:''}
       <div class="kcard-tags">
         ${!isFinalColumn(p.column)?`<span class="badge ${pMap[p.priority]||'b-baixa'}">${pIcon[p.priority]||'🟢'} ${p.priority}</span>`:''}
@@ -226,7 +231,7 @@ function createCardHTML(p, cardIdx=0){
     <div class="kcard-exp">
       ${dl?`<div style="font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px" class="${dateCls}"><i class="bi bi-calendar3"></i>${dl.toLocaleDateString('pt-BR')} ${dateBadge}</div>`:''}
       ${finHtml}${checkHtml}${noteHtml}
-      ${driveHtml}
+      ${folderHtml}
       <div class="cact">
         <button class="cbtn ntf" onclick="openNotifyModal(${p.id});event.stopPropagation()" title="Notificar cliente"><i class="bi bi-bell"></i></button>
         <button class="cbtn" style="color:#25D366" onclick="openWhatsApp(${p.id});event.stopPropagation()" title="Enviar WhatsApp"><i class="bi bi-whatsapp"></i></button>
@@ -243,10 +248,11 @@ function createCardHTML(p, cardIdx=0){
 function createCompactCardHTML(p){
   return `<div class="kcard-compact" data-id="${p.id}" draggable="true">
     <div class="kcard-compact-info" onclick="editProject(${p.id})">
-      <div class="kcard-compact-name">${p.name}</div>
-      <div class="kcard-compact-sub">${p.client||'—'} · ${p.column}</div>
+      <div class="kcard-compact-name">${escapeHtml(p.name)}</div>
+      <div class="kcard-compact-sub">${escapeHtml(p.client||'—')} · ${escapeHtml(p.column)}</div>
     </div>
     <div class="kcard-compact-acts">
+      <button class="btn btn-ghost btn-sm" onclick="openCardFolder(event, ${p.id})" title="${p.localPath ? 'Abrir pasta no PC' : 'Vincular pasta no computador'}"><i class="bi ${p.localPath ? 'bi-folder2-open' : 'bi-folder-plus'}"></i></button>
       <button class="btn btn-ghost btn-sm" onclick="editProject(${p.id});event.stopPropagation()" title="Editar"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-danger btn-sm" onclick="deleteProject(${p.id});event.stopPropagation()" title="Excluir"><i class="bi bi-trash3"></i></button>
     </div>
@@ -377,7 +383,7 @@ function openProjectModal(id=null){
     document.getElementById('projName').value=p.name;
     document.getElementById('projClient').value=p.client;
     document.getElementById('projImage').value=p.image||'';
-    document.getElementById('projDriveLink').value=p.driveLink||'';
+    document.getElementById('projLocalPath').value=p.localPath||'';
     document.getElementById('projValue').value=p.value?toBRLInputStr(p.value):'';
     document.getElementById('projType').value=p.type;
     document.getElementById('projPrio').value=p.priority;
@@ -400,7 +406,7 @@ function openProjectModal(id=null){
     document.getElementById('projName').value='';
     document.getElementById('projClient').value='';
     document.getElementById('projImage').value='';
-    document.getElementById('projDriveLink').value='';
+    document.getElementById('projLocalPath').value='';
     document.getElementById('projValue').value='';
     document.getElementById('projType').value='Residencial';
     document.getElementById('projPrio').value='Média';
@@ -419,7 +425,7 @@ function hasProjModalChanges() {
   const name = document.getElementById('projName').value.trim();
   const client = document.getElementById('projClient').value;
   const img = document.getElementById('projImage').value.trim();
-  const drive = document.getElementById('projDriveLink').value.trim();
+  const local = (document.getElementById('projLocalPath')?.value || '').trim();
   const val = document.getElementById('projValue').value.trim();
   const type = document.getElementById('projType').value;
   const prio = document.getElementById('projPrio').value;
@@ -429,7 +435,7 @@ function hasProjModalChanges() {
   
   if (!id) {
     // Modo: Criação de Novo Projeto
-    return name !== '' || client !== '' || img !== '' || drive !== '' || val !== '' || note !== '' || date !== '' || tempSubs.length > 0 || tempPayments.length > 0 || tempProds.length > 0;
+    return name !== '' || client !== '' || img !== '' || local !== '' || val !== '' || note !== '' || date !== '' || tempSubs.length > 0 || tempPayments.length > 0 || tempProds.length > 0;
   } else {
     // Modo: Edição de Projeto Existente
     const p = projects.find(x => x.id === parseInt(id));
@@ -442,7 +448,7 @@ function hasProjModalChanges() {
     return name !== (p.name || '') ||
            client !== (p.client || '') ||
            img !== (p.image || '') ||
-           drive !== (p.driveLink || '') ||
+           local !== (p.localPath || '') ||
            parseCurrencyInput(val) !== (p.value || 0) ||
            type !== (p.type || 'Residencial') ||
            prio !== (p.priority || 'Média') ||
@@ -526,7 +532,8 @@ function saveProject(){
     name,
     client,
     image:document.getElementById('projImage').value.trim(),
-    driveLink:document.getElementById('projDriveLink').value.trim(),
+    localPath:(document.getElementById('projLocalPath')?.value || '').trim(),
+    driveLink:existingProj?.driveLink || '',
     originBudgetId: existingProj?.originBudgetId || null,
     originBudgetNumber: existingProj?.originBudgetNumber || null,
     value:parseCurrencyInput(document.getElementById('projValue').value),
@@ -553,6 +560,52 @@ function saveProject(){
   else{projects.push(pData);showToast('Projeto criado!','success');}
   renderBoard();closeProjectModal();scheduleSync();
   if (typeof renderDashboard === 'function') renderDashboard();
+}
+
+function testProjLocalPath() {
+  const val = document.getElementById('projLocalPath')?.value;
+  if (!val || !val.trim()) {
+    showToast('Digite o caminho da pasta primeiro para testar.', 'warning');
+    return;
+  }
+  abrirPastaLocal(val);
+}
+
+function openCardFolder(event, projId) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+
+  if (p.localPath && p.localPath.trim()) {
+    abrirPastaLocal(p.localPath);
+    return;
+  }
+
+  // Abre o modal de entrada com a identidade visual completa do sistema MAVIC
+  showPrompt(
+    `Informe o caminho da pasta deste projeto no seu computador (Windows Explorer):`,
+    (caminho) => {
+      if (!caminho || !caminho.trim()) return;
+      const clean = caminho.trim().replace(/^["']|["']$/g, '');
+      p.localPath = clean;
+      scheduleSync();
+      renderBoard();
+      showToast('Pasta vinculada com sucesso!', 'success');
+      abrirPastaLocal(clean);
+    },
+    {
+      title: `Vincular Pasta — ${p.name}`,
+      icon: 'bi bi-folder2-open',
+      label: 'Caminho no Computador (Windows Explorer)',
+      placeholder: 'Ex: D:\\COISAS\\Projetos\\' + p.name,
+      defaultValue: p.localPath || '',
+      helpText: 'Dica: Você pode copiar o caminho da barra de endereço do Windows Explorer e colar aqui.',
+      okText: 'Salvar e Abrir'
+    }
+  );
 }
 
 function archiveCurrentProject(){

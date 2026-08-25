@@ -1,0 +1,12 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\Classes\mavic-folder]
+@="URL:Mavic Folder Protocol"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\mavic-folder\shell]
+
+[HKEY_CURRENT_USER\Software\Classes\mavic-folder\shell\open]
+
+[HKEY_CURRENT_USER\Software\Classes\mavic-folder\shell\open\command]
+@="powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command \"$u = '%1' -replace '^mavic-folder://', '' -replace '^mavic-folder:', ''; $p = [System.Uri]::UnescapeDataString($u).TrimEnd('/', '\\\\') -replace '/', '\\\\'; if (Test-Path -LiteralPath $p) { Start-Process explorer.exe -ArgumentList ('\\\"' + $p + '\\\"') } else { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Pasta nao encontrada:\n' + $p, 'MAVIC Projetos', 0, 48) }\""

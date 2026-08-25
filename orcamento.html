@@ -217,7 +217,7 @@
 
       <div class="orc-two-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0">
         <div class="fld" style="margin:0"><label class="flbl">Desconto (R$)</label><input type="text" inputmode="decimal" class="inp inp-sm" id="orcDiscount" value="0,00" oninput="maskCurrencyInput(this);updateOrcPreviewLabels()"></div>
-        <div class="fld" style="margin:0"><label class="flbl">Status</label><select class="inp inp-sm" id="orcStatus"><option value="Pendente">Pendente</option><option value="Aprovado">Aprovado</option><option value="Recusado">Recusado</option><option value="Convertido" disabled>Convertido</option></select></div>
+        <div class="fld" style="margin:0"><label class="flbl">Status</label><select class="inp inp-sm" id="orcStatus"><option value="Pendente">Pendente</option><option value="Parcial">Parcial</option><option value="Aprovado">Aprovado</option><option value="Recusado">Recusado</option><option value="Convertido" disabled>Convertido</option></select></div>
       </div>
     </div>
     
@@ -345,6 +345,15 @@
       </div>
     </div>
 
+    <!-- Histórico de Faturamentos e Projetos Vinculados (Oculto na Impressão) -->
+    <div class="no-print orc-history-section" id="orcHistorySection" style="display:none;margin-top:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px">
+      <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+        <i class="bi bi-clock-history" style="color:var(--accent)"></i>
+        <span>Histórico de Faturamentos & Projetos Vinculados</span>
+      </div>
+      <div id="orcHistoryList" class="orc-history-box"></div>
+    </div>
+
   </div>
   <div class="mftr no-print orc-modal-footer" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;gap:8px">
     <button class="btn btn-ghost btn-icon" onclick="closeOrcamentoModal()" title="Cancelar / Fechar" style="color:var(--text3);padding:7px 10px;display:inline-flex;align-items:center;gap:5px">
@@ -356,6 +365,9 @@
       </button>
       <button class="btn btn-ghost" style="color:#2563EB;padding:7px 10px;display:inline-flex;align-items:center;gap:5px" onclick="saveOrcamentoAndShare()" title="Salvar e Compartilhar">
         <i class="bi bi-share" style="font-size:14px"></i> <span class="d-none-mobile">Compartilhar</span>
+      </button>
+      <button class="btn btn-success" id="btnOrcModalFaturar" style="padding:7px 12px;display:none;align-items:center;gap:5px" onclick="saveOrcamentoAndFaturar()" title="Salvar e Faturar Proposta">
+        <i class="bi bi-arrow-right-circle" style="font-size:14px"></i> <span>Faturar</span>
       </button>
       <button class="btn btn-primary" onclick="saveOrcamento()" title="Salvar Orçamento" style="padding:7px 14px;display:inline-flex;align-items:center;gap:5px">
         <i class="bi bi-check-lg" style="font-size:15px"></i> <span>Salvar</span>
@@ -372,8 +384,33 @@
     <input type="hidden" id="fatOrcId">
     
     <div class="fld" style="margin-bottom:12px">
-      <label class="flbl">Orçamento Selecionado</label>
-      <div id="fatOrcInfo" style="font-size:14px;font-weight:600;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"></div>
+      <label class="flbl">Orçamento de Origem</label>
+      <div id="fatOrcInfo" style="font-size:13.5px;font-weight:600;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"></div>
+    </div>
+
+    <div class="fld" style="margin-bottom:12px">
+      <label class="flbl">Nome do Projeto no Kanban *</label>
+      <input type="text" class="inp inp-sm" id="fatProjectTitle" placeholder="Nome do projeto..." style="font-weight:600">
+    </div>
+
+    <!-- SELEÇÃO DE ITENS A FATURAR -->
+    <div class="stgrp" style="margin-bottom:12px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="sec" style="margin:0;font-size:13px"><i class="bi bi-check2-square" style="color:var(--accent)"></i> Escolha os Itens para este Projeto</div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnFatSelectAll" style="font-size:11px;padding:2px 8px;color:var(--accent)" onclick="toggleSelectAllFaturarItems()">Desmarcar Todos</button>
+      </div>
+      
+      <div id="fatItemsList" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;padding-right:2px">
+        <!-- Renderizado dinamicamente via JS -->
+      </div>
+      
+      <div id="fatItemsSummary" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:12px">
+        <span id="fatSelectedCount" style="color:var(--text2);font-weight:600">0 itens selecionados</span>
+        <div style="text-align:right">
+          <span style="font-size:11px;color:var(--text3);margin-right:6px">Total dos Itens:</span>
+          <span style="font-weight:800;color:var(--accent);font-size:13.5px;font-family:'Outfit',sans-serif" id="fatSelectedTotal">R$ 0,00</span>
+        </div>
+      </div>
     </div>
 
     <div class="row2" style="margin-bottom:12px">
@@ -407,11 +444,41 @@
       </div>
     </div>
 
-    <p style="font-size:11.5px;color:var(--text3);margin:4px 0 0"><i class="bi bi-info-circle"></i> O projeto será inserido na coluna <strong>"Briefing"</strong> com os produtos como checklist de tarefas e o financeiro sincronizado.</p>
+    <!-- Aviso sobre Faturamento Integral ou Parcial -->
+    <div id="fatConversionNotice" style="font-size:11.5px;color:var(--text2);margin:4px 0 0;padding:8px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border);line-height:1.4">
+      <i class="bi bi-info-circle" style="color:var(--accent);margin-right:4px"></i> <span id="fatConversionNoticeText">O projeto será inserido na coluna <strong>"Briefing"</strong> com os produtos como checklist de tarefas.</span>
+    </div>
   </div>
   <div class="mftr">
     <button class="btn btn-ghost" onclick="closeFaturarModal()">Cancelar</button>
-    <button class="btn btn-primary" onclick="confirmFaturarOrcamento()"><i class="bi bi-check2"></i> Confirmar Faturamento</button>
+    <button class="btn btn-primary" id="btnConfirmFaturar" onclick="confirmFaturarOrcamento()"><i class="bi bi-check2"></i> Confirmar Faturamento</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ MODAL DE CONFIRMAÇÃO / SUCESSO DO FATURAMENTO COM WHATSAPP ══ -->
+<div class="overlay" id="faturarSuccessOverlay" onclick="if(event.target===this)closeFaturarSuccessModal()">
+<div class="mbox msm" style="max-width:440px;text-align:center">
+  <div class="mbody" style="padding:22px 18px">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(22,163,74,0.15);color:var(--green);display:inline-flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:10px">
+      <i class="bi bi-check-lg"></i>
+    </div>
+    <h4 style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px" id="fatSuccessTitle">Projeto Criado com Sucesso!</h4>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px" id="fatSuccessMsg">O projeto foi inserido no Kanban da Página Inicial com o cronograma e checklist configurados.</p>
+    
+    <div id="fatSuccessDetails" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:left;font-size:11.5px;margin-bottom:14px;display:flex;flex-direction:column;gap:4px"></div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-sm" id="btnFatSuccessWhatsApp" style="background:#25D366;color:#fff;font-weight:600;padding:8px 14px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:8px;font-size:12.5px" onclick="sendFaturarWhatsAppConfirmation()">
+        <i class="bi bi-whatsapp" style="font-size:15px"></i> Enviar Confirmação no WhatsApp
+      </button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" style="flex:1" onclick="closeFaturarSuccessModal()">Fechar</button>
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="goToKanbanProject()">
+          <i class="bi bi-kanban"></i> Ver no Kanban
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 </div>

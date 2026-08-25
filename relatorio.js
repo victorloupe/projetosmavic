@@ -129,7 +129,7 @@ function renderRelatorios() {
   const paidPct = totalBilled ? Math.round((totalPaid / totalBilled) * 100) : 0;
   const restPct = totalBilled ? Math.round((totalRest / totalBilled) * 100) : 0;
   
-  let activeBudgets = filteredBudgets.filter(b => b.status === 'Pendente');
+  let activeBudgets = filteredBudgets.filter(b => b.status === 'Pendente' || b.status === 'Parcial');
   if (yearFilter || monthFilter) {
     activeBudgets = activeBudgets.filter(b => {
       if (!b.date) return false;
@@ -138,7 +138,7 @@ function renderRelatorios() {
       return matchYear && matchMonth;
     });
   }
-  const pendingBudgetsVal = activeBudgets.reduce((s, b) => s + parseFloat(b.total || 0), 0);
+  const pendingBudgetsVal = activeBudgets.reduce((s, b) => s + Math.max(0, parseFloat(b.total || 0) - (parseFloat(b.discount) || 0)), 0);
   
   document.getElementById('repTotalBilled').textContent = fmt(totalBilled);
   document.getElementById('repTotalPaid').textContent = fmt(totalPaid);

@@ -148,6 +148,8 @@ function openOrcamentoModal(id = null) {
     document.getElementById('btnPdfOrc').style.display = 'inline-flex';
     document.getElementById('btnDownloadPdfOrc').style.display = 'inline-flex';
     document.getElementById('btnSharePdfOrc').style.display = 'inline-flex';
+    const btnFatModal = document.getElementById('btnOrcModalFaturar');
+    if (btnFatModal) btnFatModal.style.display = b.status === 'Convertido' ? 'none' : 'inline-flex';
 
     handleOrcClientChange(true);
   } else {
@@ -170,8 +172,44 @@ function openOrcamentoModal(id = null) {
     document.getElementById('btnPdfOrc').style.display = 'none';
     document.getElementById('btnDownloadPdfOrc').style.display = 'none';
     document.getElementById('btnSharePdfOrc').style.display = 'none';
+    const btnFatModal = document.getElementById('btnOrcModalFaturar');
+    if (btnFatModal) btnFatModal.style.display = 'none';
   }
   
+  // Renderizar seção de Histórico de Faturamento e Projetos Vinculados
+  const histSec = document.getElementById('orcHistorySection');
+  const histList = document.getElementById('orcHistoryList');
+  if (histSec && histList) {
+    if (id) {
+      const bObj = budgets.find(x => x.id === id);
+      if (bObj && Array.isArray(bObj.history) && bObj.history.length) {
+        histSec.style.display = 'block';
+        histList.innerHTML = bObj.history.map(h => `
+          <div class="orc-history-item">
+            <div>
+              <div style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">
+                <i class="bi bi-check-circle" style="color:var(--green)"></i>
+                <span>Projeto criado: <strong>${escapeHtml(h.projectName || 'Projeto')}</strong></span>
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">
+                ${h.date ? new Date(h.date + 'T12:00:00').toLocaleDateString('pt-BR') : ''} ${h.time ? 'às ' + h.time : ''} · ${(h.items || []).join(', ')}
+              </div>
+            </div>
+            <div style="text-align:right">
+              <span style="font-weight:700;font-family:'Outfit',sans-serif;color:var(--accent);font-size:13px">${fmt(h.value)}</span>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        histSec.style.display = 'none';
+        histList.innerHTML = '';
+      }
+    } else {
+      histSec.style.display = 'none';
+      histList.innerHTML = '';
+    }
+  }
+
   updateOrcItemFormMode();
   renderOrcItems();
   renderOrcAttachments();
@@ -661,15 +699,24 @@ function saveOrcamentoAndDownloadPdf() {
   if (savedId) downloadOrcamentoPDFDirect(savedId);
 }
 
+function saveOrcamentoAndFaturar() {
+  const savedId = saveOrcamento();
+  if (savedId) {
+    transformBudgetToProject(savedId);
+  }
+}
+
 function renderOrcKpis() {
   const kpiEl = document.getElementById('orcKpis');
   if (!kpiEl) return;
+
   const total = budgets.reduce((acc, b) => acc + (b.total - (parseFloat(b.discount) || 0)), 0);
-  const pendentes = budgets.filter(b => b.status === 'Pendente');
+  const pendentes = budgets.filter(b => b.status === 'Pendente' || b.status === 'Parcial');
   const pendenteTotal = pendentes.reduce((acc, b) => acc + (b.total - (parseFloat(b.discount) || 0)), 0);
   const convertidos = budgets.filter(b => b.status === 'Convertido' || b.status === 'Aprovado');
   const convertidoTotal = convertidos.reduce((acc, b) => acc + (b.total - (parseFloat(b.discount) || 0)), 0);
   const taxa = budgets.length ? Math.round((convertidos.length / budgets.length) * 100) : 0;
+  const parcialCount = budgets.filter(b => b.status === 'Parcial').length;
 
   kpiEl.innerHTML = `
     <div class="orc-kpi-card">
@@ -685,7 +732,7 @@ function renderOrcKpis() {
       <div>
         <div class="orc-kpi-lbl">AGUARDANDO APROVAÇÃO</div>
         <div class="orc-kpi-val" style="color:var(--yellow)">${fmt(pendenteTotal)}</div>
-        <div class="orc-kpi-sub">${pendentes.length} ${pendentes.length === 1 ? 'pendente' : 'pendentes'}</div>
+        <div class="orc-kpi-sub">${pendentes.length} em aberto ${parcialCount ? `(${parcialCount} parciais)` : ''}</div>
       </div>
     </div>
     <div class="orc-kpi-card">
@@ -705,6 +752,7 @@ function renderOrcChips(currentStatus) {
 
   const totalCount = budgets.length;
   const pendenteCount = budgets.filter(b => b.status === 'Pendente').length;
+  const parcialCount = budgets.filter(b => b.status === 'Parcial').length;
   const aprovadoCount = budgets.filter(b => b.status === 'Aprovado').length;
   const convertidoCount = budgets.filter(b => b.status === 'Convertido').length;
   const recusadoCount = budgets.filter(b => b.status === 'Recusado').length;
@@ -712,6 +760,7 @@ function renderOrcChips(currentStatus) {
   const chips = [
     { label: 'Todos', value: '', count: totalCount },
     { label: 'Pendentes', value: 'Pendente', count: pendenteCount },
+    { label: 'Parciais', value: 'Parcial', count: parcialCount },
     { label: 'Aprovados', value: 'Aprovado', count: aprovadoCount },
     { label: 'Convertidos', value: 'Convertido', count: convertidoCount },
     { label: 'Recusados', value: 'Recusado', count: recusadoCount }
@@ -746,6 +795,7 @@ function toggleOrcActionsMenu(event, budgetId) {
 
   dropdown._activeId = budgetId;
   dropdown.innerHTML = `
+    ${budget.status !== 'Convertido' ? `<button onclick="closeOrcActionsMenu();transformBudgetToProject(${budgetId})"><i class="bi bi-arrow-right-circle" style="color:var(--green)"></i> Faturar Orçamento</button>` : ''}
     <button onclick="closeOrcActionsMenu();downloadOrcamentoPDFDirect(${budgetId})"><i class="bi bi-file-pdf" style="color:var(--red)"></i> Visualizar PDF</button>
     <button onclick="closeOrcActionsMenu();downloadOrcamentoPDFFile(${budgetId})"><i class="bi bi-download" style="color:var(--accent)"></i> Baixar Arquivo PDF</button>
     <button onclick="closeOrcActionsMenu();shareOrcamentoPDF(${budgetId})"><i class="bi bi-share" style="color:#2563EB"></i> Compartilhar Link</button>
@@ -1004,25 +1054,184 @@ function addDays(dateStr, days) {
   return `${year}-${month}-${day}`;
 }
 
+let faturarSelectedItems = [];
+let faturarItemQtys = {};
+let lastFaturadoProject = null;
+let lastFaturadoBudget = null;
+
+function getFaturarSelectedTotals(b) {
+  if (!b || !Array.isArray(b.items)) {
+    return { selected: [], selectedSubtotal: 0, selectedDiscount: 0, selectedNetTotal: 0, isPartial: false };
+  }
+  const selected = b.items.filter(it => faturarSelectedItems.includes(it.id));
+  const selectedSubtotal = selected.reduce((sum, it) => {
+    const q = faturarItemQtys[it.id] || parseInt(it.qty || 1);
+    return sum + (parseFloat(it.price || 0) * q);
+  }, 0);
+  const totalBudgetSub = b.items.reduce((sum, it) => sum + (parseFloat(it.price || 0) * parseInt(it.qty || 1)), 0);
+  const budgetDiscount = parseFloat(b.discount) || 0;
+  const selectedDiscount = totalBudgetSub > 0 ? Math.round(((selectedSubtotal / totalBudgetSub) * budgetDiscount) * 100) / 100 : 0;
+  const selectedNetTotal = Math.max(0, selectedSubtotal - selectedDiscount);
+  
+  const isPartial = selected.length < b.items.length || selected.some(it => {
+    const q = faturarItemQtys[it.id] || parseInt(it.qty || 1);
+    return q < parseInt(it.qty || 1);
+  });
+
+  return { selected, selectedSubtotal, selectedDiscount, selectedNetTotal, isPartial };
+}
+
+function renderFaturarItemsList(b) {
+  const container = document.getElementById('fatItemsList');
+  const countEl = document.getElementById('fatSelectedCount');
+  const totalEl = document.getElementById('fatSelectedTotal');
+  const btnSelectAll = document.getElementById('btnFatSelectAll');
+  const noticeEl = document.getElementById('fatConversionNoticeText');
+  const confirmBtn = document.getElementById('btnConfirmFaturar');
+  if (!container || !b || !Array.isArray(b.items)) return;
+
+  const { selected, selectedSubtotal, selectedDiscount, selectedNetTotal, isPartial } = getFaturarSelectedTotals(b);
+
+  container.innerHTML = b.items.map(item => {
+    const isChecked = faturarSelectedItems.includes(item.id);
+    const totalQty = parseInt(item.qty || 1);
+    const curQty = Math.min(Math.max(1, faturarItemQtys[item.id] || totalQty), totalQty);
+    faturarItemQtys[item.id] = curQty;
+    const itemTotal = parseFloat(item.price || 0) * (isChecked ? curQty : totalQty);
+
+    const qtyControl = totalQty > 1 ? `
+      <div class="fat-qty-stepper" onclick="event.stopPropagation()">
+        <button type="button" class="fat-qty-btn" onclick="changeFaturarItemQty(${item.id}, -1)" title="Diminuir quantidade">−</button>
+        <span class="fat-qty-val">${curQty}/${totalQty}</span>
+        <button type="button" class="fat-qty-btn" onclick="changeFaturarItemQty(${item.id}, 1)" title="Aumentar quantidade">+</button>
+      </div>
+    ` : `<div class="fat-item-qty">1 un</div>`;
+
+    return `
+      <div class="fat-item-row ${isChecked ? 'selected' : 'unselected'}" onclick="toggleFaturarItem(${item.id})">
+        <input type="checkbox" class="fat-item-checkbox" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleFaturarItem(${item.id})">
+        <div class="fat-item-info">
+          <div class="fat-item-title">${escapeHtml(item.desc || 'Sem descrição')}</div>
+          ${item.note ? `<div class="fat-item-sub">${escapeHtml(item.note)}</div>` : ''}
+        </div>
+        ${qtyControl}
+        <div class="fat-item-price">${fmt(itemTotal)}</div>
+      </div>
+    `;
+  }).join('');
+
+  if (countEl) {
+    countEl.textContent = `${selected.length} de ${b.items.length} ${b.items.length === 1 ? 'item selecionado' : 'itens selecionados'}`;
+  }
+
+  if (totalEl) {
+    totalEl.textContent = fmt(selectedNetTotal);
+  }
+
+  if (btnSelectAll) {
+    btnSelectAll.textContent = selected.length === b.items.length ? 'Desmarcar Todos' : 'Selecionar Todos';
+  }
+
+  if (noticeEl) {
+    if (selected.length === 0) {
+      noticeEl.innerHTML = '<span style="color:var(--red);font-weight:600"><i class="bi bi-exclamation-triangle"></i> Selecione ao menos 1 item para criar o projeto.</span>';
+    } else if (isPartial) {
+      noticeEl.innerHTML = `<strong>Faturamento Parcial:</strong> O projeto será criado com os itens e quantidades selecionados (${fmt(selectedNetTotal)}). O orçamento continuará em aberto com o status <strong>Parcial</strong> e saldo remanescente.`;
+    } else {
+      noticeEl.innerHTML = `<strong>Faturamento Total:</strong> Todos os itens serão transformados no projeto (${fmt(selectedNetTotal)}) e a proposta será marcada como <strong>Convertida</strong>.`;
+    }
+  }
+
+  if (confirmBtn) {
+    confirmBtn.disabled = selected.length === 0;
+    confirmBtn.style.opacity = selected.length === 0 ? '0.5' : '1';
+    confirmBtn.style.cursor = selected.length === 0 ? 'not-allowed' : 'pointer';
+  }
+}
+
+function changeFaturarItemQty(itemId, delta) {
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  if (!b) return;
+  const item = b.items.find(x => x.id === itemId);
+  if (!item) return;
+
+  const totalQty = parseInt(item.qty || 1);
+  let cur = faturarItemQtys[itemId] || totalQty;
+  cur = Math.min(Math.max(1, cur + delta), totalQty);
+  faturarItemQtys[itemId] = cur;
+
+  if (!faturarSelectedItems.includes(itemId)) {
+    faturarSelectedItems.push(itemId);
+  }
+
+  renderFaturarItemsList(b);
+  handleFatConditionChange();
+}
+
+function toggleFaturarItem(itemId) {
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  if (!b) return;
+
+  if (faturarSelectedItems.includes(itemId)) {
+    faturarSelectedItems = faturarSelectedItems.filter(x => x !== itemId);
+  } else {
+    faturarSelectedItems.push(itemId);
+  }
+
+  renderFaturarItemsList(b);
+  handleFatConditionChange();
+}
+
+function toggleSelectAllFaturarItems() {
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  if (!b || !Array.isArray(b.items)) return;
+
+  if (faturarSelectedItems.length === b.items.length) {
+    faturarSelectedItems = [];
+  } else {
+    faturarSelectedItems = b.items.map(it => it.id);
+  }
+
+  renderFaturarItemsList(b);
+  handleFatConditionChange();
+}
+
 function transformBudgetToProject(id) {
   const b = budgets.find(x => x.id === id);
   if (!b) return;
   if (b.status === 'Convertido') return showToast('Orçamento já foi faturado (convertido)!', 'warning');
+  if (!Array.isArray(b.items) || !b.items.length) return showToast('Este orçamento não possui itens para faturar!', 'warning');
 
   currentFaturarPlan = null;
+  faturarSelectedItems = b.items.map(it => it.id);
+  faturarItemQtys = {};
+  b.items.forEach(it => {
+    faturarItemQtys[it.id] = parseInt(it.qty || 1);
+  });
+
   const netTotal = b.total - (parseFloat(b.discount) || 0);
 
   document.getElementById('fatOrcId').value = b.id;
   document.getElementById('fatOrcInfo').innerHTML = `
-    <span><strong>${b.title}</strong> · ${b.client}</span>
-    <span style="color:var(--accent);font-weight:800;font-size:15px">${fmt(netTotal)}</span>
+    <span><strong>#${b.number || b.id}</strong> · ${escapeHtml(b.title)} · ${escapeHtml(b.client)}</span>
+    <span style="color:var(--accent);font-weight:800;font-size:14.5px">${fmt(netTotal)}</span>
   `;
+  
+  const projTitleInput = document.getElementById('fatProjectTitle');
+  if (projTitleInput) {
+    projTitleInput.value = b.title || `Projeto - ${b.client}`;
+  }
+
   document.getElementById('fatPriority').value = 'Média';
   document.getElementById('fatDeadline').value = b.validUntil || addDays(today(), 15);
   
   const condSel = document.getElementById('fatPayCondition');
   if (condSel) condSel.value = '50_50';
   
+  renderFaturarItemsList(b);
   handleFatConditionChange();
   document.getElementById('faturarOverlay').classList.add('open');
 }
@@ -1038,7 +1247,8 @@ function handleFatConditionChange() {
 
   const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
   const b = budgets.find(x => x.id === id);
-  const netTotal = b ? (b.total - (parseFloat(b.discount) || 0)) : 0;
+  const { selectedNetTotal } = getFaturarSelectedTotals(b);
+  const netTotal = selectedNetTotal;
   const deadline = document.getElementById('fatDeadline')?.value || addDays(today(), 15);
 
   if (cond === '50_50') {
@@ -1339,7 +1549,8 @@ function updateFaturarPlanPreview(keepEdits = false) {
   const b = budgets.find(x => x.id === id);
   if (!b) return;
 
-  const netTotal = b.total - (parseFloat(b.discount) || 0);
+  const { selectedNetTotal } = getFaturarSelectedTotals(b);
+  const netTotal = selectedNetTotal;
   const deadline = document.getElementById('fatDeadline')?.value || addDays(today(), 15);
 
   if (!keepEdits || !currentFaturarPlan || !Array.isArray(currentFaturarPlan.installments)) {
@@ -1351,6 +1562,11 @@ function updateFaturarPlanPreview(keepEdits = false) {
   if (sumEl) sumEl.textContent = `Total: ${fmt(netTotal)}`;
 
   if (!preview) return;
+
+  if (!currentFaturarPlan || !currentFaturarPlan.installments.length) {
+    preview.innerHTML = `<div style="text-align:center;color:var(--text3);padding:10px;font-size:12px">Nenhuma parcela a ser gerada (selecione os itens acima).</div>`;
+    return;
+  }
 
   preview.innerHTML = currentFaturarPlan.installments.map((inst, idx) => {
     const isPaid = inst.status === 'Pago';
@@ -1397,25 +1613,36 @@ function confirmFaturarOrcamento() {
   const b = budgets.find(x => x.id === id);
   if (!b) return closeFaturarModal();
 
+  const { selected, selectedDiscount, selectedNetTotal, isPartial } = getFaturarSelectedTotals(b);
+  if (!selected.length) {
+    return showToast('Selecione pelo menos um item para faturar!', 'warning');
+  }
+
+  const projName = document.getElementById('fatProjectTitle')?.value.trim() || b.title || `Projeto - ${b.client}`;
   const priority = document.getElementById('fatPriority').value;
   const deadline = document.getElementById('fatDeadline').value;
   if (!deadline) return showToast('Informe o prazo de entrega', 'warning');
 
-  const products = b.items.map((item, idx) => ({
-    id: Date.now() + idx,
-    name: `${item.desc} (x${item.qty})`,
-    price: parseFloat(item.price)
-  }));
+  const products = selected.map((item, idx) => {
+    const selQty = faturarItemQtys[item.id] || parseInt(item.qty || 1);
+    return {
+      id: Date.now() + idx,
+      name: selQty > 1 ? `${item.desc} (x${selQty})` : item.desc,
+      price: parseFloat(item.price) * selQty
+    };
+  });
 
-  // Os itens da proposta viram as subtarefas do projeto (checklist de andamento)
-  const subtasks = b.items.map((item, idx) => ({
-    id: Date.now() + idx + 1,
-    text: item.qty > 1 ? `${item.desc} (x${item.qty})` : item.desc,
-    done: false,
-    current: false
-  }));
+  const subtasks = selected.map((item, idx) => {
+    const selQty = faturarItemQtys[item.id] || parseInt(item.qty || 1);
+    return {
+      id: Date.now() + idx + 1,
+      text: selQty > 1 ? `${item.desc} (x${selQty})` : item.desc,
+      done: false,
+      current: false
+    };
+  });
 
-  const value = b.total - (parseFloat(b.discount) || 0);
+  const value = selectedNetTotal;
 
   if (!currentFaturarPlan || !Array.isArray(currentFaturarPlan.installments)) {
     currentFaturarPlan = calculateFaturarPlan(value, deadline);
@@ -1428,9 +1655,12 @@ function confirmFaturarOrcamento() {
 
   const newProj = {
     id: Date.now(),
-    name: b.title,
+    name: projName,
     client: b.client,
     image: '',
+    driveLink: '',
+    originBudgetId: b.id,
+    originBudgetNumber: b.number || b.id,
     value: value,
     payments: payments,
     paid: paid,
@@ -1442,18 +1672,144 @@ function confirmFaturarOrcamento() {
     priority: priority,
     column: 'Briefing',
     date: deadline,
-    note: '',
+    note: b.notes ? `Observações da Proposta:\n${b.notes}` : '',
     subtasks: subtasks,
     archived: false,
     createdAt: Date.now()
   };
 
   projects.push(newProj);
-  b.status = 'Convertido';
+
+  // Calcular itens remanescentes do orçamento
+  let isFullyConverted = true;
+  const newBudgetItems = [];
+
+  b.items.forEach(it => {
+    const isSelected = faturarSelectedItems.includes(it.id);
+    const totalQty = parseInt(it.qty || 1);
+    const selQty = isSelected ? (faturarItemQtys[it.id] || totalQty) : 0;
+    const remQty = totalQty - selQty;
+
+    if (remQty > 0) {
+      isFullyConverted = false;
+      newBudgetItems.push({
+        ...it,
+        qty: remQty
+      });
+    }
+  });
+
+  // Histórico da Proposta
+  if (!Array.isArray(b.history)) b.history = [];
+  b.history.unshift({
+    id: Date.now(),
+    date: today(),
+    time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    projectId: newProj.id,
+    projectName: newProj.name,
+    value: value,
+    items: selected.map(it => {
+      const q = faturarItemQtys[it.id] || parseInt(it.qty || 1);
+      return `${it.desc} (x${q})`;
+    })
+  });
+
+  // Projetos Vinculados
+  if (!Array.isArray(b.convertedProjects)) b.convertedProjects = [];
+  b.convertedProjects.push({
+    id: newProj.id,
+    name: newProj.name,
+    value: value,
+    date: today()
+  });
+
+  if (isFullyConverted) {
+    b.status = 'Convertido';
+  } else {
+    b.items = newBudgetItems;
+    b.total = newBudgetItems.reduce((s, it) => s + (parseFloat(it.price || 0) * parseInt(it.qty || 1)), 0);
+    b.discount = Math.max(0, Math.round(((parseFloat(b.discount) || 0) - selectedDiscount) * 100) / 100);
+    b.status = 'Parcial';
+  }
+
+  lastFaturadoProject = newProj;
+  lastFaturadoBudget = b;
+
   scheduleSync();
   closeFaturarModal();
-  showToast('Orçamento faturado com sucesso! Salvo no Kanban da Página Inicial com parcelamento configurado.', 'success');
   renderOrcamentos();
+  openFaturarSuccessModal(newProj, b, isFullyConverted);
+}
+
+function openFaturarSuccessModal(proj, budget, isFullyConverted) {
+  const overlay = document.getElementById('faturarSuccessOverlay');
+  if (!overlay) return;
+
+  const titleEl = document.getElementById('fatSuccessTitle');
+  const msgEl = document.getElementById('fatSuccessMsg');
+  const detailsEl = document.getElementById('fatSuccessDetails');
+
+  if (titleEl) {
+    titleEl.textContent = isFullyConverted ? 'Orçamento Faturado com Sucesso!' : 'Projeto Criado (Faturamento Parcial)!';
+  }
+  if (msgEl) {
+    msgEl.innerHTML = isFullyConverted 
+      ? `A proposta <strong>#${budget.number || budget.id}</strong> foi convertida integralmente em projeto no Kanban.`
+      : `O projeto <strong>${escapeHtml(proj.name)}</strong> foi gerado e a proposta <strong>#${budget.number || budget.id}</strong> continua em aberto como <strong>Parcial</strong>.`;
+  }
+  if (detailsEl) {
+    const deadlineStr = proj.date ? new Date(proj.date + 'T12:00:00').toLocaleDateString('pt-BR') : 'A definir';
+    detailsEl.innerHTML = `
+      <div><strong>Cliente:</strong> ${escapeHtml(proj.client)}</div>
+      <div><strong>Projeto:</strong> ${escapeHtml(proj.name)}</div>
+      <div><strong>Valor:</strong> <strong style="color:var(--accent)">${fmt(proj.value)}</strong> (${proj.products.length} ${proj.products.length === 1 ? 'item' : 'itens'})</div>
+      <div><strong>Prazo de Entrega:</strong> ${deadlineStr}</div>
+    `;
+  }
+
+  overlay.classList.add('open');
+}
+
+function closeFaturarSuccessModal() {
+  document.getElementById('faturarSuccessOverlay')?.classList.remove('open');
+}
+
+function sendFaturarWhatsAppConfirmation() {
+  if (!lastFaturadoProject) return;
+  const p = lastFaturadoProject;
+  const cl = clients.find(c => c.name.toLowerCase().trim() === p.client.toLowerCase().trim());
+  const phone = cl?.phone ? cl.phone.replace(/\D/g, '') : '';
+  
+  const firstName = p.client.split(' ')[0];
+  const itemsText = (p.products || []).map(prod => `  • ${prod.name} (${fmt(prod.price)})`).join('\n');
+  const deadlineStr = p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString('pt-BR') : 'A combinar';
+  
+  let payCondText = 'Conforme acordado';
+  if (p.paymentCondition === '50_50') payCondText = '50% Entrada + 50% na Entrega';
+  else if (p.paymentCondition === 'vista') payCondText = 'À Vista';
+  else if (p.paymentCondition === 'entrada_parc') payCondText = 'Entrada + Parcelas do Saldo';
+  else if (p.paymentCondition === 'parcelado') payCondText = 'Parcelamento';
+
+  const msg = `Olá, *${firstName}*! Tudo bem?
+
+Confirmamos o início do seu projeto *${p.name}*! 🎉
+
+📋 *Serviços Contratados:*
+${itemsText}
+
+💰 *Valor Total:* ${fmt(p.value)}
+💳 *Condição de Pagamento:* ${payCondText}
+📅 *Prazo Estimado de Entrega:* ${deadlineStr}
+
+Já estamos iniciando os trabalhos! Qualquer dúvida, estamos à total disposição. ✨`;
+
+  const url = `https://api.whatsapp.com/send?phone=${phone ? '55' + phone : ''}&text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
+function goToKanbanProject() {
+  closeFaturarSuccessModal();
+  window.location.href = 'index.html';
 }
 
 function sendOrcamentoWhatsApp(id) {

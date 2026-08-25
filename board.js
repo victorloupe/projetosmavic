@@ -219,6 +219,7 @@ function createCardHTML(p, cardIdx=0){
       <div class="kcard-tags">
         ${!isFinalColumn(p.column)?`<span class="badge ${pMap[p.priority]||'b-baixa'}">${pIcon[p.priority]||'🟢'} ${p.priority}</span>`:''}
         <span class="badge" style="background:${typeBg(p.type)};color:${typeColor(p.type)}">${p.type}</span>
+        ${p.originBudgetNumber?`<a href="orcamento.html" class="proj-origin-badge" title="Orçamento de Origem #${p.originBudgetNumber}" onclick="event.stopPropagation()"><i class="bi bi-file-earmark-spreadsheet"></i> #${p.originBudgetNumber}</a>`:''}
         ${total>0?`<span class="badge ${sClass}" style="margin-left:auto">${sLabel}</span>`:''}
       </div>
     </div>
@@ -371,7 +372,7 @@ function openProjectModal(id=null){
   
   if(id){
     const p=projects.find(x=>x.id===id);if(!p)return;
-    document.getElementById('projModalTitle').textContent='Editar Projeto';
+    document.getElementById('projModalTitle').innerHTML=`Editar Projeto ${p.originBudgetNumber?`<a href="orcamento.html" class="proj-origin-badge" style="font-size:11px;margin-left:6px;vertical-align:middle" title="Ver Orçamento de Origem"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamento #${p.originBudgetNumber}</a>`:''}`;
     document.getElementById('projId').value=p.id;
     document.getElementById('projName').value=p.name;
     document.getElementById('projClient').value=p.client;
@@ -519,12 +520,15 @@ function saveProject(){
   const name=document.getElementById('projName').value.trim();const client=document.getElementById('projClient').value;
   if(!name||!client)return showToast('Cliente e Nome são obrigatórios','warning');
   const id=document.getElementById('projId').value;
+  const existingProj = id ? projects.find(x => x.id === parseInt(id)) : null;
   const pData={
     id:id?parseInt(id):Date.now(),
     name,
     client,
     image:document.getElementById('projImage').value.trim(),
     driveLink:document.getElementById('projDriveLink').value.trim(),
+    originBudgetId: existingProj?.originBudgetId || null,
+    originBudgetNumber: existingProj?.originBudgetNumber || null,
     value:parseCurrencyInput(document.getElementById('projValue').value),
     payments:tempPayments,
     paid:tempPayments.reduce((s,x)=>s+parseFloat(x.amount||0),0),

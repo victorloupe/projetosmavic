@@ -681,7 +681,7 @@ function createCardHTML(p, cardIdx=0){
         <span style="font-family:'Outfit',sans-serif;font-weight:700">${subDone}/${subs.length}</span>
       </div>
       <div class="prog" style="margin:0 8px 6px"><div class="prog-fill ${subPct===100?'done':''}" style="width:${subPct}%"></div></div>
-      <div style="max-height:96px;overflow-y:auto">
+      <div style="max-height:185px;overflow-y:auto">
         ${subs.map(s=>{
           const sIsCurrent = isCurrent(s.id);
           return `<div class="sub-row ${sIsCurrent?'sub-in-progress':''}"><input type="checkbox" disabled ${s.done?'checked':''}><span class="${s.done?'sub-done':''}">${sIsCurrent?'<i class="bi bi-play-fill" style="color:var(--accent);font-size:10px;margin-right:2px"></i>':''}${s.text}</span></div>`;

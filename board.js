@@ -209,7 +209,7 @@ function createCardHTML(p, cardIdx=0){
       </button>
     </div>
   ` : '';
-  return `<div class="kcard ${dlClass} ${pinnedCards.has(p.id)?'pinned':''}" data-id="${p.id}" draggable="true" onclick="togglePin(event,${p.id})" style="animation-delay:${cardIdx*0.04}s;--type-color:${typeColor(p.type)}">
+  return `<div class="kcard ${dlClass} ${pinnedCards.has(p.id)?'pinned':''}" data-id="${p.id}" draggable="true" onclick="togglePin(event,${p.id})" style="--type-color:${typeColor(p.type)}">
     ${subs.length?`<div class="kcard-prog-bar"><div class="kcard-prog-fill" style="width:${subPct}%;background:${progColor}"></div></div>`:''}
     ${p.image?`<img src="${p.image}" class="kcard-cover" onerror="this.style.display='none'">`:''}
     <div class="kcard-body">
@@ -283,10 +283,60 @@ document.addEventListener('click',()=>document.querySelectorAll('.sort-menu:not(
 // ══════════════════════════════════════════
 //  DRAG & DROP EVENTS
 // ══════════════════════════════════════════
+function bindCardDragEvents(card){
+  card.addEventListener('dragstart',e=>{isDragging=true;e.dataTransfer.setData('text/plain',card.dataset.id);setTimeout(()=>card.classList.add('dragging'),0);});
+  card.addEventListener('dragend',()=>{card.classList.remove('dragging');setTimeout(()=>isDragging=false,50);});
+
+  card.addEventListener('touchstart',e=>{
+    const touch=e.touches[0];
+    touchTimer=setTimeout(()=>{
+      touchDragId=card.dataset.id;navigator.vibrate?.(30);
+      const r=card.getBoundingClientRect();
+      touchGhost=card.cloneNode(true);
+      Object.assign(touchGhost.style,{position:'fixed',opacity:'0.8',pointerEvents:'none',zIndex:'9999',width:r.width+'px',left:(touch.clientX-r.width/2)+'px',top:(touch.clientY-24)+'px',transform:'rotate(2deg)',boxShadow:'0 8px 32px rgba(0,0,0,.2)',borderRadius:'10px'});
+      document.body.appendChild(touchGhost);card.classList.add('dragging');
+    },400);
+  },{passive:true});
+  card.addEventListener('touchmove',e=>{
+    clearTimeout(touchTimer);if(!touchDragId)return;e.preventDefault();
+    const touch=e.touches[0];
+    if(touchGhost){touchGhost.style.left=(touch.clientX-parseInt(touchGhost.style.width)/2)+'px';touchGhost.style.top=(touch.clientY-24)+'px';}
+    if(touchGhost)touchGhost.style.display='none';
+    const el=document.elementFromPoint(touch.clientX,touch.clientY);
+    if(touchGhost)touchGhost.style.display='';
+    document.querySelectorAll('.kdrop').forEach(z=>z.classList.remove('drop-over'));
+    el?.closest('.kdrop')?.classList.add('drop-over');
+  },{passive:false});
+  card.addEventListener('touchend',e=>{
+    clearTimeout(touchTimer);if(!touchDragId)return;
+    const touch=e.changedTouches[0];
+    if(touchGhost){touchGhost.style.display='none';}
+    const el=document.elementFromPoint(touch.clientX,touch.clientY);
+    if(touchGhost){touchGhost.remove();touchGhost=null;}
+    document.querySelectorAll('.kdrop').forEach(z=>z.classList.remove('drop-over'));
+    const zone=el?.closest('.kdrop');
+    if(zone){
+      const col=zone.dataset.column,id=parseInt(touchDragId);
+      const idx=projects.findIndex(p=>p.id===id);
+      if(idx>-1&&projects[idx].column!==col){
+        projects[idx].column=col;renderBoard();scheduleSync();
+        if(isHiddenColumn(col)) showToast(`Movido para ${col} — não aparece mais pro cliente`,'warning');
+        else showToast(`Movido para ${col}`,'info');
+      }
+    }
+    document.querySelector(`.kcard[data-id="${touchDragId}"]`)?.classList.remove('dragging');
+    touchDragId=null;
+  });
+  card.addEventListener('touchcancel',()=>{
+    clearTimeout(touchTimer);if(touchGhost){touchGhost.remove();touchGhost=null;}
+    if(touchDragId)document.querySelector(`.kcard[data-id="${touchDragId}"]`)?.classList.remove('dragging');
+    touchDragId=null;document.querySelectorAll('.kdrop').forEach(z=>z.classList.remove('drop-over'));
+  });
+}
+
 function setupDragDrop(){
   document.querySelectorAll('.kcard[draggable], .kcard-compact[draggable]').forEach(card=>{
-    card.addEventListener('dragstart',e=>{isDragging=true;e.dataTransfer.setData('text/plain',card.dataset.id);setTimeout(()=>card.classList.add('dragging'),0);});
-    card.addEventListener('dragend',()=>{card.classList.remove('dragging');setTimeout(()=>isDragging=false,50);});
+    bindCardDragEvents(card);
   });
   document.querySelectorAll('.kdrop').forEach(zone=>{
     zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drop-over');});
@@ -296,63 +346,46 @@ function setupDragDrop(){
       const id=parseInt(e.dataTransfer.getData('text/plain'));const col=zone.dataset.column;
       const idx=projects.findIndex(p=>p.id===id);
       if(idx>-1&&projects[idx].column!==col){
-          projects[idx].column=col;renderBoard();scheduleSync();
-          if(isHiddenColumn(col)) showToast(`Movido para ${col} — não aparece mais pro cliente`,'warning');
-          else showToast(`Movido para ${col}`,'info');
-        }
+        projects[idx].column=col;renderBoard();scheduleSync();
+        if(isHiddenColumn(col)) showToast(`Movido para ${col} — não aparece mais pro cliente`,'warning');
+        else showToast(`Movido para ${col}`,'info');
+      }
     });
   });
-  setupTouchDrag();
 }
 
-function setupTouchDrag(){
-  document.querySelectorAll('.kcard[draggable], .kcard-compact[draggable]').forEach(card=>{
-    card.addEventListener('touchstart',e=>{
-      const touch=e.touches[0];
-      touchTimer=setTimeout(()=>{
-        touchDragId=card.dataset.id;navigator.vibrate?.(30);
-        const r=card.getBoundingClientRect();
-        touchGhost=card.cloneNode(true);
-        Object.assign(touchGhost.style,{position:'fixed',opacity:'0.8',pointerEvents:'none',zIndex:'9999',width:r.width+'px',left:(touch.clientX-r.width/2)+'px',top:(touch.clientY-24)+'px',transform:'rotate(2deg)',boxShadow:'0 8px 32px rgba(0,0,0,.2)',borderRadius:'10px'});
-        document.body.appendChild(touchGhost);card.classList.add('dragging');
-      },400);
-    },{passive:true});
-    card.addEventListener('touchmove',e=>{
-      clearTimeout(touchTimer);if(!touchDragId)return;e.preventDefault();
-      const touch=e.touches[0];
-      if(touchGhost){touchGhost.style.left=(touch.clientX-parseInt(touchGhost.style.width)/2)+'px';touchGhost.style.top=(touch.clientY-24)+'px';}
-      if(touchGhost)touchGhost.style.display='none';
-      const el=document.elementFromPoint(touch.clientX,touch.clientY);
-      if(touchGhost)touchGhost.style.display='';
-      document.querySelectorAll('.kdrop').forEach(z=>z.classList.remove('drop-over'));
-      el?.closest('.kdrop')?.classList.add('drop-over');
-    },{passive:false});
-    card.addEventListener('touchend',e=>{
-      clearTimeout(touchTimer);if(!touchDragId)return;
-      const touch=e.changedTouches[0];
-      if(touchGhost){touchGhost.style.display='none';}
-      const el=document.elementFromPoint(touch.clientX,touch.clientY);
-      if(touchGhost){touchGhost.remove();touchGhost=null;}
-      document.querySelectorAll('.kdrop').forEach(z=>z.classList.remove('drop-over'));
-      const zone=el?.closest('.kdrop');
-      if(zone){
-        const col=zone.dataset.column,id=parseInt(touchDragId);
-        const idx=projects.findIndex(p=>p.id===id);
-        if(idx>-1&&projects[idx].column!==col){
-          projects[idx].column=col;renderBoard();scheduleSync();
-          if(isHiddenColumn(col)) showToast(`Movido para ${col} — não aparece mais pro cliente`,'warning');
-          else showToast(`Movido para ${col}`,'info');
-        }
-      }
-      document.querySelector(`.kcard[data-id="${touchDragId}"]`)?.classList.remove('dragging');
-      touchDragId=null;
-    });
-    card.addEventListener('touchcancel',()=>{
-      clearTimeout(touchTimer);if(touchGhost){touchGhost.remove();touchGhost=null;}
-      if(touchDragId)document.querySelector(`.kcard[data-id="${touchDragId}"]`)?.classList.remove('dragging');
-      touchDragId=null;document.querySelectorAll('.kdrop').forEach(z=>z.classList.remove('drop-over'));
-    });
-  });
+function updateCardDOM(pId){
+  const p = projects.find(x => x.id === pId);
+  if (!p) return false;
+  const oldCard = document.querySelector(`.kcard[data-id="${pId}"], .kcard-compact[data-id="${pId}"]`);
+  if (!oldCard) {
+    renderBoard();
+    return true;
+  }
+  const isCompact = oldCard.classList.contains('kcard-compact') || isHiddenColumn(p.column);
+  const scrollContainer = oldCard.querySelector('.kcard-exp div[style*="overflow-y:auto"]');
+  const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+
+  const temp = document.createElement('div');
+  temp.innerHTML = isCompact ? createCompactCardHTML(p) : createCardHTML(p);
+  const newCard = temp.firstElementChild;
+  if (!newCard) {
+    renderBoard();
+    return true;
+  }
+
+  oldCard.replaceWith(newCard);
+  bindCardDragEvents(newCard);
+
+  if (pinnedCards.has(p.id) && !newCard.classList.contains('pinned')) {
+    newCard.classList.add('pinned');
+  }
+
+  const newScrollContainer = newCard.querySelector('.kcard-exp div[style*="overflow-y:auto"]');
+  if (newScrollContainer && scrollTop) {
+    newScrollContainer.scrollTop = scrollTop;
+  }
+  return true;
 }
 
 function togglePin(e,id){
@@ -908,14 +941,18 @@ function moveNext(id){
   else showToast(`➡ ${p.column}`,'info');
 }
 
-function toggleFinHist(id){if(expandedFin.has(id))expandedFin.delete(id);else expandedFin.add(id);renderBoard();}
+function toggleFinHist(id){
+  if(expandedFin.has(id)) expandedFin.delete(id);
+  else expandedFin.add(id);
+  updateCardDOM(id);
+}
 function toggleSub(pId,sId){
   const p=projects.find(x=>x.id===pId);if(!p)return;
   const s=p.subtasks?.find(x=>x.id===sId);
   if(s){
     s.done=!s.done;
     if(s.done) s.current=false;
-    renderBoard();
+    updateCardDOM(pId);
     scheduleSync();
   }
 }
@@ -927,7 +964,7 @@ function toggleSubActive(pId,sId){
       if(s.current) s.done = false;
     }
   });
-  renderBoard();
+  updateCardDOM(pId);
   scheduleSync();
 }
 

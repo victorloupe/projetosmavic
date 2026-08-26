@@ -925,6 +925,7 @@ function syncLocal(){
 }
 
 function scheduleSync(){
+  sessionStorage.setItem('mavic_last_local_save', String(Date.now()));
   localStorage.setItem('mavic_pending_sync', 'true');
   syncLocal();
   clearTimeout(syncTimer);

@@ -794,7 +794,6 @@ textarea.inp {
   overflow: hidden;
   position: relative;
   user-select: none;
-  animation: cardIn .2s ease both;
   box-shadow: var(--sh);
 }
 
@@ -1058,7 +1057,6 @@ textarea.inp {
   cursor: grab;
   transition: background .15s;
   user-select: none;
-  animation: cardIn .22s ease both;
 }
 
 .kdrop-compact .kcard-compact:last-child {

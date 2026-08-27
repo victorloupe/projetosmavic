@@ -1249,6 +1249,35 @@ function toggleSelectAllFaturarItems() {
   handleFatConditionChange();
 }
 
+function findSuggestedProjectForBudget(b, clientProjs) {
+  if (!b || !clientProjs || !clientProjs.length) return null;
+
+  const bTitle = (b.title || '').toLowerCase().trim();
+
+  // 1. Vinculado diretamente ao ID da proposta de origem
+  const byOrigin = clientProjs.find(p => p.originBudgetId === b.id || (Array.isArray(b.convertedProjects) && b.convertedProjects.some(cp => cp.id === p.id)));
+  if (byOrigin) return byOrigin;
+
+  // 2. Nome idêntico ao título da proposta (ex: "Clinica Thafarel")
+  if (bTitle) {
+    const byExactName = clientProjs.find(p => (p.name || '').toLowerCase().trim() === bTitle);
+    if (byExactName) return byExactName;
+
+    // 3. Nome contém ou está contido no título da proposta
+    const byPartialName = clientProjs.find(p => {
+      const pName = (p.name || '').toLowerCase().trim();
+      return pName && (bTitle.includes(pName) || pName.includes(bTitle));
+    });
+    if (byPartialName) return byPartialName;
+  }
+
+  // 4. Se só houver 1 projeto não-finalizado do cliente
+  const activeProjs = clientProjs.filter(p => !['Finalizado', 'Concluído', 'Entregue'].includes(p.column));
+  if (activeProjs.length === 1) return activeProjs[0];
+
+  return null;
+}
+
 function transformBudgetToProject(id) {
   const b = budgets.find(x => x.id === id);
   if (!b) return;
@@ -1296,12 +1325,41 @@ function transformBudgetToProject(id) {
     if (clientProjs.length > 0) {
       existRadio.disabled = false;
       existWrap.classList.remove('disabled');
-      if (existDesc) existDesc.textContent = `${clientProjs.length} projeto(s) deste cliente`;
-      existSel.innerHTML = '<option value="">Selecione o projeto de destino...</option>' +
-        clientProjs.map(p => {
+
+      const suggestedProj = findSuggestedProjectForBudget(b, clientProjs);
+
+      if (existDesc) {
+        existDesc.textContent = suggestedProj 
+          ? `Sugestão: ${suggestedProj.name}` 
+          : `${clientProjs.length} projeto(s) deste cliente`;
+      }
+
+      // Ordenar: sugestão em primeiro lugar, projetos ativos em seguida, finalizados por último
+      const sortedProjs = [...clientProjs].sort((x, y) => {
+        if (suggestedProj && x.id === suggestedProj.id) return -1;
+        if (suggestedProj && y.id === suggestedProj.id) return 1;
+        const isFinalX = ['Finalizado', 'Concluído', 'Entregue'].includes(x.column);
+        const isFinalY = ['Finalizado', 'Concluído', 'Entregue'].includes(y.column);
+        if (!isFinalX && isFinalY) return -1;
+        if (isFinalX && !isFinalY) return 1;
+        return (y.id || 0) - (x.id || 0);
+      });
+
+      existSel.innerHTML = 
+        (suggestedProj ? '' : '<option value="">Selecione o projeto de destino...</option>') +
+        sortedProjs.map(p => {
+          const isSuggested = suggestedProj && (p.id === suggestedProj.id);
           const isOrigin = (p.originBudgetId === b.id);
-          return `<option value="${p.id}" ${isOrigin ? 'selected' : ''}>${escapeHtml(p.name)} [${escapeHtml(p.column)}] - Atual: ${fmt(p.value || 0)}${isOrigin ? ' ★ (Origem desta proposta)' : ''}</option>`;
-        }).join('');
+          let tag = '';
+          if (isSuggested) tag = ' ⭐ Sugestão (Mesmo Nome / Origem)';
+          else if (isOrigin) tag = ' ★ (Origem desta proposta)';
+          return `<option value="${p.id}" ${isSuggested ? 'selected' : ''}>${isSuggested ? '⭐ ' : ''}${escapeHtml(p.name)} [${escapeHtml(p.column)}] - Atual: ${fmt(p.value || 0)}${tag}</option>`;
+        }).join('') +
+        (suggestedProj ? '<option value="">── Outro projeto (escolher manualmente) ──</option>' : '');
+
+      if (suggestedProj) {
+        existSel.value = String(suggestedProj.id);
+      }
     } else {
       existRadio.disabled = true;
       existWrap.classList.add('disabled');

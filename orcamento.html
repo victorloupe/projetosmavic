@@ -388,7 +388,35 @@
       <div id="fatOrcInfo" style="font-size:13.5px;font-weight:600;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"></div>
     </div>
 
+    <!-- ESCOLHA DO DESTINO: NOVO PROJETO OU PROJETO EXISTENTE -->
     <div class="fld" style="margin-bottom:12px">
+      <label class="flbl"><i class="bi bi-diagram-3" style="color:var(--accent)"></i> Destino do Faturamento</label>
+      <div class="fat-dest-grid">
+        <label class="fat-dest-opt active" id="fatDestNewWrap" onclick="setFaturarDestination('new')">
+          <input type="radio" name="fatDestination" id="fatDestNew" value="new" checked onchange="handleFatDestinationChange()">
+          <div>
+            <div style="font-weight:700;font-size:12.5px;color:var(--text)"><i class="bi bi-plus-circle" style="color:var(--accent)"></i> Criar Novo Projeto</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">Abre um novo card no Quadro</div>
+          </div>
+        </label>
+        <label class="fat-dest-opt" id="fatDestExistWrap" onclick="setFaturarDestination('existing')">
+          <input type="radio" name="fatDestination" id="fatDestExist" value="existing" onchange="handleFatDestinationChange()">
+          <div>
+            <div style="font-weight:700;font-size:12.5px;color:var(--text)"><i class="bi bi-folder-plus" style="color:var(--accent)"></i> Projeto Existente</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px" id="fatDestExistDesc">Adiciona a um card já aberto</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- SE FOR PROJETO EXISTENTE: SELECT DO PROJETO -->
+    <div class="fld d-none" id="fatExistingProjectWrap" style="margin-bottom:12px">
+      <label class="flbl"><i class="bi bi-folder2-open" style="color:var(--accent)"></i> Selecione o Projeto de Destino *</label>
+      <select class="inp inp-sm" id="fatExistingProjectSelect" onchange="handleExistingProjectSelected()" style="font-weight:600"></select>
+    </div>
+
+    <!-- SE FOR NOVO PROJETO: NOME DO PROJETO -->
+    <div class="fld" id="fatNewProjectTitleWrap" style="margin-bottom:12px">
       <label class="flbl">Nome do Projeto no Kanban *</label>
       <input type="text" class="inp inp-sm" id="fatProjectTitle" placeholder="Nome do projeto..." style="font-weight:600">
     </div>
@@ -683,6 +711,6 @@
 </nav>
 
 <script src="common.js?v=114"></script>
-<script src="orcamento.js?v=115"></script>
+<script src="orcamento.js?v=116"></script>
 </body>
 </html>

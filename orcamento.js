@@ -1058,6 +1058,56 @@ let faturarSelectedItems = [];
 let faturarItemQtys = {};
 let lastFaturadoProject = null;
 let lastFaturadoBudget = null;
+let currentFaturarDestination = 'new'; // 'new' | 'existing'
+let lastFaturadoIsExisting = false;
+
+function setFaturarDestination(mode) {
+  const radio = document.getElementById(mode === 'existing' ? 'fatDestExist' : 'fatDestNew');
+  if (radio && radio.disabled) return;
+  if (radio) radio.checked = true;
+  handleFatDestinationChange();
+}
+
+function handleFatDestinationChange() {
+  const isExist = document.getElementById('fatDestExist')?.checked;
+  currentFaturarDestination = isExist ? 'existing' : 'new';
+
+  const wrapNew = document.getElementById('fatDestNewWrap');
+  const wrapExist = document.getElementById('fatDestExistWrap');
+  const titleWrap = document.getElementById('fatNewProjectTitleWrap');
+  const existWrap = document.getElementById('fatExistingProjectWrap');
+  const noticeText = document.getElementById('fatConversionNoticeText');
+
+  if (isExist) {
+    wrapNew?.classList.remove('active');
+    wrapExist?.classList.add('active');
+    titleWrap?.classList.add('d-none');
+    existWrap?.classList.remove('d-none');
+    if (noticeText) {
+      noticeText.innerHTML = 'Os itens selecionados e o valor serão <strong>incorporados ao projeto existente</strong> selecionado.';
+    }
+    handleExistingProjectSelected();
+  } else {
+    wrapNew?.classList.add('active');
+    wrapExist?.classList.remove('active');
+    titleWrap?.classList.remove('d-none');
+    existWrap?.classList.add('d-none');
+    if (noticeText) {
+      noticeText.innerHTML = 'O projeto será inserido na coluna <strong>"Briefing"</strong> com os produtos como checklist de tarefas.';
+    }
+  }
+}
+
+function handleExistingProjectSelected() {
+  const projId = document.getElementById('fatExistingProjectSelect')?.value;
+  if (!projId) return;
+  const p = projects.find(x => x.id === parseInt(projId));
+  if (!p) return;
+
+  if (p.priority) document.getElementById('fatPriority').value = p.priority;
+  if (p.date) document.getElementById('fatDeadline').value = p.date;
+  updateFaturarPlanPreview();
+}
 
 function getFaturarSelectedTotals(b) {
   if (!b || !Array.isArray(b.items)) {
@@ -1230,7 +1280,37 @@ function transformBudgetToProject(id) {
   
   const condSel = document.getElementById('fatPayCondition');
   if (condSel) condSel.value = '50_50';
-  
+
+  // Configuração dos destinos (Novo Projeto vs Projeto Existente)
+  currentFaturarDestination = 'new';
+  const newRadio = document.getElementById('fatDestNew');
+  if (newRadio) newRadio.checked = true;
+
+  const clientProjs = projects.filter(p => !p.archived && (p.client || '').toLowerCase().trim() === (b.client || '').toLowerCase().trim());
+  const existRadio = document.getElementById('fatDestExist');
+  const existWrap = document.getElementById('fatDestExistWrap');
+  const existDesc = document.getElementById('fatDestExistDesc');
+  const existSel = document.getElementById('fatExistingProjectSelect');
+
+  if (existRadio && existWrap && existSel) {
+    if (clientProjs.length > 0) {
+      existRadio.disabled = false;
+      existWrap.classList.remove('disabled');
+      if (existDesc) existDesc.textContent = `${clientProjs.length} projeto(s) deste cliente`;
+      existSel.innerHTML = '<option value="">Selecione o projeto de destino...</option>' +
+        clientProjs.map(p => {
+          const isOrigin = (p.originBudgetId === b.id);
+          return `<option value="${p.id}" ${isOrigin ? 'selected' : ''}>${escapeHtml(p.name)} [${escapeHtml(p.column)}] - Atual: ${fmt(p.value || 0)}${isOrigin ? ' ★ (Origem desta proposta)' : ''}</option>`;
+        }).join('');
+    } else {
+      existRadio.disabled = true;
+      existWrap.classList.add('disabled');
+      if (existDesc) existDesc.textContent = 'Nenhum projeto ativo deste cliente';
+      existSel.innerHTML = '<option value="">Nenhum projeto ativo deste cliente no Kanban</option>';
+    }
+  }
+
+  handleFatDestinationChange();
   renderFaturarItemsList(b);
   handleFatConditionChange();
   document.getElementById('faturarOverlay').classList.add('open');
@@ -1618,7 +1698,23 @@ function confirmFaturarOrcamento() {
     return showToast('Selecione pelo menos um item para faturar!', 'warning');
   }
 
-  const projName = document.getElementById('fatProjectTitle')?.value.trim() || b.title || `Projeto - ${b.client}`;
+  const isExisting = (currentFaturarDestination === 'existing');
+  let targetProject = null;
+
+  if (isExisting) {
+    const selectedProjId = document.getElementById('fatExistingProjectSelect')?.value;
+    if (!selectedProjId) {
+      return showToast('Selecione um projeto existente para incorporar os itens!', 'warning');
+    }
+    targetProject = projects.find(x => x.id === parseInt(selectedProjId));
+    if (!targetProject) {
+      return showToast('Projeto selecionado não foi encontrado!', 'error');
+    }
+  }
+
+  const projName = isExisting 
+    ? targetProject.name 
+    : (document.getElementById('fatProjectTitle')?.value.trim() || b.title || `Projeto - ${b.client}`);
   const priority = document.getElementById('fatPriority').value;
   const deadline = document.getElementById('fatDeadline').value;
   if (!deadline) return showToast('Informe o prazo de entrega', 'warning');
@@ -1653,32 +1749,64 @@ function confirmFaturarOrcamento() {
   const paid = payments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
   const condition = document.getElementById('fatPayCondition')?.value || '50_50';
 
-  const newProj = {
-    id: Date.now(),
-    name: projName,
-    client: b.client,
-    image: '',
-    driveLink: '',
-    originBudgetId: b.id,
-    originBudgetNumber: b.number || b.id,
-    value: value,
-    payments: payments,
-    paid: paid,
-    installments: installments,
-    paymentCondition: condition,
-    products: products,
-    product: products.map(p => p.name).join(', '),
-    type: b.projectType || 'Outro',
-    priority: priority,
-    column: 'Briefing',
-    date: deadline,
-    note: b.notes ? `Observações da Proposta:\n${b.notes}` : '',
-    subtasks: subtasks,
-    archived: false,
-    createdAt: Date.now()
-  };
+  if (isExisting) {
+    // ════════════════════════════════════════════════════════
+    // INCORPORAR NO PROJETO EXISTENTE
+    // ════════════════════════════════════════════════════════
+    targetProject.products = [...(targetProject.products || []), ...products];
+    targetProject.product = targetProject.products.map(p => p.name).join(', ');
+    targetProject.subtasks = [...(targetProject.subtasks || []), ...subtasks];
+    targetProject.value = (parseFloat(targetProject.value) || 0) + value;
+    
+    // Anexar parcelas e pagamentos
+    targetProject.installments = [...(targetProject.installments || []), ...installments];
+    targetProject.payments = [...(targetProject.payments || []), ...payments];
+    targetProject.paid = (targetProject.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+    
+    if (deadline && (!targetProject.date || deadline > targetProject.date)) {
+      targetProject.date = deadline;
+    }
+    if (priority) targetProject.priority = priority;
+    
+    if (!targetProject.originBudgetId) {
+      targetProject.originBudgetId = b.id;
+      targetProject.originBudgetNumber = b.number || b.id;
+    }
 
-  projects.push(newProj);
+    if (typeof reconcileProjectFinancials === 'function') {
+      reconcileProjectFinancials(targetProject);
+    }
+  } else {
+    // ════════════════════════════════════════════════════════
+    // CRIAR NOVO PROJETO
+    // ════════════════════════════════════════════════════════
+    const newProj = {
+      id: Date.now(),
+      name: projName,
+      client: b.client,
+      image: '',
+      driveLink: '',
+      originBudgetId: b.id,
+      originBudgetNumber: b.number || b.id,
+      value: value,
+      payments: payments,
+      paid: paid,
+      installments: installments,
+      paymentCondition: condition,
+      products: products,
+      product: products.map(p => p.name).join(', '),
+      type: b.projectType || 'Outro',
+      priority: priority,
+      column: 'Briefing',
+      date: deadline,
+      note: b.notes ? `Observações da Proposta:\n${b.notes}` : '',
+      subtasks: subtasks,
+      archived: false,
+      createdAt: Date.now()
+    };
+    projects.push(newProj);
+    targetProject = newProj;
+  }
 
   // Calcular itens remanescentes do orçamento
   let isFullyConverted = true;
@@ -1705,8 +1833,9 @@ function confirmFaturarOrcamento() {
     id: Date.now(),
     date: today(),
     time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    projectId: newProj.id,
-    projectName: newProj.name,
+    projectId: targetProject.id,
+    projectName: targetProject.name,
+    isExistingProject: isExisting,
     value: value,
     items: selected.map(it => {
       const q = faturarItemQtys[it.id] || parseInt(it.qty || 1);
@@ -1716,12 +1845,17 @@ function confirmFaturarOrcamento() {
 
   // Projetos Vinculados
   if (!Array.isArray(b.convertedProjects)) b.convertedProjects = [];
-  b.convertedProjects.push({
-    id: newProj.id,
-    name: newProj.name,
-    value: value,
-    date: today()
-  });
+  const existingConverted = b.convertedProjects.find(cp => cp.id === targetProject.id);
+  if (!existingConverted) {
+    b.convertedProjects.push({
+      id: targetProject.id,
+      name: targetProject.name,
+      value: value,
+      date: today()
+    });
+  } else {
+    existingConverted.value = (parseFloat(existingConverted.value) || 0) + value;
+  }
 
   if (isFullyConverted) {
     b.status = 'Convertido';
@@ -1732,16 +1866,17 @@ function confirmFaturarOrcamento() {
     b.status = 'Parcial';
   }
 
-  lastFaturadoProject = newProj;
+  lastFaturadoProject = targetProject;
   lastFaturadoBudget = b;
+  lastFaturadoIsExisting = isExisting;
 
   scheduleSync();
   closeFaturarModal();
   renderOrcamentos();
-  openFaturarSuccessModal(newProj, b, isFullyConverted);
+  openFaturarSuccessModal(targetProject, b, isFullyConverted, isExisting);
 }
 
-function openFaturarSuccessModal(proj, budget, isFullyConverted) {
+function openFaturarSuccessModal(proj, budget, isFullyConverted, isExisting = false) {
   const overlay = document.getElementById('faturarSuccessOverlay');
   if (!overlay) return;
 
@@ -1750,19 +1885,25 @@ function openFaturarSuccessModal(proj, budget, isFullyConverted) {
   const detailsEl = document.getElementById('fatSuccessDetails');
 
   if (titleEl) {
-    titleEl.textContent = isFullyConverted ? 'Orçamento Faturado com Sucesso!' : 'Projeto Criado (Faturamento Parcial)!';
+    titleEl.textContent = isExisting
+      ? 'Itens Incorporados ao Projeto com Sucesso!'
+      : (isFullyConverted ? 'Orçamento Faturado com Sucesso!' : 'Projeto Criado (Faturamento Parcial)!');
   }
   if (msgEl) {
-    msgEl.innerHTML = isFullyConverted 
-      ? `A proposta <strong>#${budget.number || budget.id}</strong> foi convertida integralmente em projeto no Kanban.`
-      : `O projeto <strong>${escapeHtml(proj.name)}</strong> foi gerado e a proposta <strong>#${budget.number || budget.id}</strong> continua em aberto como <strong>Parcial</strong>.`;
+    if (isExisting) {
+      msgEl.innerHTML = `Os itens selecionados foram adicionados ao projeto existente <strong>${escapeHtml(proj.name)}</strong> no Kanban.`;
+    } else {
+      msgEl.innerHTML = isFullyConverted 
+        ? `A proposta <strong>#${budget.number || budget.id}</strong> foi convertida integralmente em projeto no Kanban.`
+        : `O projeto <strong>${escapeHtml(proj.name)}</strong> foi gerado e a proposta <strong>#${budget.number || budget.id}</strong> continua em aberto como <strong>Parcial</strong>.`;
+    }
   }
   if (detailsEl) {
     const deadlineStr = proj.date ? new Date(proj.date + 'T12:00:00').toLocaleDateString('pt-BR') : 'A definir';
     detailsEl.innerHTML = `
       <div><strong>Cliente:</strong> ${escapeHtml(proj.client)}</div>
-      <div><strong>Projeto:</strong> ${escapeHtml(proj.name)}</div>
-      <div><strong>Valor:</strong> <strong style="color:var(--accent)">${fmt(proj.value)}</strong> (${proj.products.length} ${proj.products.length === 1 ? 'item' : 'itens'})</div>
+      <div><strong>Projeto:</strong> ${escapeHtml(proj.name)} ${isExisting ? '<span class="badge b-alta" style="font-size:10px;margin-left:4px;padding:2px 6px">Projeto Atualizado</span>' : ''}</div>
+      <div><strong>Valor Total do Projeto:</strong> <strong style="color:var(--accent)">${fmt(proj.value)}</strong> (${(proj.products || []).length} ${(proj.products || []).length === 1 ? 'item' : 'itens'})</div>
       <div><strong>Prazo de Entrega:</strong> ${deadlineStr}</div>
     `;
   }
@@ -1790,7 +1931,20 @@ function sendFaturarWhatsAppConfirmation() {
   else if (p.paymentCondition === 'entrada_parc') payCondText = 'Entrada + Parcelas do Saldo';
   else if (p.paymentCondition === 'parcelado') payCondText = 'Parcelamento';
 
-  const msg = `Olá, *${firstName}*! Tudo bem?
+  const isExisting = lastFaturadoIsExisting;
+
+  const msg = isExisting ? `Olá, *${firstName}*! Tudo bem?
+
+Confirmamos a atualização dos serviços no seu projeto *${p.name}*! 🎉
+
+📋 *Serviços Contratados:*
+${itemsText}
+
+💰 *Valor Total do Projeto:* ${fmt(p.value)}
+📅 *Prazo Estimado de Entrega:* ${deadlineStr}
+
+Já estamos dando andamento! Qualquer dúvida, estamos à total disposição. ✨`
+: `Olá, *${firstName}*! Tudo bem?
 
 Confirmamos o início do seu projeto *${p.name}*! 🎉
 

@@ -4860,8 +4860,44 @@ textarea.inp {
 }
 
 /* ══════════════════════════════════════════
-   FATURAMENTO - SELEÇÃO DE ITENS
+   FATURAMENTO - DESTINO & SELEÇÃO DE ITENS
    ══════════════════════════════════════════ */
+.fat-dest-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.fat-dest-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+.fat-dest-opt:hover:not(.disabled) {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+.fat-dest-opt.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.fat-dest-opt.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--surface2);
+}
+.fat-dest-opt input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .fat-item-row {
   display: flex;
   align-items: center;

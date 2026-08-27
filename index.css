@@ -533,6 +533,13 @@ textarea.inp {
   flex-wrap: wrap;
 }
 
+.toolbar .inp.filter-active {
+  border-color: var(--accent) !important;
+  background: var(--accent-bg) !important;
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
 /* ══ QUADRO KANBAN ══ */
 .board-view {
   flex: 1;
@@ -553,7 +560,7 @@ textarea.inp {
   flex: 1;
   overflow-x: auto;
   overflow-y: auto;
-  padding: 0 20px 20px;
+  padding: 16px 20px 24px;
 }
 
 .board {

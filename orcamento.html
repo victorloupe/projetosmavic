@@ -106,7 +106,7 @@
     <table>
       <thead>
         <tr>
-          <th>Orçamento</th>
+          <th id="thOrcColName">Orçamento</th>
           <th>Cliente</th>
           <th>Data</th>
           <th>Validade</th>
@@ -217,7 +217,7 @@
 
       <div class="orc-two-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0">
         <div class="fld" style="margin:0"><label class="flbl">Desconto (R$)</label><input type="text" inputmode="decimal" class="inp inp-sm" id="orcDiscount" value="0,00" oninput="maskCurrencyInput(this);updateOrcPreviewLabels()"></div>
-        <div class="fld" style="margin:0"><label class="flbl">Status</label><select class="inp inp-sm" id="orcStatus"><option value="Pendente">Pendente</option><option value="Parcial">Parcial</option><option value="Aprovado">Aprovado</option><option value="Recusado">Recusado</option><option value="Convertido" disabled>Convertido</option></select></div>
+        <div class="fld" style="margin:0"><label class="flbl">Status</label><select class="inp inp-sm" id="orcStatus"><option value="Pendente">Pendente</option><option value="Parcial">Parcial</option><option value="Recusado">Recusado</option><option value="Convertido" disabled>Convertido</option></select></div>
       </div>
     </div>
     
@@ -413,6 +413,7 @@
     <div class="fld d-none" id="fatExistingProjectWrap" style="margin-bottom:12px">
       <label class="flbl"><i class="bi bi-folder2-open" style="color:var(--accent)"></i> Selecione o Projeto de Destino *</label>
       <select class="inp inp-sm" id="fatExistingProjectSelect" onchange="handleExistingProjectSelected()" style="font-weight:600"></select>
+      <div id="fatExistingProjectPreview" style="display:none;margin-top:6px;padding:8px 12px;background:var(--surface);border:1px dashed var(--border);border-radius:8px;font-size:12px;color:var(--text2);justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"></div>
     </div>
 
     <!-- SE FOR NOVO PROJETO: NOME DO PROJETO -->
@@ -711,6 +712,6 @@
 </nav>
 
 <script src="common.js?v=114"></script>
-<script src="orcamento.js?v=116"></script>
+<script src="orcamento.js?v=117"></script>
 </body>
 </html>

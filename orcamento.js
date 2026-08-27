@@ -142,8 +142,8 @@ function openOrcamentoModal(id = null) {
     document.getElementById('orcDiscount').value = toBRLInputStr(b.discount || 0);
     tempOrcItems = [...b.items];
     tempOrcAttachments = Array.isArray(b.attachments) ? JSON.parse(JSON.stringify(b.attachments)) : [];
-    tempOrcShowAttachments = b.showAttachments === true; // padrão: desligado (só liga se foi explicitamente salvo como true)
-    document.getElementById('orcModalTitle').textContent = 'Editar Orçamento';
+    tempOrcShowAttachments = b.showAttachments === true;
+    document.getElementById('orcModalTitle').textContent = b.status === 'Convertido' ? `Pedido #${b.number || b.id}` : `Editar Orçamento #${b.number || b.id}`;
     document.getElementById('btnPrnOrc').style.display = 'inline-flex';
     document.getElementById('btnPdfOrc').style.display = 'inline-flex';
     document.getElementById('btnDownloadPdfOrc').style.display = 'inline-flex';
@@ -296,22 +296,26 @@ document.addEventListener('click', (e) => {
 });
 
 
-function updateOrcPreviewLabels() {
-  const clientName = document.getElementById('orcClient')?.value.trim() || '';
-  const title = document.getElementById('orcTitle')?.value.trim() || '';
-  const date = document.getElementById('orcDate')?.value || '';
-  const validUntil = document.getElementById('orcValidUntil')?.value || '';
-  const notes = document.getElementById('orcNotes')?.value.trim() || '';
-  const number = document.getElementById('orcNumber')?.value || '';
-  const projectType = document.getElementById('orcProjectType')?.value || '';
-  const discountVal = parseCurrencyInput(document.getElementById('orcDiscount')?.value || '0');
+function updateOrcPreviewLabels(budgetParam = null) {
+  const orcIdVal = parseInt(document.getElementById('orcId')?.value || '0');
+  const b = budgetParam || budgets.find(x => x.id === orcIdVal);
+  const clientName = document.getElementById('orcClient')?.value.trim() || b?.client || '';
+  const title = document.getElementById('orcTitle')?.value.trim() || b?.title || '';
+  const date = document.getElementById('orcDate')?.value || b?.date || '';
+  const validUntil = document.getElementById('orcValidUntil')?.value || b?.validUntil || '';
+  const notes = document.getElementById('orcNotes')?.value.trim() || b?.notes || '';
+  const number = document.getElementById('orcNumber')?.value || b?.number || '';
+  const projectType = document.getElementById('orcProjectType')?.value || b?.projectType || '';
+  const discountVal = parseCurrencyInput(document.getElementById('orcDiscount')?.value || String(b?.discount || 0));
+  const status = document.getElementById('orcStatus')?.value || b?.status || '';
+  const isConvertido = (status === 'Convertido' || b?.status === 'Convertido');
   
   const cl = clients.find(x => x.name.toLowerCase() === clientName.toLowerCase());
   
   // Projeto e Tipo de Projeto
   const projNameEl = document.getElementById('lblOrcProjectName');
   if (projNameEl) {
-    projNameEl.textContent = title || (clientName ? `Projeto - ${clientName}` : 'Proposta de Projeto');
+    projNameEl.textContent = title || (clientName ? `Projeto - ${clientName}` : (isConvertido ? 'Pedido de Projeto' : 'Proposta de Projeto'));
   }
   const projTypeEl = document.getElementById('lblOrcProjectTypePreview');
   if (projTypeEl) {
@@ -349,7 +353,9 @@ function updateOrcPreviewLabels() {
   // Identificação e Datas
   const numEl = document.getElementById('lblProposalNum');
   if (numEl) {
-    numEl.textContent = number ? `Orçamento #${number}` : 'Novo Orçamento';
+    numEl.textContent = isConvertido 
+      ? (number ? `Pedido #${number}` : 'Pedido') 
+      : (number ? `Orçamento #${number}` : 'Novo Orçamento');
   }
   
   const dateEl = document.getElementById('lblOrcDatePreview');
@@ -679,7 +685,8 @@ function saveOrcamento() {
     if (idx > -1) {
       bData.status = budgets[idx].status === 'Convertido' ? 'Convertido' : status;
       budgets[idx] = bData;
-      showToast('Orçamento atualizado!', 'success');
+      const isConvertido = (bData.status === 'Convertido');
+      showToast(isConvertido ? 'Pedido atualizado!' : 'Orçamento atualizado!', 'success');
     }
   } else {
     budgets.push(bData);
@@ -738,7 +745,7 @@ function renderOrcKpis() {
     <div class="orc-kpi-card">
       <div class="orc-kpi-icon" style="background:var(--green-bg);color:var(--green)"><i class="bi bi-check2-circle"></i></div>
       <div>
-        <div class="orc-kpi-lbl">APROVADOS / CONVERTIDOS</div>
+        <div class="orc-kpi-lbl">CONVERTIDOS EM PROJETO</div>
         <div class="orc-kpi-val" style="color:var(--green)">${fmt(convertidoTotal)}</div>
         <div class="orc-kpi-sub">${convertidos.length} ${convertidos.length === 1 ? 'fechado' : 'fechados'} (${taxa}% conversão)</div>
       </div>
@@ -753,15 +760,13 @@ function renderOrcChips(currentStatus) {
   const totalCount = budgets.length;
   const pendenteCount = budgets.filter(b => b.status === 'Pendente').length;
   const parcialCount = budgets.filter(b => b.status === 'Parcial').length;
-  const aprovadoCount = budgets.filter(b => b.status === 'Aprovado').length;
-  const convertidoCount = budgets.filter(b => b.status === 'Convertido').length;
+  const convertidoCount = budgets.filter(b => b.status === 'Convertido' || b.status === 'Aprovado').length;
   const recusadoCount = budgets.filter(b => b.status === 'Recusado').length;
 
   const chips = [
     { label: 'Todos', value: '', count: totalCount },
     { label: 'Pendentes', value: 'Pendente', count: pendenteCount },
     { label: 'Parciais', value: 'Parcial', count: parcialCount },
-    { label: 'Aprovados', value: 'Aprovado', count: aprovadoCount },
     { label: 'Convertidos', value: 'Convertido', count: convertidoCount },
     { label: 'Recusados', value: 'Recusado', count: recusadoCount }
   ];
@@ -793,15 +798,18 @@ function toggleOrcActionsMenu(event, budgetId) {
   const budget = budgets.find(b => b.id === budgetId);
   if (!budget) return;
 
+  const isConvertido = (budget.status === 'Convertido');
+  const docLabel = isConvertido ? 'Pedido' : 'Orçamento';
+
   dropdown._activeId = budgetId;
   dropdown.innerHTML = `
-    ${budget.status !== 'Convertido' ? `<button onclick="closeOrcActionsMenu();transformBudgetToProject(${budgetId})"><i class="bi bi-arrow-right-circle" style="color:var(--green)"></i> Faturar Orçamento</button>` : ''}
-    <button onclick="closeOrcActionsMenu();downloadOrcamentoPDFDirect(${budgetId})"><i class="bi bi-file-pdf" style="color:var(--red)"></i> Visualizar PDF</button>
-    <button onclick="closeOrcActionsMenu();downloadOrcamentoPDFFile(${budgetId})"><i class="bi bi-download" style="color:var(--accent)"></i> Baixar Arquivo PDF</button>
-    <button onclick="closeOrcActionsMenu();shareOrcamentoPDF(${budgetId})"><i class="bi bi-share" style="color:#2563EB"></i> Compartilhar Link</button>
-    <button onclick="closeOrcActionsMenu();duplicateOrcamento(${budgetId})"><i class="bi bi-copy"></i> Duplicar Proposta</button>
+    ${!isConvertido ? `<button onclick="closeOrcActionsMenu();transformBudgetToProject(${budgetId})"><i class="bi bi-arrow-right-circle" style="color:var(--green)"></i> Faturar Orçamento</button>` : ''}
+    <button onclick="closeOrcActionsMenu();downloadOrcamentoPDFDirect(${budgetId})"><i class="bi bi-file-pdf" style="color:var(--red)"></i> Visualizar ${docLabel} (PDF)</button>
+    <button onclick="closeOrcActionsMenu();downloadOrcamentoPDFFile(${budgetId})"><i class="bi bi-download" style="color:var(--accent)"></i> Baixar Arquivo do ${docLabel}</button>
+    <button onclick="closeOrcActionsMenu();shareOrcamentoPDF(${budgetId})"><i class="bi bi-share" style="color:#2563EB"></i> Compartilhar ${docLabel}</button>
+    <button onclick="closeOrcActionsMenu();duplicateOrcamento(${budgetId})"><i class="bi bi-copy"></i> Duplicar ${isConvertido ? 'Pedido' : 'Proposta'}</button>
     <div class="dropdown-sep"></div>
-    <button class="del" onclick="closeOrcActionsMenu();deleteOrcamento(${budgetId})"><i class="bi bi-trash"></i> Excluir Orçamento</button>
+    <button class="del" onclick="closeOrcActionsMenu();deleteOrcamento(${budgetId})"><i class="bi bi-trash"></i> Excluir ${docLabel}</button>
   `;
 
   const btnRect = event.currentTarget.getBoundingClientRect();
@@ -855,6 +863,28 @@ function renderOrcamentos() {
   const yearFilter = document.getElementById('fOrcYear')?.value || '';
   const monthFilter = document.getElementById('fOrcMonth')?.value || '';
   
+  const colTh = document.getElementById('thOrcColName');
+  if (colTh) {
+    if (statusFilter === 'Convertido') {
+      colTh.textContent = 'Pedido';
+    } else if (statusFilter === 'Pendente' || statusFilter === 'Parcial' || statusFilter === 'Recusado') {
+      colTh.textContent = 'Orçamento';
+    } else {
+      colTh.textContent = 'Orçamento / Pedido';
+    }
+  }
+
+  const searchInp = document.getElementById('fOrcSearch');
+  if (searchInp) {
+    if (statusFilter === 'Convertido') {
+      searchInp.placeholder = 'Buscar pedido…';
+    } else if (statusFilter === 'Pendente' || statusFilter === 'Parcial' || statusFilter === 'Recusado') {
+      searchInp.placeholder = 'Buscar orçamento…';
+    } else {
+      searchInp.placeholder = 'Buscar orçamento ou pedido…';
+    }
+  }
+
   renderOrcKpis();
   renderOrcChips(statusFilter);
 
@@ -915,8 +945,9 @@ function renderOrcamentos() {
       const vStr = b.validUntil ? new Date(b.validUntil + (b.validUntil.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR') : '—';
       
       const showConvert = b.status !== 'Convertido';
+      const isParcial = (b.status === 'Parcial');
       const convertBtn = showConvert 
-        ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 9px;font-size:11.5px" title="Transformar em Fatura (Projeto)"><i class="bi bi-arrow-right-circle"></i> Faturar</button>`
+        ? `<button class="btn ${isParcial ? 'btn-warning' : 'btn-success'} btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 9px;font-size:11.5px" title="${isParcial ? 'Faturar restante desta proposta' : 'Transformar em Fatura (Projeto)'}"><i class="bi ${isParcial ? 'bi-plus-circle' : 'bi-arrow-right-circle'}"></i> ${isParcial ? 'Faturar Restante' : 'Faturar'}</button>`
         : `<span style="font-size:11px;color:var(--text3);font-weight:600;padding:4px 6px"><i class="bi bi-check-all" style="color:var(--green);font-size:13px"></i> Faturado</span>`;
         
       const netTotal = b.total - (parseFloat(b.discount) || 0);
@@ -960,6 +991,7 @@ function renderOrcamentos() {
       const vStr = b.validUntil ? new Date(b.validUntil + (b.validUntil.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR') : '—';
       const netTotal = b.total - (parseFloat(b.discount) || 0);
       const showConvert = b.status !== 'Convertido';
+      const isParcial = (b.status === 'Parcial');
       const isExpired = b.validUntil && b.status !== 'Convertido' && new Date(b.validUntil + 'T23:59:59') < new Date();
       const expiredBadge = isExpired ? ' <span class="badge b-venc" style="font-size:9px">Vencido</span>' : '';
 
@@ -989,7 +1021,7 @@ function renderOrcamentos() {
           <div class="orc-card-bottom" style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border)">
             <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text)">${fmt(netTotal)}</div>
             <div style="display:inline-flex;gap:4px;align-items:center">
-              ${showConvert ? `<button class="btn btn-success btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 8px;font-size:11px"><i class="bi bi-arrow-right-circle"></i> Faturar</button>` : ''}
+              ${showConvert ? `<button class="btn ${isParcial ? 'btn-warning' : 'btn-success'} btn-sm" onclick="transformBudgetToProject(${b.id})" style="padding:4px 8px;font-size:11px"><i class="bi ${isParcial ? 'bi-plus-circle' : 'bi-arrow-right-circle'}"></i> ${isParcial ? 'Faturar Restante' : 'Faturar'}</button>` : ''}
               <button class="btn btn-ghost btn-sm" onclick="sendOrcamentoWhatsApp(${b.id})" style="padding:4px 7px;color:#25D366"><i class="bi bi-whatsapp"></i></button>
               <button class="btn btn-ghost btn-sm" onclick="openOrcamentoModal(${b.id})" style="padding:4px 7px"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-ghost btn-sm" onclick="toggleOrcActionsMenu(event, ${b.id})" style="padding:4px 6px"><i class="bi bi-three-dots-vertical"></i></button>
@@ -1076,37 +1108,83 @@ function handleFatDestinationChange() {
   const wrapExist = document.getElementById('fatDestExistWrap');
   const titleWrap = document.getElementById('fatNewProjectTitleWrap');
   const existWrap = document.getElementById('fatExistingProjectWrap');
-  const noticeText = document.getElementById('fatConversionNoticeText');
 
   if (isExist) {
     wrapNew?.classList.remove('active');
     wrapExist?.classList.add('active');
     titleWrap?.classList.add('d-none');
     existWrap?.classList.remove('d-none');
-    if (noticeText) {
-      noticeText.innerHTML = 'Os itens selecionados e o valor serão <strong>incorporados ao projeto existente</strong> selecionado.';
-    }
     handleExistingProjectSelected();
   } else {
     wrapNew?.classList.add('active');
     wrapExist?.classList.remove('active');
     titleWrap?.classList.remove('d-none');
     existWrap?.classList.add('d-none');
-    if (noticeText) {
-      noticeText.innerHTML = 'O projeto será inserido na coluna <strong>"Briefing"</strong> com os produtos como checklist de tarefas.';
-    }
+    updateFatExistingProjectPreview();
   }
+
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  if (b) renderFaturarItemsList(b);
 }
 
 function handleExistingProjectSelected() {
   const projId = document.getElementById('fatExistingProjectSelect')?.value;
-  if (!projId) return;
+  if (!projId) {
+    updateFatExistingProjectPreview();
+    return;
+  }
   const p = projects.find(x => x.id === parseInt(projId));
   if (!p) return;
 
   if (p.priority) document.getElementById('fatPriority').value = p.priority;
   if (p.date) document.getElementById('fatDeadline').value = p.date;
   updateFaturarPlanPreview();
+  updateFatExistingProjectPreview();
+}
+
+function updateFatExistingProjectPreview() {
+  const previewEl = document.getElementById('fatExistingProjectPreview');
+  if (!previewEl) return;
+
+  const isExist = (currentFaturarDestination === 'existing');
+  if (!isExist) {
+    previewEl.style.display = 'none';
+    return;
+  }
+
+  const projId = document.getElementById('fatExistingProjectSelect')?.value;
+  if (!projId) {
+    previewEl.style.display = 'none';
+    return;
+  }
+
+  const p = projects.find(x => x.id === parseInt(projId));
+  if (!p) {
+    previewEl.style.display = 'none';
+    return;
+  }
+
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  const { selectedNetTotal } = getFaturarSelectedTotals(b);
+
+  const curVal = parseFloat(p.value || 0);
+  const addVal = selectedNetTotal;
+  const newTotal = curVal + addVal;
+
+  previewEl.style.display = 'flex';
+  previewEl.innerHTML = `
+    <div>
+      <span style="color:var(--text3)">Atual:</span> <strong>${fmt(curVal)}</strong> 
+      <span style="color:var(--text3);margin:0 4px">+</span> 
+      <span style="color:var(--text3)">Novos itens:</span> <strong style="color:var(--accent)">${fmt(addVal)}</strong>
+    </div>
+    <div style="font-weight:700;font-size:12.5px;color:var(--text);display:flex;align-items:center;gap:4px">
+      <span>Novo Total:</span>
+      <span style="color:var(--accent);font-family:'Outfit',sans-serif;font-size:13.5px">${fmt(newTotal)}</span>
+    </div>
+  `;
 }
 
 function getFaturarSelectedTotals(b) {
@@ -1184,7 +1262,12 @@ function renderFaturarItemsList(b) {
 
   if (noticeEl) {
     if (selected.length === 0) {
-      noticeEl.innerHTML = '<span style="color:var(--red);font-weight:600"><i class="bi bi-exclamation-triangle"></i> Selecione ao menos 1 item para criar o projeto.</span>';
+      noticeEl.innerHTML = '<span style="color:var(--red);font-weight:600"><i class="bi bi-exclamation-triangle"></i> Selecione ao menos 1 item para faturar.</span>';
+    } else if (currentFaturarDestination === 'existing') {
+      const projId = document.getElementById('fatExistingProjectSelect')?.value;
+      const targetP = projects.find(x => x.id === parseInt(projId));
+      const targetName = targetP ? escapeHtml(targetP.name) : 'o projeto existente';
+      noticeEl.innerHTML = `<strong>Incorporar ao Projeto:</strong> Os itens selecionados (${fmt(selectedNetTotal)}) serão somados a <strong>${targetName}</strong>, mantendo as tarefas e saldo integrados.`;
     } else if (isPartial) {
       noticeEl.innerHTML = `<strong>Faturamento Parcial:</strong> O projeto será criado com os itens e quantidades selecionados (${fmt(selectedNetTotal)}). O orçamento continuará em aberto com o status <strong>Parcial</strong> e saldo remanescente.`;
     } else {
@@ -1193,10 +1276,14 @@ function renderFaturarItemsList(b) {
   }
 
   if (confirmBtn) {
-    confirmBtn.disabled = selected.length === 0;
-    confirmBtn.style.opacity = selected.length === 0 ? '0.5' : '1';
-    confirmBtn.style.cursor = selected.length === 0 ? 'not-allowed' : 'pointer';
+    const isValid = selected.length > 0 && selectedNetTotal > 0;
+    confirmBtn.disabled = !isValid;
+    confirmBtn.style.opacity = isValid ? '1' : '0.5';
+    confirmBtn.style.cursor = isValid ? 'pointer' : 'not-allowed';
+    confirmBtn.title = isValid ? 'Confirmar faturamento' : 'Selecione ao menos 1 item para faturar';
   }
+
+  updateFatExistingProjectPreview();
 }
 
 function changeFaturarItemQty(itemId, delta) {
@@ -1346,16 +1433,11 @@ function transformBudgetToProject(id) {
       });
 
       existSel.innerHTML = 
-        (suggestedProj ? '' : '<option value="">Selecione o projeto de destino...</option>') +
         sortedProjs.map(p => {
           const isSuggested = suggestedProj && (p.id === suggestedProj.id);
-          const isOrigin = (p.originBudgetId === b.id);
-          let tag = '';
-          if (isSuggested) tag = ' ⭐ Sugestão (Mesmo Nome / Origem)';
-          else if (isOrigin) tag = ' ★ (Origem desta proposta)';
-          return `<option value="${p.id}" ${isSuggested ? 'selected' : ''}>${isSuggested ? '⭐ ' : ''}${escapeHtml(p.name)} [${escapeHtml(p.column)}] - Atual: ${fmt(p.value || 0)}${tag}</option>`;
-        }).join('') +
-        (suggestedProj ? '<option value="">── Outro projeto (escolher manualmente) ──</option>' : '');
+          const tag = isSuggested ? ' (Recomendado)' : '';
+          return `<option value="${p.id}" ${isSuggested ? 'selected' : ''}>${escapeHtml(p.name)} [${escapeHtml(p.column)}] — Atual: ${fmt(p.value || 0)}${tag}</option>`;
+        }).join('');
 
       if (suggestedProj) {
         existSel.value = String(suggestedProj.id);
@@ -2032,8 +2114,20 @@ function sendOrcamentoWhatsApp(id) {
   
   const itemsText = b.items.map(item => `• *${item.desc}* (x${item.qty}): ${fmt(item.price * item.qty)}`).join('\n');
   const netTotal = b.total - (parseFloat(b.discount) || 0);
+  const firstName = b.client.split(' ')[0];
+  const isConvertido = (b.status === 'Convertido');
   
-  const msg = `Olá, *${b.client.split(' ')[0]}*!
+  const msg = isConvertido ? `Olá, *${firstName}*! Tudo bem?
+
+Confirmamos os detalhes do seu *Pedido #${b.number || b.id}* (*${b.title}*):
+
+${itemsText}
+
+${b.discount ? `*Total dos Itens:* ${fmt(b.total)}\n*Desconto:* -${fmt(b.discount)}\n` : ''}*Valor Total do Pedido:* ${fmt(netTotal)}
+${b.notes ? `\n*Condições e Observações:*\n_${b.notes}_` : ''}
+
+Seu projeto já está em andamento no nosso cronograma! Qualquer dúvida estamos à total disposição. ✨`
+: `Olá, *${firstName}*!
   
 Seguem os detalhes da Proposta Comercial *${b.title}*:
 
@@ -2053,6 +2147,7 @@ function getOrcamentoPdfFilename(b) {
   const num = b.number || '0';
   const client = (b.client || 'Cliente').trim().replace(/[/\\?%*:|"<>]/g, '');
   const proj = (b.title || 'Projeto').trim().replace(/[/\\?%*:|"<>]/g, '');
+  const prefix = b.status === 'Convertido' ? 'Pedido' : 'Orçamento';
   
   let dateFormatted = '';
   if (b.date) {
@@ -2070,7 +2165,7 @@ function getOrcamentoPdfFilename(b) {
     dateFormatted = `${d}-${m}-${y}`;
   }
 
-  return `Orçamento ${num}_${client}_${proj}_${dateFormatted}.pdf`;
+  return `${prefix} ${num}_${client}_${proj}_${dateFormatted}.pdf`;
 }
 
 async function generateOrcamentoPdfBlob(b) {
@@ -2090,7 +2185,7 @@ async function generateOrcamentoPdfBlob(b) {
   editingOrcItemId = null;
 
   renderOrcItems();
-  updateOrcPreviewLabels();
+  updateOrcPreviewLabels(b);
 
   const element = document.querySelector('#orcamentoOverlay .proposal-sheet');
   if (!element) throw new Error('Modelo de proposta não encontrado');
@@ -2108,6 +2203,13 @@ async function generateOrcamentoPdfBlob(b) {
   clone.classList.remove('mbody');
   clone.classList.add('proposal-sheet-pdf');
   clone.querySelectorAll('.no-print').forEach(el => el.remove());
+
+  // Forçar título de Pedido ou Orçamento diretamente no clone para o PDF
+  const isConvertido = (b.status === 'Convertido');
+  const cloneNumEl = clone.querySelector('#lblProposalNum');
+  if (cloneNumEl) {
+    cloneNumEl.textContent = isConvertido ? `Pedido #${b.number || b.id}` : `Orçamento #${b.number || b.id}`;
+  }
 
   // Anexos & Fotos de Referência: só entram no PDF se o toggle "Exibir no PDF" estiver
   // ligado e houver pelo menos um arquivo anexado. Quando entram, vão para uma página
@@ -2173,9 +2275,11 @@ async function downloadOrcamentoPDFDirect(id) {
 
   try {
     const { blob, filename } = await generateOrcamentoPdfBlob(b);
+    const isConvertido = (b.status === 'Convertido');
+    const docName = isConvertido ? 'Confirmação do Pedido' : 'Proposta Comercial';
     await shareOrOpenPdfBlob(blob, filename, {
       title: filename.replace(/\.pdf$/i, ''),
-      text: `Olá! Segue a Proposta Comercial referente ao projeto ${b.title || 'MAVIC'}.`,
+      text: `Olá! Segue a ${docName} referente ao projeto ${b.title || 'MAVIC'}.`,
       previewTab
     });
   } catch (err) {
@@ -2211,6 +2315,9 @@ async function shareOrcamentoPDF(id) {
   const b = budgets.find(x => x.id === id);
   if (!b) return;
 
+  const isConvertido = (b.status === 'Convertido');
+  const docName = isConvertido ? 'Confirmação do Pedido' : 'Proposta Comercial';
+
   showToast('Preparando para compartilhar...', 'info');
   try {
     const { blob, filename } = await generateOrcamentoPdfBlob(b);
@@ -2220,9 +2327,9 @@ async function shareOrcamentoPDF(id) {
       await navigator.share({
         files: [file],
         title: filename.replace('.pdf', ''),
-        text: `Olá! Segue a Proposta Comercial referente ao projeto ${b.title || 'MAVIC'}.`
+        text: `Olá! Segue a ${docName} referente ao projeto ${b.title || 'MAVIC'}.`
       });
-      showToast('Orçamento compartilhado com sucesso!', 'success');
+      showToast(`${isConvertido ? 'Pedido' : 'Orçamento'} compartilhado com sucesso!`, 'success');
     } else {
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');

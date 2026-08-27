@@ -470,6 +470,19 @@ body {
   box-shadow: 0 4px 12px rgba(31, 138, 77, 0.15);
 }
 
+.btn-warning {
+  background: var(--yellow-bg);
+  color: var(--yellow);
+  border: 1px solid rgba(217, 119, 6, 0.18);
+}
+
+.btn-warning:hover {
+  background: var(--yellow);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
+}
+
 /* ══ FORM INPUTS ══ */
 .inp {
   background: var(--surface);

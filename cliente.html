@@ -1,18 +1,29 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+(function(){
+  try {
+    var t = localStorage.getItem('mavic_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    document.documentElement.style.colorScheme = t;
+  } catch(e){}
+})();
+</script>
 <title>MAVIC — Meus Projetos</title>
 <link rel="icon" type="image/x-icon" href="icon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#92623a">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="cliente.css?v=110">
+<link rel="stylesheet" href="cliente.css?v=111">
 <!-- supabase-js e config.js removidos: o cliente não acessa o banco diretamente.
      Os dados chegam via Edge Function com autenticação server-side. -->
 </head>
-<body>
+<body class="preload">
 
 <div class="loading" id="loading">
   <div class="loading-card">

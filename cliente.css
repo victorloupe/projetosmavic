@@ -2,6 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root {
+  color-scheme: light;
   --bg: #FAF9F6; /* Alabastro clean de galeria de arte */
   --surface: #FFFFFF;
   --surface2: #F5F3EF; /* Areia suave de arquitetura */
@@ -40,6 +41,7 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0C0B0A; /* Obsidiana bronzeada profunda */
   --surface: #141311; /* Carvão quente de alto padrão */
   --surface2: #1E1C19;
@@ -120,6 +122,13 @@ body, .nav, .fin-bar, .fin-bar-mobile, .toolbar, .kcard, .fin-blk, .modal-card, 
               border-color .3s cubic-bezier(0.4, 0, 0.2, 1),
               color .2s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow .3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.preload,
+html.preload *,
+body.preload,
+body.preload * {
+  transition: none !important;
 }
 
 html, body {

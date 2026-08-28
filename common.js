@@ -1012,7 +1012,9 @@ function setSync(s){
 function toggleTheme(){appTheme=appTheme==='light'?'dark':'light';applyTheme(appTheme);scheduleSync();}
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);
+  document.documentElement.style.colorScheme = t;
   appTheme=t;
+  try{localStorage.setItem('mavic_theme',t);}catch(e){}
   const btn=document.getElementById('themeBtn');
   const logo=document.getElementById('navLogo');
   if (btn) {

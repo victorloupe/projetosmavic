@@ -357,9 +357,12 @@ function calcFinance(){
   document.getElementById('totalRestM').textContent=rF;
 }
 
-function toggleTheme(){appTheme=appTheme==='light'?'dark':'light';applyTheme(appTheme);localStorage.setItem('mavic_theme',appTheme);}
+function toggleTheme(){appTheme=appTheme==='light'?'dark':'light';applyTheme(appTheme);try{localStorage.setItem('mavic_theme',appTheme);}catch(e){}}
 function applyTheme(t){
-  document.documentElement.setAttribute('data-theme',t);appTheme=t;
+  document.documentElement.setAttribute('data-theme',t);
+  document.documentElement.style.colorScheme=t;
+  appTheme=t;
+  try{localStorage.setItem('mavic_theme',t);}catch(e){}
   const btn=document.getElementById('themeBtn'),logo=document.getElementById('navLogo');
   if(t==='dark'){btn.innerHTML='<i class="bi bi-sun" style="color:#fbbf24"></i>';if(logo)logo.src='https://i.postimg.cc/vZmmNLjj/LOGO-NOVA-black.png';}
   else{btn.innerHTML='<i class="bi bi-moon-stars"></i>';if(logo)logo.src='LOGO NOVA.png';}

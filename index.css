@@ -4,7 +4,17 @@
 /* Crossfade nativo ao trocar de página */
 @view-transition { navigation: auto; }
 
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.15s;
+}
+
+::view-transition-group(root) {
+  background-color: var(--bg);
+}
+
 :root {
+  color-scheme: light;
   --bg: #FAF9F6; /* Alabastro clean de galeria de arte */
   --surface: #FFFFFF;
   --surface2: #F5F3EF; /* Areia suave de arquitetura */
@@ -43,6 +53,7 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0C0B0A; /* Obsidiana bronzeada profunda */
   --surface: #141311; /* Carvão quente de alto padrão */
   --surface2: #1E1C19;
@@ -125,13 +136,19 @@ body, .nav, .toolbar, .kcol, .kcard, .modal-card {
               box-shadow .3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+html.preload,
+html.preload *,
+body.preload,
 body.preload * {
   transition: none !important;
 }
 
-body {
-  background: var(--bg);
+html, body {
+  background-color: var(--bg);
   color: var(--text);
+}
+
+body {
   font-family: 'Plus Jakarta Sans', 'Outfit', -apple-system, sans-serif;
   font-size: 13.5px;
   line-height: 1.55;

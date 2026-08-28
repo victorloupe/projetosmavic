@@ -62,7 +62,8 @@ function toggleLoginTheme() {
   const current = document.documentElement.getAttribute('data-theme') || 'light';
   const next = current === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('mavic_theme', next);
+  document.documentElement.style.colorScheme = next;
+  try { localStorage.setItem('mavic_theme', next); } catch(e) {}
   updateThemeIcon(next);
 }
 

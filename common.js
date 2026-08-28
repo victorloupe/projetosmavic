@@ -37,11 +37,13 @@ let noteTemplates=[];
 // Cores replicam as que já existiam fixas no CSS, pra não mudar nada visualmente
 // pra quem já usava. Tipos novos ganham a cor escolhida na hora de cadastrar.
 const INIT_PROJECT_TYPES=[
-  {id:'Residencial',color:'#2563eb'},
-  {id:'Comercial',color:'#7c3aed'},
-  {id:'Estrutural',color:'#d97706'},
-  {id:'Urbanismo',color:'#0d9488'},
-  {id:'Outro',color:'#71717a'}
+  {id:'Residencial',color:'#2563eb',defaultFolders:['01. Documentos','02. Plantas','03. Executivo','04. Renders','04. Renders/01. Prints','05. Outros']},
+  {id:'Comercial',color:'#7c3aed',defaultFolders:['01. Documentos','02. Plantas','03. Executivo','04. Aprovações','05. Renders','05. Renders/01. Prints','06. Outros']},
+  {id:'Prefeitura',color:'#0d9488',defaultFolders:['01. Documentos','02. Prefeitura','03. Renders','03. Renders/01. Prints','04. Outros']},
+  {id:'Render',color:'#db2777',defaultFolders:['01. Renders','01. Renders/01. Prints']},
+  {id:'Estrutural',color:'#d97706',defaultFolders:['01. Documentos','02. Calculo','03. Desenhos','04. Relatorios']},
+  {id:'Urbanismo',color:'#059669',defaultFolders:['01. Documentos','02. Topografia','03. Masterplan','04. Renders','04. Renders/01. Prints']},
+  {id:'Outro',color:'#71717a',defaultFolders:['01. Documentos','02. Renders','02. Renders/01. Prints','03. Outros']}
 ];
 let projectTypes=[];
 function typeColor(typeId){
@@ -55,6 +57,37 @@ function hexToRgba(hex,alpha){
   return `rgba(${r},${g},${b},${alpha})`;
 }
 function typeBg(typeId){ return hexToRgba(typeColor(typeId),0.13); }
+function getProjectDefaultFolders(typeId){
+  const low=(typeId||'').toLowerCase().trim();
+  if(low.includes('render')){
+    return ['01. Renders','01. Renders/01. Prints'];
+  }
+  if(low.includes('prefeit')){
+    return ['01. Documentos','02. Prefeitura','03. Renders','03. Renders/01. Prints','04. Outros'];
+  }
+  if(low.includes('residenc')||low.includes('interiores')){
+    return ['01. Documentos','02. Plantas','03. Executivo','04. Renders','04. Renders/01. Prints','05. Outros'];
+  }
+  if(low.includes('comercial')){
+    return ['01. Documentos','02. Plantas','03. Executivo','04. Aprovações','05. Renders','05. Renders/01. Prints','06. Outros'];
+  }
+  if(low.includes('estrutur')){
+    return ['01. Documentos','02. Calculo','03. Desenhos','04. Relatorios'];
+  }
+  if(low.includes('urbanis')){
+    return ['01. Documentos','02. Topografia','03. Masterplan','04. Renders','04. Renders/01. Prints'];
+  }
+
+  // Se o tipo já tiver pastas salvas que possuem numeração
+  const allTypes=(typeof projectTypes!=='undefined'&&projectTypes.length?projectTypes:INIT_PROJECT_TYPES);
+  const found=allTypes.find(x=>(x.id||'').trim().toLowerCase()===low);
+  if(found && Array.isArray(found.defaultFolders) && found.defaultFolders.length){
+    const hasNum = found.defaultFolders.some(f => /^\d+[\.\-_]/.test(f));
+    if (hasNum) return found.defaultFolders;
+  }
+
+  return ['01. Documentos','02. Renders','02. Renders/01. Prints','03. Outros'];
+}
 function populateProjectTypeSelects(){
   const opts=(projectTypes.length?projectTypes:INIT_PROJECT_TYPES).map(t=>`<option value="${t.id}">${t.id}</option>`).join('');
   document.querySelectorAll('.project-type-select').forEach(sel=>{
@@ -1199,11 +1232,20 @@ document.addEventListener('keydown',(e)=>{
   if(!document.querySelector('.nav')) return; // só nas páginas admin
   const wrap=document.createElement('div');
   wrap.innerHTML=`<div class="overlay" id="typesOverlay" onclick="if(event.target===this)closeManageProjectTypesModal()">
-    <div class="mbox mmd">
-      <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-tags"></i> Tipos de Projeto</h5><button class="btn-icon btn-sm" onclick="closeManageProjectTypesModal()"><i class="bi bi-x-lg"></i></button></div>
+    <div class="mbox" style="max-width:920px;width:95vw">
+      <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-tags"></i> Tipos de Projeto & Pastas Padrão</h5><button class="btn-icon btn-sm" onclick="closeManageProjectTypesModal()"><i class="bi bi-x-lg"></i></button></div>
       <div class="mbody">
-        <div style="display:flex;flex-direction:column;gap:8px" id="typesManagerList"></div>
-        <button class="btn btn-ghost btn-sm mt-3" onclick="addTypeInput()"><i class="bi bi-plus-lg"></i> Novo Tipo</button>
+        <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:14px;line-height:1.4">
+          Defina os tipos de projeto e suas subpastas padrão. Ao abrir a pasta no Windows Explorer, você poderá escolher quais subpastas deseja criar.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow-y:auto;padding-right:4px" id="typesManagerList"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:16px;flex-wrap:wrap">
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addTypeInput()"><i class="bi bi-plus-lg"></i> Novo Tipo</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="applyDefaultNumberedFoldersAll()" title="Aplica a numeração 01., 02., 03... em todos os tipos listados"><i class="bi bi-sort-numeric-down"></i> Aplicar Numeração</button>
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs" onclick="resetAllProjectTypesToDefault()" title="Restaura os tipos originais com Prefeitura e Render" style="color:var(--text-muted)"><i class="bi bi-arrow-counterclockwise"></i> Restaurar Padrões</button>
+        </div>
       </div>
       <div class="mftr">
         <button class="btn btn-ghost" onclick="closeManageProjectTypesModal()">Cancelar</button>
@@ -1216,18 +1258,80 @@ document.addEventListener('keydown',(e)=>{
 function openManageProjectTypesModal(){
   const list=document.getElementById('typesManagerList');
   if(!list) return;
-  list.innerHTML=(projectTypes.length?projectTypes:INIT_PROJECT_TYPES).map(t=>`<div class="cm-row" data-orig="${t.id}"><input type="color" class="cm-color" value="${t.color}" title="Cor do tipo"><input class="inp inp-sm" value="${t.id}" style="flex:1"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="bi bi-trash3"></i></button></div>`).join('');
+  const currentList = (projectTypes.length ? projectTypes : INIT_PROJECT_TYPES);
+  list.innerHTML = currentList.map(t => {
+    let foldersList = t.defaultFolders;
+    const hasNum = Array.isArray(foldersList) && foldersList.length && foldersList.some(f => /^\d+[\.\-_]/.test(f));
+    if (!hasNum) {
+      foldersList = getProjectDefaultFolders(t.id);
+    }
+    const folders = foldersList.join(', ');
+    return `<div class="cm-type-card" data-orig="${escapeHtml(t.id)}" style="background:var(--bg-subtle, rgba(0,0,0,0.02));border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="color" class="cm-color cm-type-color" value="${t.color || '#71717a'}" title="Cor do tipo">
+        <input class="inp inp-sm cm-type-name" value="${escapeHtml(t.id)}" placeholder="Nome do tipo" style="max-width:240px;font-weight:600">
+        <div style="flex:1"></div>
+        <button class="btn btn-danger btn-sm" onclick="this.closest('.cm-type-card').remove()" title="Excluir tipo"><i class="bi bi-trash3"></i></button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <i class="bi bi-folder" style="font-size:14px;color:var(--accent);opacity:0.9" title="Subpastas padrão"></i>
+        <input class="inp inp-sm cm-type-folders" value="${escapeHtml(folders)}" placeholder="Subpastas padrão (ex: 01. Documentos, 02. Renders, 02. Renders/01. Prints...)" style="flex:1;font-size:12px" title="Subpastas padrão que serão sugeridas ao abrir a pasta">
+      </div>
+    </div>`;
+  }).join('');
   document.getElementById('typesOverlay').classList.add('open');
 }
 function closeManageProjectTypesModal(){document.getElementById('typesOverlay').classList.remove('open');}
+function applyDefaultNumberedFoldersAll(){
+  const cards = document.querySelectorAll('#typesManagerList .cm-type-card');
+  cards.forEach(c => {
+    const name = c.querySelector('.cm-type-name')?.value.trim();
+    const folderInp = c.querySelector('.cm-type-folders');
+    if (folderInp && name) {
+      const def = getProjectDefaultFolders(name);
+      folderInp.value = def.join(', ');
+    }
+  });
+  showToast('Estruturas atualizadas com numeração! Clique em Salvar Alterações.', 'info');
+}
+function resetAllProjectTypesToDefault(){
+  if (!confirm('Deseja restaurar todos os tipos de projeto para a lista original com numeração (incluindo Prefeitura e Render)?')) return;
+  projectTypes = JSON.parse(JSON.stringify(INIT_PROJECT_TYPES));
+  openManageProjectTypesModal();
+  showToast('Tipos restaurados! Clique em Salvar Alterações para confirmar.', 'info');
+}
 function addTypeInput(){
-  document.getElementById('typesManagerList').innerHTML+=`<div class="cm-row" data-orig=""><input type="color" class="cm-color" value="${DEFAULT_COL_COLOR}" title="Cor do tipo"><input class="inp inp-sm" placeholder="Nome do tipo" style="flex:1"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="bi bi-trash3"></i></button></div>`;
+  const list=document.getElementById('typesManagerList');
+  if(!list) return;
+  const card=document.createElement('div');
+  card.className='cm-type-card';
+  card.dataset.orig='';
+  card.style.cssText='background:var(--bg-subtle, rgba(0,0,0,0.02));border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px';
+  card.innerHTML=`<div style="display:flex;align-items:center;gap:8px">
+    <input type="color" class="cm-color cm-type-color" value="${typeof DEFAULT_COL_COLOR !== 'undefined' ? DEFAULT_COL_COLOR : '#71717a'}" title="Cor do tipo">
+    <input class="inp inp-sm cm-type-name" placeholder="Nome do novo tipo..." style="max-width:240px;font-weight:600">
+    <div style="flex:1"></div>
+    <button class="btn btn-danger btn-sm" onclick="this.closest('.cm-type-card').remove()" title="Excluir tipo"><i class="bi bi-trash3"></i></button>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <i class="bi bi-folder" style="font-size:14px;color:var(--accent);opacity:0.9" title="Subpastas padrão"></i>
+    <input class="inp inp-sm cm-type-folders" value="01. Documentos, 02. Renders, 02. Renders/01. Prints, 03. Outros" placeholder="Subpastas padrão (ex: 01. Documentos, 02. Renders...)" style="flex:1;font-size:12px" title="Subpastas padrão que serão sugeridas ao abrir a pasta">
+  </div>`;
+  list.appendChild(card);
 }
 function saveProjectTypes(){
-  const rows=document.querySelectorAll('#typesManagerList .cm-row'),newTypes=[],map={};
-  rows.forEach(r=>{
-    const orig=r.dataset.orig,color=r.querySelector('input[type=color]').value,name=r.querySelector('input:not([type=color])').value.trim();
-    if(name){newTypes.push({id:name,color});if(orig&&orig!==name)map[orig]=name;}
+  const cards=document.querySelectorAll('#typesManagerList .cm-type-card');
+  const newTypes=[],map={};
+  cards.forEach(c=>{
+    const orig=c.dataset.orig;
+    const color=c.querySelector('.cm-type-color')?.value || '#71717a';
+    const name=(c.querySelector('.cm-type-name')?.value || '').trim();
+    const foldersStr=(c.querySelector('.cm-type-folders')?.value || '').trim();
+    const defaultFolders=foldersStr ? foldersStr.split(/[,;\n]+/).map(s=>s.trim().replace(/^[\/\\]+|[\/\\]+$/g,'')).filter(Boolean) : [];
+    if(name){
+      newTypes.push({id:name,color,defaultFolders});
+      if(orig&&orig!==name)map[orig]=name;
+    }
   });
   if(!newTypes.length) return showToast('Ao menos um tipo!','warning');
   projects.forEach(p=>{if(map[p.type])p.type=map[p.type];});
@@ -1236,7 +1340,151 @@ function saveProjectTypes(){
   scheduleSync();
   renderCurrentPage();
   closeManageProjectTypesModal();
-  showToast('Tipos de projeto atualizados!','success');
+  showToast('Tipos de projeto e pastas padrão atualizados!','success');
+}
+
+// ══════════════════════════════════════════
+//  MODAL DE SELEÇÃO DE SUBPASTAS POR PROJETO
+// ══════════════════════════════════════════
+(function injectFolderSelectionModal(){
+  if(document.getElementById('folderSelectionOverlay')) return;
+  if(!document.querySelector('.nav')) return;
+  const wrap=document.createElement('div');
+  wrap.innerHTML=`<div class="overlay" id="folderSelectionOverlay" onclick="if(event.target===this)closeFolderSelectionModal()">
+    <div class="mbox" style="max-width:560px;width:95vw">
+      <div class="mhdr">
+        <h5 style="color:var(--accent);display:flex;align-items:center;gap:6px"><i class="bi bi-folder-check"></i> Subpastas do Projeto</h5>
+        <button class="btn-icon btn-sm" onclick="closeFolderSelectionModal()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="mbody">
+        <div style="margin-bottom:12px;background:var(--bg-subtle, rgba(0,0,0,0.02));padding:10px 12px;border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:13.5px;font-weight:700;color:var(--text-main)" id="fsProjName">Projeto</div>
+          <div style="font-size:11.5px;color:var(--text-muted);word-break:break-all;margin-top:3px" id="fsProjPath">Caminho</div>
+        </div>
+        
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.4">
+          Marque quais subpastas você deseja verificar ou criar no computador para este projeto:
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--accent)">
+            Tipo: <strong id="fsProjType" style="color:var(--text-main)">Residencial</strong>
+          </span>
+          <div style="display:flex;gap:8px;font-size:11.5px">
+            <a href="javascript:void(0)" onclick="toggleAllFsFolders(true)" style="color:var(--accent);text-decoration:none;font-weight:600">Marcar todas</a>
+            <span style="color:var(--border)">|</span>
+            <a href="javascript:void(0)" onclick="toggleAllFsFolders(false)" style="color:var(--text-muted);text-decoration:none">Desmarcar todas</a>
+          </div>
+        </div>
+
+        <div id="fsFoldersChecklist" style="display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow-y:auto;padding:8px;background:var(--bg-subtle, rgba(0,0,0,0.02));border:1px solid var(--border);border-radius:8px">
+        </div>
+      </div>
+      <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="closeFolderSelectionModal()">Cancelar</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="fsConfirmOnlyOpen()" title="Apenas abre a pasta no Windows Explorer sem criar subpastas">Abrir Sem Criar</button>
+          <button class="btn btn-primary btn-sm" onclick="fsConfirmCreateAndOpen()"><i class="bi bi-folder2-open"></i> Criar Selecionadas e Abrir</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap.firstElementChild);
+})();
+
+let _fsCallback = null;
+let _fsPath = '';
+let _fsType = '';
+
+function openFolderSelectionModal(caminho, tipoProjeto, projName, onConfirm, currentSelectedFolders) {
+  if (!caminho || !caminho.trim()) {
+    showToast('Informe o caminho da pasta primeiro.', 'warning');
+    return;
+  }
+  let clean = caminho.trim().replace(/^["']|["']$/g, '');
+  if (/^https?:\/\//i.test(clean)) {
+    window.open(clean, '_blank');
+    return;
+  }
+
+  _fsPath = clean;
+  _fsType = tipoProjeto || '';
+  _fsCallback = onConfirm || null;
+
+  const overlay = document.getElementById('folderSelectionOverlay');
+  if (!overlay) {
+    if (typeof onConfirm === 'function') onConfirm(getProjectDefaultFolders(tipoProjeto));
+    else abrirPastaLocal(clean, tipoProjeto);
+    return;
+  }
+
+  const nameEl = document.getElementById('fsProjName');
+  const pathEl = document.getElementById('fsProjPath');
+  const typeEl = document.getElementById('fsProjType');
+  const listEl = document.getElementById('fsFoldersChecklist');
+
+  if (nameEl) nameEl.textContent = projName || 'Projeto';
+  if (pathEl) pathEl.textContent = clean;
+  if (typeEl) typeEl.textContent = tipoProjeto || 'Geral';
+
+  const defaultFolders = getProjectDefaultFolders(tipoProjeto);
+  const hasSavedSelection = Array.isArray(currentSelectedFolders) && currentSelectedFolders.length > 0;
+
+  if (listEl) {
+    if (!defaultFolders.length) {
+      listEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:12px">Nenhuma subpasta padrão configurada para este tipo.</div>';
+    } else {
+      listEl.innerHTML = defaultFolders.map((f) => {
+        const isSub = f.includes('/') || f.includes('\\');
+        const pad = isSub ? 'margin-left:20px;opacity:0.95;' : '';
+        const icon = isSub ? 'bi-arrow-return-right' : 'bi-folder-fill';
+        const isChecked = hasSavedSelection ? currentSelectedFolders.includes(f) : true;
+
+        return `
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;border-radius:6px;background:var(--card-bg, #fff);border:1px solid var(--border);${pad}user-select:none;font-size:12.5px;transition:background 0.15s">
+            <input type="checkbox" class="fs-folder-chk" value="${escapeHtml(f)}" ${isChecked ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer">
+            <i class="bi ${icon}" style="color:var(--accent);font-size:${isSub ? '12px' : '14px'}"></i>
+            <span style="flex:1;font-weight:${isSub ? '400' : '600'}">${escapeHtml(f)}</span>
+          </label>
+        `;
+      }).join('');
+    }
+  }
+
+  overlay.classList.add('open');
+}
+
+function closeFolderSelectionModal() {
+  const overlay = document.getElementById('folderSelectionOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function toggleAllFsFolders(check) {
+  document.querySelectorAll('.fs-folder-chk').forEach(chk => {
+    chk.checked = !!check;
+  });
+}
+
+function fsConfirmCreateAndOpen() {
+  const selected = [];
+  document.querySelectorAll('.fs-folder-chk:checked').forEach(chk => {
+    if (chk.value) selected.push(chk.value);
+  });
+  closeFolderSelectionModal();
+  if (typeof _fsCallback === 'function') {
+    _fsCallback(selected);
+  } else {
+    abrirPastaLocal(_fsPath, _fsType, selected);
+  }
+}
+
+function fsConfirmOnlyOpen() {
+  closeFolderSelectionModal();
+  if (typeof _fsCallback === 'function') {
+    _fsCallback([]);
+  } else {
+    abrirPastaLocal(_fsPath, _fsType, []);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -1384,7 +1632,7 @@ function getInitials(name){
   return (name && typeof name === 'string' ? name : '?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase() || '?';
 }
 
-function abrirPastaLocal(caminho) {
+function abrirPastaLocal(caminho, tipoProjeto, customFolders) {
   if (!caminho || !caminho.trim()) {
     showToast('Nenhum caminho de pasta configurado para este projeto.', 'warning');
     return;
@@ -1396,8 +1644,24 @@ function abrirPastaLocal(caminho) {
     return;
   }
 
-  showToast('Abrindo pasta no Windows Explorer…', 'info');
-  window.location.href = 'mavic-folder://' + encodeURIComponent(clean);
+  const folders = Array.isArray(customFolders) ? customFolders : getProjectDefaultFolders(tipoProjeto);
+  const payload = {
+    path: clean,
+    type: tipoProjeto || '',
+    folders: folders
+  };
+
+  try {
+    const jsonStr = JSON.stringify(payload);
+    const b64 = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, function toSolidBytes(match, p1) {
+      return String.fromCharCode('0x' + p1);
+    }));
+    showToast('Abrindo pasta no Windows Explorer…', 'info');
+    window.location.href = 'mavic-folder://open?b64=' + encodeURIComponent(b64);
+  } catch (err) {
+    showToast('Abrindo pasta no Windows Explorer…', 'info');
+    window.location.href = 'mavic-folder://' + encodeURIComponent(clean);
+  }
 }
 
 // ══════════════════════════════════════════

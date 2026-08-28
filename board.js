@@ -234,9 +234,11 @@ function createCardHTML(p, cardIdx=0){
   const folderIcon = isMob
     ? (hasFolder ? 'bi-cloud-check' : 'bi-cloud-plus')
     : (hasFolder ? 'bi-folder2-open' : 'bi-folder-plus');
+  const subCount = Array.isArray(p.selectedFolders) ? p.selectedFolders.length : 0;
+  const subText = subCount > 0 ? ` (${subCount} subpasta${subCount > 1 ? 's' : ''} ativa${subCount > 1 ? 's' : ''})` : '';
   const folderTitle = isMob
     ? (hasFolder ? `Abrir pasta na nuvem: ${escapeHtml(p.driveLink || p.localPath)}` : 'Vincular pasta na nuvem (Drive)')
-    : (hasFolder ? `Abrir pasta no PC: ${escapeHtml(p.localPath)}` : 'Vincular pasta no computador');
+    : (hasFolder ? `Abrir pasta no PC: ${escapeHtml(p.localPath)}${subText}` : 'Vincular pasta no computador');
 
   return `<div class="kcard ${dlClass} ${pinnedCards.has(p.id)?'pinned':''}" data-id="${p.id}" draggable="true" onclick="togglePin(event,${p.id})" style="--type-color:${typeColor(p.type)}">
     ${subs.length?`<div class="kcard-prog-bar"><div class="kcard-prog-fill" style="width:${subPct}%;background:${progColor}"></div></div>`:''}
@@ -281,9 +283,11 @@ function createCompactCardHTML(p){
   const folderIcon = isMob
     ? (hasFolder ? 'bi-cloud-check' : 'bi-cloud-plus')
     : (hasFolder ? 'bi-folder2-open' : 'bi-folder-plus');
+  const subCount = Array.isArray(p.selectedFolders) ? p.selectedFolders.length : 0;
+  const subText = subCount > 0 ? ` (${subCount} subpasta${subCount > 1 ? 's' : ''} ativa${subCount > 1 ? 's' : ''})` : '';
   const folderTitle = isMob
     ? (hasFolder ? `Abrir pasta na nuvem: ${escapeHtml(p.driveLink || p.localPath)}` : 'Vincular pasta na nuvem (Drive)')
-    : (hasFolder ? `Abrir pasta no PC: ${escapeHtml(p.localPath)}` : 'Vincular pasta no computador');
+    : (hasFolder ? `Abrir pasta no PC: ${escapeHtml(p.localPath)}${subText}` : 'Vincular pasta no computador');
 
   return `<div class="kcard-compact" data-id="${p.id}" draggable="true">
     <div class="kcard-compact-info" onclick="editProject(${p.id})">
@@ -469,6 +473,7 @@ function openProjectModal(id=null){
     tempProds=[...(p.products||[])];
     tempInstallments=[...(p.installments||[])];
     tempPaymentCondition=p.paymentCondition||'';
+    tempSelectedFolders=p.selectedFolders ? [...p.selectedFolders] : null;
     document.getElementById('btnDelProj').style.display='block';
     document.getElementById('btnArchProj').textContent=p.archived?'Desarquivar':'Arquivar';
     
@@ -487,7 +492,7 @@ function openProjectModal(id=null){
     document.getElementById('projCol').value='Briefing';
     document.getElementById('projDate').value='';
     document.getElementById('projNote').value='';
-    tempSubs=[];tempPayments=[];tempProds=[];tempInstallments=[];tempPaymentCondition='';
+    tempSubs=[];tempPayments=[];tempProds=[];tempInstallments=[];tempPaymentCondition='';tempSelectedFolders=null;
     document.getElementById('btnDelProj').style.display='none';
   }
   renderSubsList();renderPaymentsModal();renderProjProdsTable();
@@ -625,6 +630,7 @@ function saveProject(){
     date:document.getElementById('projDate').value,
     note:document.getElementById('projNote').value,
     subtasks:tempSubs,
+    selectedFolders: tempSelectedFolders !== null ? tempSelectedFolders : (existingProj?.selectedFolders || null),
     archived:false,
     createdAt:id?(projects.find(x=>x.id===parseInt(id))?.createdAt||Date.now()):Date.now()
   };
@@ -641,10 +647,36 @@ function saveProject(){
 function testProjLocalPath() {
   const val = document.getElementById('projLocalPath')?.value;
   if (!val || !val.trim()) {
-    showToast('Digite o caminho da pasta local primeiro para testar.', 'warning');
+    showToast('Digite o caminho da pasta local primeiro para abrir.', 'warning');
     return;
   }
-  abrirPastaLocal(val);
+  const type = document.getElementById('projType')?.value;
+  const id = document.getElementById('projId')?.value;
+  const p = id ? projects.find(x => x.id === parseInt(id)) : null;
+  const folders = (tempSelectedFolders !== null ? tempSelectedFolders : p?.selectedFolders) || [];
+  abrirPastaLocal(val, type, folders);
+}
+
+function openProjFolderCustomChecklist() {
+  const val = document.getElementById('projLocalPath')?.value;
+  if (!val || !val.trim()) {
+    showToast('Digite o caminho da pasta local primeiro.', 'warning');
+    return;
+  }
+  const type = document.getElementById('projType')?.value;
+  const name = document.getElementById('projName')?.value || 'Projeto';
+  const id = document.getElementById('projId')?.value;
+  const p = id ? projects.find(x => x.id === parseInt(id)) : null;
+  const currentSaved = (tempSelectedFolders !== null ? tempSelectedFolders : p?.selectedFolders) || null;
+
+  openFolderSelectionModal(val, type, name, (selectedFolders) => {
+    tempSelectedFolders = [...selectedFolders];
+    if (p) {
+      p.selectedFolders = [...selectedFolders];
+      scheduleSync();
+    }
+    abrirPastaLocal(val, type, selectedFolders);
+  }, currentSaved);
 }
 
 function testProjDriveLink() {
@@ -715,11 +747,12 @@ function openCardFolder(event, projId) {
     // AMBIENTE DESKTOP: ABRIR / VINCULAR PASTA LOCAL
     // ══════════════════════════════════════════════════
     if (p.localPath && p.localPath.trim()) {
-      abrirPastaLocal(p.localPath);
+      // Abre diretamente no Windows Explorer sem popup
+      abrirPastaLocal(p.localPath, p.type, []);
       return;
     }
 
-    // Solicita o caminho da pasta local no PC (Windows Explorer)
+    // Solicita o caminho da pasta local no PC (Windows Explorer) na 1ª vinculação
     showPrompt(
       `Informe o caminho da pasta deste projeto no seu computador (Windows Explorer):`,
       (caminho) => {
@@ -729,7 +762,9 @@ function openCardFolder(event, projId) {
         scheduleSync();
         renderBoard();
         showToast('Pasta local vinculada com sucesso!', 'success');
-        abrirPastaLocal(clean);
+        openFolderSelectionModal(clean, p.type, p.name, (selectedFolders) => {
+          abrirPastaLocal(clean, p.type, selectedFolders);
+        });
       },
       {
         title: `Vincular Pasta no PC — ${p.name}`,
@@ -738,7 +773,7 @@ function openCardFolder(event, projId) {
         placeholder: 'Ex: D:\\COISAS\\Projetos\\' + p.name,
         defaultValue: p.localPath || '',
         helpText: p.driveLink ? `Dica: Este projeto já possui pasta na nuvem. Digite aqui a pasta local do computador.` : 'Dica: Você pode copiar o caminho da barra de endereço do Windows Explorer e colar aqui.',
-        okText: 'Salvar e Abrir'
+        okText: 'Salvar e Continuar'
       }
     );
   }

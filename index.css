@@ -4797,21 +4797,24 @@ textarea.inp {
   justify-content: center;
   min-width: 17px;
   height: 17px;
-  padding: 0 4px;
+  padding: 0 5px;
   border-radius: 999px;
-  background: var(--red);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 800;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.24);
+  font-size: 10.5px;
+  font-weight: 700;
   line-height: 1;
   margin-left: 5px;
-  box-shadow: 0 0 8px rgba(220, 38, 38, 0.4);
-  animation: pulseBadge 2.2s infinite ease-in-out;
+  font-family: inherit;
+  transition: all 0.18s ease;
 }
 
-@keyframes pulseBadge {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.18); }
+.nav-tab:hover .nav-alert-badge,
+.nav-tab.on .nav-alert-badge {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
 }
 
 /* ══ MODAIS EM FORMATO BOTTOM-SHEET NO MOBILE ══ */

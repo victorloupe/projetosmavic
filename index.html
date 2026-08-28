@@ -146,10 +146,13 @@
         <div class="fld"><label class="flbl">Capa (URL da Imagem)</label><input class="inp inp-sm" id="projImage" placeholder="https://imagem.jpg"></div>
         <div class="fld">
           <label class="flbl"><i class="bi bi-folder2-open"></i> Pasta no Computador (Windows Explorer)</label>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;align-items:center">
             <input class="inp inp-sm" id="projLocalPath" placeholder="Ex: D:\COISAS\Projetos\NomeDoProjeto" style="flex:1">
-            <button type="button" class="btn btn-ghost btn-sm" onclick="testProjLocalPath()" title="Testar abertura no Windows Explorer" style="white-space:nowrap;display:flex;align-items:center;gap:4px">
-              <i class="bi bi-folder2-open"></i> Testar
+            <button type="button" class="btn btn-ghost btn-sm" onclick="openProjFolderCustomChecklist()" title="Configurar e gerar subpastas para este projeto" style="white-space:nowrap;display:flex;align-items:center;gap:4px">
+              <i class="bi bi-folder-check"></i> Subpastas
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="testProjLocalPath()" title="Abrir diretamente no Windows Explorer" style="white-space:nowrap;display:flex;align-items:center;gap:4px">
+              <i class="bi bi-box-arrow-up-right"></i> Abrir
             </button>
           </div>
         </div>
@@ -162,7 +165,6 @@
             </button>
           </div>
         </div>
-        <div class="fld"><label class="flbl">Observações do Projeto</label><textarea class="inp" id="projNote" rows="3" placeholder="Dados técnicos, observações de obra..."></textarea></div>
       </div>
       
       <!-- COL 2 -->
@@ -210,10 +212,14 @@
           <button class="btn btn-primary btn-sm" onclick="addPayment()">+</button>
         </div>
         <div class="pays-box" id="paysContainer" style="max-height:120px;overflow-y:auto"></div>
-        <div class="fld" style="margin-top:14px;margin-bottom:0">
+        <div class="fld" style="margin-top:14px;margin-bottom:12px">
           <label class="flbl">Valor total do contrato</label>
           <input type="text" inputmode="decimal" class="inp inp-sm" id="projValue" placeholder="R$ 0,00" oninput="maskCurrencyInput(this)">
           <div style="font-size:11px;color:var(--text3);margin-top:3px"><i class="bi bi-info-circle"></i> Preenchido automaticamente se você adicionar produtos vinculados, mas pode ser editado direto aqui</div>
+        </div>
+        <div class="fld" style="margin-bottom:0">
+          <label class="flbl"><i class="bi bi-chat-left-text"></i> Observações do Projeto</label>
+          <textarea class="inp" id="projNote" rows="3" placeholder="Dados técnicos, observações de obra..." style="resize:vertical"></textarea>
         </div>
       </div>
     </div>

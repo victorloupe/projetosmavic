@@ -1,4 +1,5 @@
 # Handler robusto para abrir pastas locais a partir do protocolo mavic-folder://
+# Verifica e cria automaticamente a pasta raiz e as subpastas padrao do projeto
 param([string]$rawUri)
 
 try {
@@ -6,45 +7,89 @@ try {
     
     if (-not $rawUri) { exit }
     
-    # 1. Remove aspas externas e espacos
-    $p = $rawUri.Trim('"', "'", ' ', "`t", "`r", "`n")
+    # 1. Limpa aspas e espacos externos
+    $raw = $rawUri.Trim('"', "'", ' ', "`t", "`r", "`n")
     
-    # 2. Remove o prefixo mavic-folder:// ou mavic-folder:
-    $p = [regex]::Replace($p, '^(?i)mavic-folder:(//)?', '')
-    
-    # 3. Decodifica URL (ex: %20 -> espaco, %C3%87 -> C, etc.)
-    try {
-        $p = [System.Uri]::UnescapeDataString($p)
-    } catch {}
-    
-    # 4. Remove aspas residuais
-    $p = $p.Trim('"', "'", ' ', "`t", "`r", "`n")
-    
-    # 5. Normaliza barras para o padrao Windows
-    $p = $p.Replace('/', '\')
-    
-    # 6. Remove barra final (exceto se for raiz como D:\)
-    if ($p -notmatch '^[a-zA-Z]:\\$') {
-        $p = $p.TrimEnd('\')
-    }
-    
-    # 7. Verifica se a pasta existe
-    if (Test-Path -LiteralPath $p) {
-        # Abre diretamente no Windows Explorer
-        Start-Process explorer.exe -ArgumentList "`"$p`""
+    # 2. Remove o prefixo do protocolo
+    $raw = [regex]::Replace($raw, '^(?i)mavic-folder:(//)?', '')
+    $raw = $raw.Trim('"', "'", ' ', "`t", "`r", "`n")
+
+    $targetPath = ""
+    $folders = @()
+    $projType = ""
+
+    # 3. Identifica o formato do parametro recebido
+    if ($raw -match '(?i)b64=([^&"''\s]+)') {
+        $b64Val = [System.Uri]::UnescapeDataString($matches[1]).TrimEnd('/', '\')
+        $bytes = [System.Convert]::FromBase64String($b64Val)
+        $jsonStr = [System.Text.Encoding]::UTF8.GetString($bytes)
+        $obj = $jsonStr | ConvertFrom-Json
+        $targetPath = $obj.path
+        $projType = $obj.type
+        if ($obj.folders) {
+            $folders = @($obj.folders)
+        }
+    } elseif ($raw -match '[\?&]path=' -or $raw -match '^path=') {
+        $cleanQ = [regex]::Replace($raw, '^(?i)open[\\/]*\??', '')
+        $cleanQ = $cleanQ.TrimStart('?', '&')
+        $pairs = $cleanQ.Split('&')
+        $dict = @{}
+        foreach ($pair in $pairs) {
+            $kv = $pair.Split('=', 2)
+            if ($kv.Length -eq 2) {
+                $dict[[System.Uri]::UnescapeDataString($kv[0])] = [System.Uri]::UnescapeDataString($kv[1])
+            }
+        }
+        $targetPath = $dict['path']
+        $projType = $dict['type']
+        if ($dict['folders']) {
+            $folders = $dict['folders'].Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+        }
     } else {
-        # Se a pasta especifica nao existir, tenta abrir a pasta pai
-        $parent = Split-Path -Parent $p
-        if ($parent -and (Test-Path -LiteralPath $parent)) {
-            Start-Process explorer.exe -ArgumentList "`"$parent`""
-            Add-Type -AssemblyName System.Windows.Forms
-            [System.Windows.Forms.MessageBox]::Show("A subpasta nao foi encontrada:`n`n$p`n`nAbrindo pasta anterior:`n$parent", "MAVIC Projetos", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-        } else {
-            Add-Type -AssemblyName System.Windows.Forms
-            [System.Windows.Forms.MessageBox]::Show("A pasta informada nao foi encontrada no computador:`n`n$p`n`nVerifique se o caminho digitado esta correto.", "MAVIC Projetos - Pasta Nao Encontrada", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        # Formato legado (caminho direto)
+        try {
+            $targetPath = [System.Uri]::UnescapeDataString($raw)
+        } catch {
+            $targetPath = $raw
         }
     }
+
+    if (-not $targetPath) { exit }
+
+    # 4. Normaliza caminho para Windows
+    $targetPath = $targetPath.Trim('"', "'", ' ', "`t", "`r", "`n")
+    $targetPath = $targetPath.Replace('/', '\')
+    if ($targetPath -notmatch '^[a-zA-Z]:\\$') {
+        $targetPath = $targetPath.TrimEnd('\')
+    }
+
+    # 5. Cria a pasta raiz do projeto se nao existir
+    if (-not (Test-Path -LiteralPath $targetPath)) {
+        New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+    }
+
+    # 6. Cria as subpastas padrao faltantes (sem sobrescrever nada existente)
+    if ($folders -and $folders.Count -gt 0) {
+        foreach ($sub in $folders) {
+            if (-not $sub) { continue }
+            $cleanSub = $sub.Trim(' ', '\', '/').Replace('/', '\')
+            if (-not $cleanSub) { continue }
+            $fullSub = Join-Path $targetPath $cleanSub
+            if (-not (Test-Path -LiteralPath $fullSub)) {
+                New-Item -ItemType Directory -Path $fullSub -Force | Out-Null
+            }
+        }
+    }
+
+    # 7. Abre a pasta no Windows Explorer
+    if (Test-Path -LiteralPath $targetPath) {
+        Start-Process explorer.exe -ArgumentList "`"$targetPath`""
+    } else {
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show("A pasta informada nao pôde ser acessada:`n`n$targetPath", "MAVIC Projetos", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+    }
+
 } catch {
     Add-Type -AssemblyName System.Windows.Forms
-    [System.Windows.Forms.MessageBox]::Show("Erro ao abrir pasta:`n" + $_.Exception.Message, "MAVIC Projetos", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    [System.Windows.Forms.MessageBox]::Show("Erro ao processar pasta do projeto:`n" + $_.Exception.Message, "MAVIC Projetos", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
 }

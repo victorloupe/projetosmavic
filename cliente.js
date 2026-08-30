@@ -884,9 +884,9 @@ function createCardHTML(p, cardIdx=0){
       </div>
     </div>
     <div class="kcard-exp">
+      ${driveHtml}
       ${approvalBannerHtml}
       ${timelineHtml}
-      ${driveHtml}
       ${finHtml}
       ${subtaskTextHtml}
       ${prodsHtml}

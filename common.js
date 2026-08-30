@@ -1129,13 +1129,13 @@ function fallbackCopyText(text, successMsg) {
   if (!overlay) {
     const wrap=document.createElement('div');
     wrap.innerHTML=`<div class="overlay" id="confirmOverlay" onclick="if(event.target===this)closeConfirm()">
-      <div class="mbox msm" style="max-width:440px">
+      <div class="mbox msm" id="confirmBox" style="max-width:520px;width:100%">
         <div class="mhdr">
           <h5 id="confirmTitle" style="color:var(--accent);display:flex;align-items:center;gap:6px"><i class="bi bi-question-circle"></i> Confirmar ação</h5>
           <button class="btn-icon btn-sm" onclick="closeConfirm()"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="mbody"><div id="confirmMsg" style="font-size:14px;color:var(--text2);line-height:1.5;margin:0"></div></div>
-        <div class="mftr" id="confirmFooter" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="mftr" id="confirmFooter" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:nowrap">
           <button class="btn btn-ghost" id="confirmBtnCancel" onclick="closeConfirm()">Cancelar</button>
           <div id="confirmExtraBtns" style="display:inline-flex;gap:8px"></div>
           <button class="btn btn-danger" id="confirmBtnOk">Confirmar</button>
@@ -1151,6 +1151,11 @@ function showConfirm(message,onConfirm,opts={}){
   const overlay=document.getElementById('confirmOverlay');
   if(!overlay){ onConfirm(); return; }
   
+  const box = document.getElementById('confirmBox');
+  if (box) {
+    box.style.maxWidth = opts.maxWidth || (opts.extraBtn || opts.extraBtns ? '520px' : '440px');
+  }
+
   const titleEl = document.getElementById('confirmTitle');
   if (titleEl) titleEl.innerHTML=`<i class="${opts.icon||'bi bi-question-circle'}"></i> ${opts.title||'Confirmar ação'}`;
   

@@ -1260,12 +1260,13 @@ function openProjFoldersModal(projId) {
 
   const listEl = document.getElementById('pfSubfoldersList');
   if (listEl) {
+    listEl.innerHTML = '';
     if (!folders || !folders.length) {
       listEl.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:6px">Nenhuma subpasta configurada.</div>';
     } else {
-      listEl.innerHTML = folders.map(f => {
+      folders.forEach(f => {
         let icon = 'bi-folder2';
-        const fLow = f.toLowerCase();
+        const fLow = (f || '').toLowerCase();
         if (fLow.includes('render') || fLow.includes('print') || fLow.includes('imagem') || fLow.includes('foto')) icon = 'bi-images';
         else if (fLow.includes('doc') || fLow.includes('texto') || fLow.includes('brief')) icon = 'bi-file-earmark-text';
         else if (fLow.includes('plant') || fLow.includes('cad') || fLow.includes('dwg')) icon = 'bi-bounding-box';
@@ -1273,18 +1274,27 @@ function openProjFoldersModal(projId) {
         else if (fLow.includes('3d') || fLow.includes('skp') || fLow.includes('model')) icon = 'bi-box';
         else if (fLow.includes('final') || fLow.includes('apresent')) icon = 'bi-award';
 
-        return `
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">
-            <span style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--text)">
-              <i class="bi ${icon}" style="color:var(--accent);font-size:14px"></i>
-              <span>${escapeHtml(f)}</span>
-            </span>
-            <button type="button" class="btn btn-ghost btn-xs" onclick="abrirSubpastaEspecifica('${escapeHtml(p.localPath || '')}', '${escapeHtml(f)}');event.stopPropagation()" style="font-size:11.5px;padding:3px 8px;border-radius:6px;display:flex;align-items:center;gap:4px">
-              <i class="bi bi-box-arrow-up-right"></i> Abrir
-            </button>
-          </div>
-        `;
-      }).join('');
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px';
+
+        const left = document.createElement('span');
+        left.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--text)';
+        left.innerHTML = `<i class="bi ${icon}" style="color:var(--accent);font-size:14px"></i><span>${escapeHtml(f)}</span>`;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-ghost btn-xs';
+        btn.style.cssText = 'font-size:11.5px;padding:3px 8px;border-radius:6px;display:flex;align-items:center;gap:4px';
+        btn.innerHTML = '<i class="bi bi-box-arrow-up-right"></i> Abrir';
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          abrirSubpastaEspecifica(p.localPath || '', f);
+        };
+
+        row.appendChild(left);
+        row.appendChild(btn);
+        listEl.appendChild(row);
+      });
     }
   }
 

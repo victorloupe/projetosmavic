@@ -1772,8 +1772,8 @@ function abrirSubpastaEspecifica(basePath, subfolder) {
     showToast('Nenhum caminho de pasta configurado.', 'warning');
     return;
   }
-  let cleanBase = basePath.trim().replace(/^["']|["']$/g, '').replace(/[/\\]+$/, '');
-  let sub = (subfolder || '').trim().replace(/^[/\\]+/, '').replace(/\//g, '\\');
+  let cleanBase = basePath.trim().replace(/^["']|["']$/g, '').replace(/\//g, '\\').replace(/\\+$/, '');
+  let sub = (subfolder || '').trim().replace(/^[\/\\]+/, '').replace(/\//g, '\\');
   let fullPath = sub ? `${cleanBase}\\${sub}` : cleanBase;
   abrirPastaLocal(fullPath, '', []);
 }

@@ -21,6 +21,7 @@ try {
     # 3. Identifica o formato do parametro recebido
     if ($raw -match '(?i)b64=([^&"''\s]+)') {
         $b64Val = [System.Uri]::UnescapeDataString($matches[1]).TrimEnd('/', '\')
+        while ($b64Val.Length % 4 -ne 0) { $b64Val += "=" }
         $bytes = [System.Convert]::FromBase64String($b64Val)
         $jsonStr = [System.Text.Encoding]::UTF8.GetString($bytes)
         $obj = $jsonStr | ConvertFrom-Json

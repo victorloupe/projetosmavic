@@ -459,10 +459,15 @@
         <label class="flbl">Como será realizado o pagamento?</label>
         <select class="inp inp-sm" id="fatPayCondition" onchange="handleFatConditionChange()">
           <option value="50_50" selected>50% Entrada + 50% na Entrega (Padrão MAVIC)</option>
+          <option value="pagamento_mensal">Pagamento Mensal (1 Parcela no Vencimento)</option>
+          <option value="mensal">Parcelamento Mensal (Vencimento Fixo)</option>
           <option value="vista">À Vista (100%)</option>
           <option value="entrada_parc">Entrada + Parcelas do Saldo</option>
           <option value="parcelado">Parcelado sem Entrada</option>
         </select>
+        <div id="fatClientDueBadge" style="display:none;font-size:11.5px;color:var(--accent);font-weight:600;margin-top:4px">
+          <i class="bi bi-calendar2-check"></i> Vencimento habitual deste cliente: todo dia <b id="fatClientDueDayVal">10</b>
+        </div>
       </div>
 
       <!-- Configurações Dinâmicas por Condição -->

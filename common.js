@@ -59,6 +59,12 @@ function hexToRgba(hex,alpha){
 function typeBg(typeId){ return hexToRgba(typeColor(typeId),0.13); }
 function getProjectDefaultFolders(typeId){
   const low=(typeId||'').toLowerCase().trim();
+  const allTypes=(typeof projectTypes!=='undefined'&&projectTypes.length?projectTypes:INIT_PROJECT_TYPES);
+  const found=allTypes.find(x=>(x.id||'').trim().toLowerCase()===low);
+  if(found && Array.isArray(found.defaultFolders) && found.defaultFolders.length){
+    return found.defaultFolders;
+  }
+
   if(low.includes('render')){
     return ['01. Renders','01. Renders/01. Prints'];
   }
@@ -76,14 +82,6 @@ function getProjectDefaultFolders(typeId){
   }
   if(low.includes('urbanis')){
     return ['01. Documentos','02. Topografia','03. Masterplan','04. Renders','04. Renders/01. Prints'];
-  }
-
-  // Se o tipo já tiver pastas salvas que possuem numeração
-  const allTypes=(typeof projectTypes!=='undefined'&&projectTypes.length?projectTypes:INIT_PROJECT_TYPES);
-  const found=allTypes.find(x=>(x.id||'').trim().toLowerCase()===low);
-  if(found && Array.isArray(found.defaultFolders) && found.defaultFolders.length){
-    const hasNum = found.defaultFolders.some(f => /^\d+[\.\-_]/.test(f));
-    if (hasNum) return found.defaultFolders;
   }
 
   return ['01. Documentos','02. Renders','02. Renders/01. Prints','03. Outros'];
@@ -1107,7 +1105,7 @@ function showConfirm(message,onConfirm,opts={}){
   const overlay=document.getElementById('confirmOverlay');
   if(!overlay){ onConfirm(); return; } // fallback de segurança, nunca deve cair aqui
   document.getElementById('confirmTitle').innerHTML=`<i class="${opts.icon||'bi bi-question-circle'}"></i> ${opts.title||'Confirmar ação'}`;
-  document.getElementById('confirmMsg').textContent=message;
+  document.getElementById('confirmMsg').innerHTML=message;
   const btn=document.getElementById('confirmBtnOk');
   btn.textContent=opts.okText||'Confirmar';
   btn.className=opts.danger===false?'btn btn-primary':'btn btn-danger';
@@ -1257,16 +1255,74 @@ document.addEventListener('keydown',(e)=>{
   </div>`;
   document.body.appendChild(wrap.firstElementChild);
 })();
+function stripFolderNumbering(segment) {
+  return (segment || '').replace(/^\s*\d+[\.\-_\s]+\s*/, '').trim();
+}
+
+function formatAndNumberFolderString(folderStr) {
+  if (!folderStr || typeof folderStr !== 'string') return '';
+  const rawList = folderStr.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+  if (!rawList.length) return '';
+
+  const parsedItems = [];
+  const seenKeys = new Set();
+
+  rawList.forEach(item => {
+    const rawParts = item.split(/[\/\\]/).map(p => stripFolderNumbering(p)).filter(Boolean);
+    if (!rawParts.length) return;
+    const cleanKey = rawParts.join('/').toLowerCase();
+    if (seenKeys.has(cleanKey)) return;
+    seenKeys.add(cleanKey);
+    parsedItems.push({
+      parts: rawParts,
+      isSub: rawParts.length > 1
+    });
+  });
+
+  const rootNumberedMap = new Map();
+  let rootCounter = 1;
+
+  parsedItems.forEach(item => {
+    const rootName = item.parts[0];
+    const rootKey = rootName.toLowerCase();
+    if (!rootNumberedMap.has(rootKey)) {
+      const numStr = String(rootCounter).padStart(2, '0');
+      rootNumberedMap.set(rootKey, `${numStr}. ${rootName}`);
+      rootCounter++;
+    }
+  });
+
+  const subCounters = new Map();
+  const result = [];
+
+  parsedItems.forEach(item => {
+    const rootName = item.parts[0];
+    const rootKey = rootName.toLowerCase();
+    const numberedRoot = rootNumberedMap.get(rootKey) || rootName;
+
+    if (item.parts.length === 1) {
+      result.push(numberedRoot);
+    } else {
+      const subParts = item.parts.slice(1);
+      let subCount = (subCounters.get(rootKey) || 0) + 1;
+      subCounters.set(rootKey, subCount);
+      const subNumStr = String(subCount).padStart(2, '0');
+      const numberedSub = `${subNumStr}. ${subParts[0]}`;
+      const restParts = subParts.slice(1);
+      const fullPath = [numberedRoot, numberedSub, ...restParts].join('/');
+      result.push(fullPath);
+    }
+  });
+
+  return result.join(', ');
+}
+
 function openManageProjectTypesModal(){
   const list=document.getElementById('typesManagerList');
   if(!list) return;
   const currentList = (projectTypes.length ? projectTypes : INIT_PROJECT_TYPES);
   list.innerHTML = currentList.map(t => {
-    let foldersList = t.defaultFolders;
-    const hasNum = Array.isArray(foldersList) && foldersList.length && foldersList.some(f => /^\d+[\.\-_]/.test(f));
-    if (!hasNum) {
-      foldersList = getProjectDefaultFolders(t.id);
-    }
+    const foldersList = Array.isArray(t.defaultFolders) && t.defaultFolders.length ? t.defaultFolders : getProjectDefaultFolders(t.id);
     const folders = foldersList.join(', ');
     return `<div class="cm-type-card" data-orig="${escapeHtml(t.id)}" style="background:var(--bg-subtle, rgba(0,0,0,0.02));border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
@@ -1287,14 +1343,19 @@ function closeManageProjectTypesModal(){document.getElementById('typesOverlay').
 function applyDefaultNumberedFoldersAll(){
   const cards = document.querySelectorAll('#typesManagerList .cm-type-card');
   cards.forEach(c => {
-    const name = c.querySelector('.cm-type-name')?.value.trim();
     const folderInp = c.querySelector('.cm-type-folders');
-    if (folderInp && name) {
-      const def = getProjectDefaultFolders(name);
-      folderInp.value = def.join(', ');
+    if (folderInp) {
+      const currentVal = folderInp.value.trim();
+      if (currentVal) {
+        folderInp.value = formatAndNumberFolderString(currentVal);
+      } else {
+        const name = c.querySelector('.cm-type-name')?.value.trim();
+        const def = getProjectDefaultFolders(name);
+        folderInp.value = def.join(', ');
+      }
     }
   });
-  showToast('Estruturas atualizadas com numeração! Clique em Salvar Alterações.', 'info');
+  showToast('Numeração aplicada mantendo todas as pastas adicionadas!', 'success');
 }
 function resetAllProjectTypesToDefault(){
   if (!confirm('Deseja restaurar todos os tipos de projeto para a lista original com numeração (incluindo Prefeitura e Render)?')) return;
@@ -1619,6 +1680,46 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 function today(){return new Date().toISOString().split('T')[0];}
+function addDays(dateStr, days) {
+  if (!dateStr) return today();
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + (parseInt(days) || 0));
+  return d.toISOString().split('T')[0];
+}
+
+function getClientDueDay(clientName) {
+  if (!clientName) return null;
+  if (typeof clients !== 'undefined' && Array.isArray(clients)) {
+    const cl = clients.find(c => (c.name || '').toLowerCase().trim() === String(clientName).toLowerCase().trim() || String(c.id) === String(clientName));
+    if (cl && cl.dueDay && cl.dueDay >= 1 && cl.dueDay <= 31) {
+      return parseInt(cl.dueDay);
+    }
+  }
+  return null;
+}
+
+function calculateNextDueDateWithTargetDay(baseDateStr, targetDay, monthOffset = 1) {
+  const base = baseDateStr ? new Date(baseDateStr + 'T12:00:00') : new Date();
+  let year = base.getFullYear();
+  let month = base.getMonth() + monthOffset;
+  
+  while (month > 11) {
+    month -= 12;
+    year += 1;
+  }
+  while (month < 0) {
+    month += 12;
+    year -= 1;
+  }
+  
+  const day = targetDay || base.getDate();
+  const maxDayInMonth = new Date(year, month + 1, 0).getDate();
+  const clampedDay = Math.min(day, maxDayInMonth);
+  
+  const mStr = String(month + 1).padStart(2, '0');
+  const dStr = String(clampedDay).padStart(2, '0');
+  return `${year}-${mStr}-${dStr}`;
+}
 function formatPhone(phone){
   const d=(phone||'').replace(/\D/g,'');
   if(d.length===11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
@@ -1664,6 +1765,17 @@ function abrirPastaLocal(caminho, tipoProjeto, customFolders) {
     showToast('Abrindo pasta no Windows Explorer…', 'info');
     window.location.href = 'mavic-folder://' + encodeURIComponent(clean);
   }
+}
+
+function abrirSubpastaEspecifica(basePath, subfolder) {
+  if (!basePath || !basePath.trim()) {
+    showToast('Nenhum caminho de pasta configurado.', 'warning');
+    return;
+  }
+  let cleanBase = basePath.trim().replace(/^["']|["']$/g, '').replace(/[/\\]+$/, '');
+  let sub = (subfolder || '').trim().replace(/^[/\\]+/, '').replace(/\//g, '\\');
+  let fullPath = sub ? `${cleanBase}\\${sub}` : cleanBase;
+  abrirPastaLocal(fullPath, '', []);
 }
 
 // ══════════════════════════════════════════

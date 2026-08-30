@@ -1394,8 +1394,22 @@ function transformBudgetToProject(id) {
   document.getElementById('fatPriority').value = 'Média';
   document.getElementById('fatDeadline').value = b.validUntil || addDays(today(), 15);
   
+  const clientDueDay = getClientDueDay(b.client);
+  const dueBadge = document.getElementById('fatClientDueBadge');
+  const dueVal = document.getElementById('fatClientDueDayVal');
+  if (dueBadge && dueVal) {
+    if (clientDueDay) {
+      dueVal.textContent = clientDueDay;
+      dueBadge.style.display = 'block';
+    } else {
+      dueBadge.style.display = 'none';
+    }
+  }
+
   const condSel = document.getElementById('fatPayCondition');
-  if (condSel) condSel.value = '50_50';
+  if (condSel) {
+    condSel.value = clientDueDay ? 'pagamento_mensal' : '50_50';
+  }
 
   // Configuração dos destinos (Novo Projeto vs Projeto Existente)
   currentFaturarDestination = 'new';
@@ -1470,9 +1484,14 @@ function handleFatConditionChange() {
   const { selectedNetTotal } = getFaturarSelectedTotals(b);
   const netTotal = selectedNetTotal;
   const deadline = document.getElementById('fatDeadline')?.value || addDays(today(), 15);
+  const clientDueDay = getClientDueDay(b?.client);
 
   if (cond === '50_50') {
     const halfVal = Math.round((netTotal / 2) * 100) / 100;
+    const defaultSecondDueDate = clientDueDay 
+      ? calculateNextDueDateWithTargetDay(today(), clientDueDay, 1) 
+      : (deadline || addDays(today(), 15));
+
     wrap.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
@@ -1497,8 +1516,63 @@ function handleFatConditionChange() {
             <input type="date" class="inp inp-sm" id="fatEntryDate" value="${today()}" onchange="updateFaturarPlanPreview()">
           </div>
         </div>
-        <div style="font-size:12px;color:var(--text2);padding:4px 2px">
-          <i class="bi bi-calendar-check" style="color:var(--accent)"></i> Saldo restante de <strong>${fmt(netTotal - halfVal)}</strong> com vencimento na data de entrega (${deadline ? new Date(deadline + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}).
+        <div class="row2">
+          <div class="fld" style="margin:0">
+            <label class="flbl"><i class="bi bi-calendar2-check" style="color:var(--accent)"></i> Vencimento do Saldo (50%)</label>
+            <input type="date" class="inp inp-sm" id="fatSecondDueDate" value="${defaultSecondDueDate}" onchange="updateFaturarPlanPreview()">
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (cond === 'pagamento_mensal') {
+    const targetDay = clientDueDay || 10;
+    const baseToday = today();
+    const todayDay = parseInt(baseToday.split('-')[2]);
+    const startOffset = todayDay <= targetDay ? 0 : 1;
+    const defaultDueDate = calculateNextDueDateWithTargetDay(baseToday, targetDay, startOffset);
+
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="row2">
+          <div class="fld" style="margin:0"><label class="flbl">Dia Fixo de Vencimento</label>
+            <input type="number" min="1" max="31" class="inp inp-sm" id="fatSingleMonthlyDueDay" value="${targetDay}" onchange="updateFaturarPlanPreview()">
+          </div>
+          <div class="fld" style="margin:0"><label class="flbl">Data do Vencimento</label>
+            <input type="date" class="inp inp-sm" id="fatSingleMonthlyDueDate" value="${defaultDueDate}" onchange="updateFaturarPlanPreview()">
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--text2);padding:2px 2px;line-height:1.4">
+          <i class="bi bi-info-circle" style="color:var(--accent)"></i> Cria 1 parcela mensal no valor do projeto (<strong>${fmt(netTotal)}</strong>). No momento do recebimento você poderá quitar o valor total ou receber parcialmente (o restante será reprogramado automaticamente).
+        </div>
+      </div>
+    `;
+  } else if (cond === 'mensal') {
+    const targetDay = clientDueDay || 10;
+    const baseToday = today();
+    const todayDay = parseInt(baseToday.split('-')[2]);
+    const startOffset = todayDay <= targetDay ? 0 : 1;
+    const defaultFirstDate = calculateNextDueDateWithTargetDay(baseToday, targetDay, startOffset);
+
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="row2">
+          <div class="fld" style="margin:0"><label class="flbl">Quantidade de Parcelas</label>
+            <select class="inp inp-sm" id="fatMonthlyParcCount" onchange="updateFaturarPlanPreview()">
+              <option value="2">2x Mensais</option>
+              <option value="3">3x Mensais</option>
+              <option value="4" selected>4x Mensais</option>
+              <option value="5">5x Mensais</option>
+              <option value="6">6x Mensais</option>
+              <option value="10">10x Mensais</option>
+              <option value="12">12x Mensais</option>
+            </select>
+          </div>
+          <div class="fld" style="margin:0"><label class="flbl">Dia Fixo de Vencimento</label>
+            <input type="number" min="1" max="31" class="inp inp-sm" id="fatMonthlyDueDay" value="${targetDay}" onchange="updateFaturarPlanPreview()">
+          </div>
+        </div>
+        <div class="fld" style="margin:0"><label class="flbl">1º Vencimento</label>
+          <input type="date" class="inp inp-sm" id="fatMonthlyFirstDate" value="${defaultFirstDate}" onchange="updateFaturarPlanPreview()">
         </div>
       </div>
     `;
@@ -1531,6 +1605,10 @@ function handleFatConditionChange() {
     `;
   } else if (cond === 'entrada_parc') {
     const defaultEntry = Math.round((netTotal * 0.3) * 100) / 100;
+    const defaultFirstDueDate = clientDueDay 
+      ? calculateNextDueDateWithTargetDay(today(), clientDueDay, 1) 
+      : addDays(today(), 30);
+
     wrap.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:8px">
         <div class="row2">
@@ -1563,7 +1641,7 @@ function handleFatConditionChange() {
         </div>
         <div class="row2">
           <div class="fld" style="margin:0"><label class="flbl">1º Vencimento do Saldo</label>
-            <input type="date" class="inp inp-sm" id="fatCustomFirstDueDate" value="${addDays(today(), 30)}" onchange="updateFaturarPlanPreview()">
+            <input type="date" class="inp inp-sm" id="fatCustomFirstDueDate" value="${defaultFirstDueDate}" onchange="updateFaturarPlanPreview()">
           </div>
           <div class="fld" style="margin:0"><label class="flbl">Intervalo</label>
             <select class="inp inp-sm" id="fatCustomInterval" onchange="updateFaturarPlanPreview()">
@@ -1575,6 +1653,12 @@ function handleFatConditionChange() {
       </div>
     `;
   } else if (cond === 'parcelado') {
+    const targetDay = clientDueDay || 10;
+    const baseToday = today();
+    const todayDay = parseInt(baseToday.split('-')[2]);
+    const startOffset = todayDay <= targetDay ? 0 : 1;
+    const defaultFirstDueDate = calculateNextDueDateWithTargetDay(baseToday, targetDay, startOffset);
+
     wrap.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:8px">
         <div class="row2">
@@ -1590,7 +1674,7 @@ function handleFatConditionChange() {
             </select>
           </div>
           <div class="fld" style="margin:0"><label class="flbl">1º Vencimento</label>
-            <input type="date" class="inp inp-sm" id="fatDirectFirstDueDate" value="${addDays(today(), 30)}" onchange="updateFaturarPlanPreview()">
+            <input type="date" class="inp inp-sm" id="fatDirectFirstDueDate" value="${defaultFirstDueDate}" onchange="updateFaturarPlanPreview()">
           </div>
         </div>
         <div class="fld" style="margin:0"><label class="flbl">Intervalo entre Parcelas</label>
@@ -1611,12 +1695,17 @@ function calculateFaturarPlan(netTotal, deadline) {
   let installments = [];
   let payments = [];
 
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  const clientDueDay = getClientDueDay(b?.client);
+
   if (cond === '50_50') {
     const halfVal = Math.round((netTotal / 2) * 100) / 100;
     const restVal = Math.round((netTotal - halfVal) * 100) / 100;
     const isEntryPaid = document.getElementById('fatEntryPaid')?.checked ?? true;
     const entryMethod = document.getElementById('fatEntryMethod')?.value || 'Pix';
     const entryDate = document.getElementById('fatEntryDate')?.value || today();
+    const secondDueDate = document.getElementById('fatSecondDueDate')?.value || (clientDueDay ? calculateNextDueDateWithTargetDay(today(), clientDueDay, 1) : (deadline || addDays(today(), 15)));
 
     const inst1Id = Date.now();
     const inst2Id = Date.now() + 1;
@@ -1637,7 +1726,7 @@ function calculateFaturarPlan(netTotal, deadline) {
       number: 2,
       desc: 'Saldo na Entrega (50%)',
       amount: restVal,
-      dueDate: deadline || addDays(today(), 15),
+      dueDate: secondDueDate,
       status: 'Pendente'
     };
 
@@ -1651,6 +1740,41 @@ function calculateFaturarPlan(netTotal, deadline) {
         date: entryDate,
         method: entryMethod,
         desc: 'Entrada (50%)'
+      });
+    }
+  } else if (cond === 'pagamento_mensal') {
+    const targetDay = parseInt(document.getElementById('fatSingleMonthlyDueDay')?.value) || (clientDueDay || 10);
+    const dueDate = document.getElementById('fatSingleMonthlyDueDate')?.value || calculateNextDueDateWithTargetDay(today(), targetDay, 1);
+
+    installments.push({
+      id: Date.now(),
+      number: 1,
+      desc: 'Mensalidade do Projeto',
+      amount: netTotal,
+      dueDate: dueDate,
+      status: 'Pendente'
+    });
+  } else if (cond === 'mensal') {
+    const count = parseInt(document.getElementById('fatMonthlyParcCount')?.value || '4');
+    const targetDay = parseInt(document.getElementById('fatMonthlyDueDay')?.value) || (clientDueDay || 10);
+    const firstDate = document.getElementById('fatMonthlyFirstDate')?.value || calculateNextDueDateWithTargetDay(today(), targetDay, 1);
+    
+    let runningId = Date.now();
+    const perParc = Math.floor((netTotal / count) * 100) / 100;
+    const diff = Math.round((netTotal - (perParc * count)) * 100) / 100;
+
+    for (let i = 0; i < count; i++) {
+      const isLast = (i === count - 1);
+      const pVal = isLast ? Math.round((perParc + diff) * 100) / 100 : perParc;
+      const pDate = calculateNextDueDateWithTargetDay(firstDate, targetDay, i);
+      
+      installments.push({
+        id: runningId++,
+        number: i + 1,
+        desc: `${i + 1}ª Parcela`,
+        amount: pVal,
+        dueDate: pDate,
+        status: 'Pendente'
       });
     }
   } else if (cond === 'vista') {
@@ -1727,7 +1851,7 @@ function calculateFaturarPlan(netTotal, deadline) {
         installments.push({
           id: runningId++,
           number: installments.length + 1,
-          desc: `Parcela ${i}/${count}`,
+          desc: `${i + (validEntry > 0 ? 1 : 0)}ª Parcela`,
           amount: pVal,
           dueDate: pDate,
           status: 'Pendente'
@@ -1750,7 +1874,7 @@ function calculateFaturarPlan(netTotal, deadline) {
       installments.push({
         id: runningId++,
         number: i,
-        desc: `Parcela ${i}/${count}`,
+        desc: `${i}ª Parcela`,
         amount: pVal,
         dueDate: pDate,
         status: 'Pendente'
@@ -1796,7 +1920,7 @@ function updateFaturarPlanPreview(keepEdits = false) {
           <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${isPaid ? 'rgba(22,163,74,0.15)' : 'var(--surface2)'};color:${isPaid ? 'var(--green)' : 'var(--text3)'};font-size:11px;font-weight:700">${inst.number}</span>
           <div style="display:flex;flex-direction:column;gap:3px;flex:1">
             <div style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">
-              <span>${inst.desc}</span>
+              <input type="text" class="inp inp-sm" style="padding:1px 6px;font-size:12px;height:24px;border-radius:6px;width:150px;background:transparent;border:1px solid transparent;font-weight:600;color:var(--text)" value="${escapeHtml(inst.desc)}" onchange="changeFaturarInstDesc(${idx}, this.value)" onfocus="this.style.background='var(--surface2)';this.style.borderColor='var(--border)'" onblur="this.style.background='transparent';this.style.borderColor='transparent'" title="Clique para editar a descrição">
               <span class="badge" style="font-size:9.5px;padding:1px 6px;background:${isPaid ? 'rgba(22,163,74,0.15)' : 'var(--surface2)'};color:${isPaid ? 'var(--green)' : 'var(--text3)'}">${isPaid ? '✓ Já Pago' : '⏳ Pendente'}</span>
             </div>
             <div style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)">
@@ -1807,11 +1931,42 @@ function updateFaturarPlanPreview(keepEdits = false) {
           </div>
         </div>
         <div style="text-align:right">
-          <div style="font-weight:700;font-family:'Outfit',sans-serif;font-size:13.5px;color:${isPaid ? 'var(--green)' : 'var(--text)'}">${fmt(inst.amount)}</div>
+          <input type="text" inputmode="decimal" class="inp inp-sm" style="width:115px;text-align:right;font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;padding:2px 6px;height:28px;color:${isPaid ? 'var(--green)' : 'var(--accent)'};background:var(--surface2);border:1px solid var(--border);border-radius:6px" value="${toBRLInputStr(inst.amount)}" oninput="maskCurrencyInput(this)" onchange="changeFaturarInstAmount(${idx}, this.value)" title="Clique para alterar o valor desta parcela">
         </div>
       </div>
     `;
   }).join('');
+}
+
+function changeFaturarInstDesc(index, newDesc) {
+  if (!currentFaturarPlan || !currentFaturarPlan.installments || !currentFaturarPlan.installments[index]) return;
+  currentFaturarPlan.installments[index].desc = newDesc || `Parcela ${index + 1}`;
+}
+
+function changeFaturarInstAmount(index, valStr) {
+  if (!currentFaturarPlan || !currentFaturarPlan.installments || !currentFaturarPlan.installments[index]) return;
+  const newAmt = parseCurrencyInput(valStr) || 0;
+  currentFaturarPlan.installments[index].amount = newAmt;
+
+  const id = parseInt(document.getElementById('fatOrcId')?.value || '0');
+  const b = budgets.find(x => x.id === id);
+  const { selectedNetTotal } = getFaturarSelectedTotals(b);
+  const netTotal = selectedNetTotal;
+
+  // Se houver 2 parcelas e o usuário editou a 1ª, calcula a 2ª com a diferença automaticamente
+  if (currentFaturarPlan.installments.length === 2 && index === 0) {
+    const diff = Math.max(0, Math.round((netTotal - newAmt) * 100) / 100);
+    currentFaturarPlan.installments[1].amount = diff;
+  }
+
+  // Se a parcela estava marcada como paga, atualiza o valor do pagamento
+  const inst = currentFaturarPlan.installments[index];
+  if (inst.status === 'Pago' && Array.isArray(currentFaturarPlan.payments)) {
+    const pay = currentFaturarPlan.payments.find(p => p.id === inst.id || p.desc === inst.desc);
+    if (pay) pay.amount = newAmt;
+  }
+
+  updateFaturarPlanPreview(true);
 }
 
 function changeFaturarInstDate(index, newDate) {

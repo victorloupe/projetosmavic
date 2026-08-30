@@ -170,8 +170,20 @@ const params=new URLSearchParams(window.location.search);
 clientName=(params.get('nome')||'').trim();
 clientToken=(params.get('token')||'').trim();
 
+let sbClient = null;
+function getSupabaseClient() {
+  if (!sbClient && typeof window.supabase !== 'undefined' && typeof SB_URL !== 'undefined' && typeof SB_KEY !== 'undefined') {
+    try {
+      sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+    } catch (e) {
+      console.warn('Erro ao inicializar Supabase:', e);
+    }
+  }
+  return sbClient;
+}
+
 // ══════════════════════════════════════════
-//  LOAD DATA — via Edge Function (server-side auth)
+//  LOAD DATA
 // ══════════════════════════════════════════
 async function loadData(){
   const rIcon = document.getElementById('refreshIcon');
@@ -196,41 +208,76 @@ async function loadData(){
     wAvatar.style.color = getClientColor(clientName);
   }
 
-  try{
-    const url=`${EDGE_FN}?nome=${encodeURIComponent(clientName)}${clientToken?'&token='+encodeURIComponent(clientToken):''}`;
-    const res=await fetch(url);
-    const payload=await res.json();
+  let loaded = false;
 
-    if(!res.ok){
-      if(res.status===401||payload.error==='invalid_token')
-        showError('bi-shield-lock','Acesso negado','Token inválido. Solicite um novo link ao escritório MAVIC.');
-      else if(res.status===404||payload.error==='client_not_found')
-        showError('bi-person-x','Cliente não encontrado','Verifique o link recebido ou entre em contato com o escritório.');
-      else
-        showError('bi-exclamation-triangle','Erro ao carregar','Não foi possível conectar ao servidor. Tente novamente.');
-      if(rIcon)rIcon.classList.remove('spinning');
-      return;
+  // 1. Tenta carregar direto do banco Supabase
+  const sb = getSupabaseClient();
+  if (sb) {
+    try {
+      const { data, error } = await sb.from('mavic_store').select('key,data');
+      if (!error && data && data.length) {
+        const store = {};
+        data.forEach(r => store[r.key] = r.data);
+        const allClients = store.clients || [];
+        const cli = allClients.find(c => (c.name || '').toLowerCase().trim() === clientName.toLowerCase().trim());
+        if (cli) {
+          const allProjects = store.projects || [];
+          projects = allProjects.filter(p => (p.client || '').toLowerCase().trim() === clientName.toLowerCase().trim());
+          const allNotifs = store.notifications || [];
+          notifications = allNotifs.filter(n => n.clientToken === cli.token);
+          const allGlobal = store.global_notices || [];
+          globalNotices = allGlobal.filter(gn => gn.active && (gn.targetAll || (gn.targetClients || []).some(n => (n||'').toLowerCase() === clientName.toLowerCase().trim())));
+          
+          const cfg = store.config || {};
+          if (cfg.columns?.length) appColumns = cfg.columns;
+          if (cfg.projectTypes?.length) projectTypes = cfg.projectTypes;
+          applyTheme(cfg.theme || localStorage.getItem('mavic_theme') || 'light');
+          clientDoc = cli.doc || '';
+          clientAddress = cli.address || '';
+          companyName = cfg.companyName || 'MAVIC Arquitetura e Engenharia';
+          companyDoc = cfg.companyDoc || '';
+          pixKey = cfg.pixKey || '';
+          pixName = cfg.pixName || '';
+          pixBank = cfg.pixBank || '';
+          loaded = true;
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao ler do Supabase, tentando Edge Function:', err);
     }
+  }
 
-    projects      = payload.projects      || [];
-    notifications = payload.notifications || [];
-    globalNotices = payload.globalNotices || [];
-    if(payload.config?.columns?.length) appColumns=payload.config.columns;
-    if(payload.config?.projectTypes?.length) projectTypes=payload.config.projectTypes;
-    applyTheme(payload.config?.theme || localStorage.getItem('mavic_theme') || 'light');
+  // 2. Se não carregou do Supabase, tenta Edge Function
+  if (!loaded) {
+    try{
+      const url=`${EDGE_FN}?nome=${encodeURIComponent(clientName)}${clientToken?'&token='+encodeURIComponent(clientToken):''}`;
+      const res=await fetch(url);
+      const payload=await res.json();
 
-    // Dados pro recibo em PDF
-    clientDoc = payload.clientDoc || '';
-    clientAddress = payload.clientAddress || '';
-    companyName = payload.config?.companyName || 'MAVIC Arquitetura e Engenharia';
-    companyDoc = payload.config?.companyDoc || '';
-    pixKey = payload.config?.pixKey || '';
-    pixName = payload.config?.pixName || '';
-    pixBank = payload.config?.pixBank || '';
+      if(res.ok){
+        projects      = payload.projects      || [];
+        notifications = payload.notifications || [];
+        globalNotices = payload.globalNotices || [];
+        if(payload.config?.columns?.length) appColumns=payload.config.columns;
+        if(payload.config?.projectTypes?.length) projectTypes=payload.config.projectTypes;
+        applyTheme(payload.config?.theme || localStorage.getItem('mavic_theme') || 'light');
 
-  }catch(e){
-    console.warn('Edge Function indisponível, usando cache local:', e);
-    // Fallback para dados locais (sem dados reais do servidor)
+        clientDoc = payload.clientDoc || '';
+        clientAddress = payload.clientAddress || '';
+        companyName = payload.config?.companyName || 'MAVIC Arquitetura e Engenharia';
+        companyDoc = payload.config?.companyDoc || '';
+        pixKey = payload.config?.pixKey || '';
+        pixName = payload.config?.pixName || '';
+        pixBank = payload.config?.pixBank || '';
+        loaded = true;
+      }
+    }catch(e){
+      console.warn('Edge Function indisponível:', e);
+    }
+  }
+
+  // 3. Fallback de cache local
+  if (!loaded) {
     projects      = JSON.parse(localStorage.getItem('mavic_projects_'+clientName)||'[]');
     notifications = JSON.parse(localStorage.getItem('mavic_notifications_'+clientName)||'[]');
     globalNotices = JSON.parse(localStorage.getItem('mavic_global_notices')||'[]');
@@ -238,11 +285,12 @@ async function loadData(){
     if(cfg.columns?.length) appColumns=cfg.columns;
     if(cfg.projectTypes?.length) projectTypes=cfg.projectTypes;
   }
+
   populateTypeFilter();
 
-  // Garante 2.5s a 2.8s de animação suave de boas-vindas
+  // Garante 1.2s de animação suave de boas-vindas
   const elapsed = Date.now() - startTime;
-  const minWait = 2600;
+  const minWait = 1200;
   if (elapsed < minWait) {
     await new Promise(r => setTimeout(r, minWait - elapsed));
   }
@@ -253,7 +301,7 @@ async function loadData(){
 }
 
 // ══════════════════════════════════════════
-//  WRITE — marcar avisos como lidos (server-side)
+//  WRITE & SYNC — sincroniza alterações do cliente
 // ══════════════════════════════════════════
 async function postEdgeFn(body){
   try{
@@ -262,7 +310,91 @@ async function postEdgeFn(body){
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({...body, nome:clientName, token:clientToken})
     });
-  }catch(e){console.warn('Falha ao sincronizar leitura:', e);}
+  }catch(e){console.warn('Falha ao sincronizar com Edge Function:', e);}
+}
+
+async function syncProjectChangeToServer(updatedProj) {
+  // 1. Atualiza cache local do cliente
+  try {
+    localStorage.setItem('mavic_projects_' + clientName, JSON.stringify(projects));
+  } catch (e) {}
+
+  // 2. Se o admin estiver no mesmo navegador, atualiza o storage global do admin
+  try {
+    const rawAll = localStorage.getItem('mavic_projects');
+    if (rawAll) {
+      let all = JSON.parse(rawAll) || [];
+      const idx = all.findIndex(x => x.id === updatedProj.id);
+      if (idx >= 0) {
+        all[idx] = {
+          ...all[idx],
+          column: updatedProj.column,
+          revisions: updatedProj.revisions !== undefined ? updatedProj.revisions : all[idx].revisions,
+          revisionLogs: updatedProj.revisionLogs || all[idx].revisionLogs,
+          clientApproved: updatedProj.clientApproved !== undefined ? updatedProj.clientApproved : all[idx].clientApproved,
+          clientApprovedAt: updatedProj.clientApprovedAt || all[idx].clientApprovedAt
+        };
+        localStorage.setItem('mavic_projects', JSON.stringify(all));
+        sessionStorage.setItem('mavic_last_local_save', String(Date.now()));
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao atualizar localStorage:', e);
+  }
+
+  // 3. Atualiza diretamente no banco Supabase
+  const sb = getSupabaseClient();
+  if (sb) {
+    try {
+      const { data, error } = await sb.from('mavic_store').select('key,data');
+      if (!error && data) {
+        const pRow = data.find(r => r.key === 'projects');
+        if (pRow && Array.isArray(pRow.data)) {
+          const allProjs = pRow.data;
+          const pIdx = allProjs.findIndex(x => x.id === updatedProj.id);
+          if (pIdx >= 0) {
+            allProjs[pIdx] = {
+              ...allProjs[pIdx],
+              column: updatedProj.column,
+              revisions: updatedProj.revisions !== undefined ? updatedProj.revisions : allProjs[pIdx].revisions,
+              revisionLogs: updatedProj.revisionLogs || allProjs[pIdx].revisionLogs,
+              clientApproved: updatedProj.clientApproved !== undefined ? updatedProj.clientApproved : allProjs[pIdx].clientApproved,
+              clientApprovedAt: updatedProj.clientApprovedAt || allProjs[pIdx].clientApprovedAt
+            };
+
+            const upsertPayload = [{ key: 'projects', data: allProjs }];
+
+            if (updatedProj.column === 'Desenvolvimento' && updatedProj.notes) {
+              const notifRow = data.find(r => r.key === 'notifications');
+              const notifList = (notifRow && Array.isArray(notifRow.data)) ? [...notifRow.data] : [];
+              notifList.push({
+                id: Date.now(),
+                title: 'Ajuste Solicitado pelo Cliente',
+                message: `O cliente ${clientName} solicitou alteração no projeto "${allProjs[pIdx].name}": "${updatedProj.notes}"`,
+                projectName: allProjs[pIdx].name,
+                createdAt: new Date().toISOString(),
+                read: false
+              });
+              upsertPayload.push({ key: 'notifications', data: notifList });
+            }
+
+            await sb.from('mavic_store').upsert(upsertPayload, { onConflict: 'key' });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Erro no sync direto com Supabase:', e);
+    }
+  }
+
+  // 4. Também notifica via Edge Function
+  try {
+    await postEdgeFn({
+      action: updatedProj.column === 'Desenvolvimento' ? 'request_revision' : 'approve_project',
+      projectId: updatedProj.id,
+      notes: updatedProj.notes
+    });
+  } catch (e) {}
 }
 
 function showError(icon,title,msg){
@@ -406,7 +538,7 @@ let _confirmCallback = null;
 function showConfirm(message, onConfirm) {
   const overlay = document.getElementById('confirmOverlay');
   if (!overlay) { onConfirm(); return; }
-  document.getElementById('confirmMsg').textContent = message;
+  document.getElementById('confirmMsg').innerHTML = message;
   _confirmCallback = onConfirm;
   overlay.classList.remove('d-none');
 }
@@ -707,6 +839,31 @@ function createCardHTML(p, cardIdx=0){
   const unreadNotifs=notifications.filter(n=>n.projectName===p.name&&!dismissed.includes(n.id)&&!n.read);
   const hasBell=unreadNotifs.length>0;
 
+  // Bloco de Aprovação / Revisão pelo Cliente
+  const isInReview = (p.column === 'Revisão');
+  let approvalBannerHtml = '';
+  if (isInReview) {
+    approvalBannerHtml = `
+      <div class="client-approval-banner" style="background:linear-gradient(135deg, rgba(37,99,235,0.08), rgba(124,58,237,0.08));border:1.5px solid rgba(37,99,235,0.35);border-radius:12px;padding:12px;margin:8px 0;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;font-size:13px;flex-shrink:0"><i class="bi bi-bell-fill"></i></span>
+          <div>
+            <div style="font-weight:700;font-size:13px;color:var(--text);font-family:'Outfit',sans-serif">Aguardando sua Aprovação</div>
+            <div style="font-size:11.5px;color:var(--text2)">Avalie as imagens/arquivos deste projeto e confirme abaixo:</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm" style="flex:1;min-width:120px;background:var(--green);color:#fff;border:none;font-weight:700;padding:8px 10px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer" onclick="clientApproveProject(${p.id})">
+            <i class="bi bi-check-circle-fill"></i> Aprovar Projeto
+          </button>
+          <button type="button" class="btn btn-sm" style="flex:1;min-width:120px;background:rgba(234,88,12,0.12);color:#ea580c;border:1px solid rgba(234,88,12,0.4);font-weight:700;padding:8px 10px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer" onclick="clientRequestRevision(${p.id})">
+            <i class="bi bi-arrow-counterclockwise"></i> Solicitar Ajustes
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   return `<div class="kcard ${dlClass}" data-id="${p.id}" style="animation-delay:${cardIdx*0.04}s;--type-color:${typeColor(p.type)}">
     ${subs.length?`<div class="kcard-prog-bar"><div class="kcard-prog-fill" style="width:${subPct}%;background:${progColor}"></div></div>`:''}
     ${p.image?`<img src="${p.image}" class="kcard-cover" onerror="this.style.display='none'">`:''}
@@ -727,6 +884,7 @@ function createCardHTML(p, cardIdx=0){
       </div>
     </div>
     <div class="kcard-exp">
+      ${approvalBannerHtml}
       ${timelineHtml}
       ${driveHtml}
       ${finHtml}
@@ -736,6 +894,93 @@ function createCardHTML(p, cardIdx=0){
       ${noteHtml}
     </div>
   </div>`;
+}
+
+function clientApproveProject(projId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+
+  showConfirm(
+    `Deseja confirmar a <strong>aprovação final</strong> do projeto "<strong>${escapeHtml(p.name)}</strong>"?`,
+    async () => {
+      p.column = 'Concluído';
+      p.clientApproved = true;
+      p.clientApprovedAt = new Date().toISOString();
+
+      renderBoard();
+      calcFinance();
+      showToast('🎉 Projeto aprovado com sucesso! Muito obrigado!', 'success');
+
+      await syncProjectChangeToServer({
+        id: p.id,
+        column: 'Concluído',
+        clientApproved: true,
+        clientApprovedAt: p.clientApprovedAt
+      });
+    }
+  );
+}
+
+function clientRequestRevision(projId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+
+  document.getElementById('revReqProjId').value = String(projId);
+  document.getElementById('revReqNotes').value = '';
+  document.getElementById('revisionRequestModal').classList.remove('d-none');
+  setTimeout(() => document.getElementById('revReqNotes')?.focus(), 100);
+}
+
+function closeRevisionRequestModal() {
+  document.getElementById('revisionRequestModal').classList.add('d-none');
+}
+
+function getRevisionTargetColumn() {
+  const cols = (Array.isArray(appColumns) && appColumns.length) ? appColumns.filter(c => !isHiddenColumn(c.id)) : [];
+  const altCol = cols.find(c => (c.id || '').toLowerCase().includes('altera'));
+  if (altCol) return altCol.id;
+  const devCol = cols.find(c => (c.id || '').toLowerCase().includes('desenv'));
+  if (devCol) return devCol.id;
+  return 'Alteração';
+}
+
+async function submitRevisionRequest() {
+  const idStr = document.getElementById('revReqProjId').value;
+  const projId = parseInt(idStr);
+  const p = projects.find(x => x.id === projId);
+  if (!p) return closeRevisionRequestModal();
+
+  const notes = document.getElementById('revReqNotes').value.trim();
+  if (!notes) {
+    showToast('Por favor, descreva o que precisa ser ajustado', 'warning');
+    document.getElementById('revReqNotes')?.focus();
+    return;
+  }
+
+  const targetCol = getRevisionTargetColumn();
+  p.column = targetCol;
+  p.revisions = (p.revisions || 0) + 1;
+  p.pendingClientRevision = true;
+  p.revisionLogs = p.revisionLogs || [];
+  p.revisionLogs.push({
+    id: Date.now(),
+    timestamp: new Date().toISOString(),
+    text: notes,
+    author: clientName || 'Cliente'
+  });
+
+  closeRevisionRequestModal();
+  renderBoard();
+  calcFinance();
+  showToast(`Solicitação de ajustes enviada! O projeto retornou para ${targetCol}.`, 'success');
+
+  await syncProjectChangeToServer({
+    id: p.id,
+    column: targetCol,
+    revisions: p.revisions,
+    revisionLogs: p.revisionLogs,
+    notes: notes
+  });
 }
 
 function scrollToNotif(e,projectName){

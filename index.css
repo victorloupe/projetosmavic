@@ -572,13 +572,41 @@ textarea.inp {
 
 /* ══ QUADRO KANBAN ══ */
 .board-view {
+  position: relative;
   flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
+.board-watermark-logo {
+  position: fixed;
+  bottom: 24px;
+  right: 32px;
+  width: 260px;
+  max-width: 20vw;
+  opacity: 0.08;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  z-index: 0;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+[data-theme="dark"] .board-watermark-logo {
+  opacity: 0.06;
+  filter: brightness(1.3) invert(0.05);
+}
+
+@media (max-width: 992px) {
+  .board-watermark-logo {
+    display: none !important;
+  }
+}
+
 .board-header {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -587,6 +615,8 @@ textarea.inp {
 }
 
 .board-outer {
+  position: relative;
+  z-index: 1;
   flex: 1;
   overflow-x: auto;
   overflow-y: auto;
@@ -834,7 +864,8 @@ textarea.inp {
   box-shadow: var(--sh);
 }
 
-.kcard:hover {
+.kcard:hover,
+.kcard.is-hovered {
   box-shadow: var(--sh2);
   border-color: var(--border2);
   transform: translateY(-4px);
@@ -965,13 +996,115 @@ textarea.inp {
   border-color: var(--accent);
 }
 
+.kcard-bell-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text3);
+  cursor: pointer;
+  transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 13px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.kcard-bell-btn:hover {
+  background: var(--accent);
+  color: #fff !important;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(146, 98, 58, 0.25);
+}
+
+.kcard-bell-btn.in-review {
+  background: rgba(37, 99, 235, 0.14);
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.kcard-bell-btn.in-review:hover {
+  background: #2563eb;
+  color: #fff !important;
+  border-color: #2563eb;
+}
+
+.kcard-bell-btn.has-adjustment {
+  background: rgba(234, 88, 12, 0.18);
+  color: #ea580c;
+  border-color: rgba(234, 88, 12, 0.5);
+}
+
+.kcard-bell-btn.has-adjustment:hover {
+  background: #ea580c;
+  color: #fff !important;
+  border-color: #ea580c;
+}
+
+.kcard-bell-btn.approved {
+  background: rgba(22, 163, 74, 0.14);
+  color: var(--green);
+  border-color: rgba(22, 163, 74, 0.4);
+}
+
+.kcard-bell-btn.approved:hover {
+  background: var(--green);
+  color: #fff !important;
+  border-color: var(--green);
+}
+
+.kcard-bell-btn.pulse {
+  animation: bellPulse 2s infinite ease-in-out;
+}
+
+.kcard-bell-btn.has-adjustment.pulse {
+  animation: adjustPulse 1.8s infinite ease-in-out;
+}
+
+@keyframes bellPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
+  50% { transform: scale(1.08); box-shadow: 0 0 0 5px rgba(37, 99, 235, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+@keyframes adjustPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.5); }
+  50% { transform: scale(1.1); box-shadow: 0 0 0 5px rgba(234, 88, 12, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(234, 88, 12, 0); }
+}
+
 .kcard-client {
   font-size: 12px;
   color: var(--text2);
   margin-bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.kcard-client-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 135px;
+  font-weight: 550;
+}
+
+.kcard-fin-badge {
+  margin-left: auto;
+  font-size: 9.5px !important;
+  font-weight: 600;
+  padding: 1.5px 6.5px !important;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.15px;
+  flex-shrink: 0;
 }
 
 .kcard-current-task {
@@ -1005,8 +1138,10 @@ textarea.inp {
 
 .kcard-tags {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 4px;
+  width: 100%;
 }
 
 .kcard-exp {
@@ -1017,7 +1152,8 @@ textarea.inp {
   padding: 0 12px 0 16px;
 }
 
-.kcard:hover .kcard-exp {
+.kcard:hover .kcard-exp,
+.kcard.is-hovered .kcard-exp {
   max-height: 1200px;
   opacity: 1;
   padding-bottom: 12px;
@@ -1349,6 +1485,174 @@ textarea.inp {
 .pay-item > span {
   flex: 1;
   min-width: 0;
+}
+
+/* ══ INSTALMENT MANAGEMENT IN MODAL ══ */
+.insts-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inst-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.inst-card:hover {
+  border-color: var(--border2);
+}
+
+.inst-card.paid {
+  border-left: 3px solid var(--green);
+  background: rgba(34, 197, 94, 0.03);
+}
+
+.inst-card.pending {
+  border-left: 3px solid var(--accent);
+}
+
+.inst-card.overdue {
+  border-left: 3px solid var(--red);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.inst-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.inst-desc {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.inst-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inst-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--text2);
+}
+
+.btn-quick-pay {
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.btn-quick-pay:hover {
+  filter: brightness(1.1);
+  transform: scale(1.02);
+}
+
+/* Card drag-and-drop cover image target */
+.kcard.drag-target-image {
+  outline: 2px dashed var(--accent) !important;
+  outline-offset: -2px;
+  background: var(--surface2) !important;
+  transform: scale(1.01);
+}
+
+/* Badge de Revisão */
+.b-rev {
+  background: rgba(146, 98, 58, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(146, 98, 58, 0.22);
+  font-weight: 700;
+}
+
+/* Linha de Alterações / Revisões no Card */
+.kcard-rev-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  margin-top: 7px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.kcard-rev-row:hover {
+  border-color: var(--border2);
+}
+
+.kcard-rev-row.over-limit {
+  background: rgba(221, 107, 32, 0.08) !important;
+  border-color: rgba(221, 107, 32, 0.4) !important;
+}
+
+.kcard-rev-row.over-limit .rev-step-btn {
+  border-color: rgba(221, 107, 32, 0.35);
+}
+
+.kcard-rev-row.over-limit .rev-step-btn:hover:not(:disabled) {
+  background: rgba(221, 107, 32, 0.15);
+  color: #dd6b20;
+  border-color: #dd6b20;
+}
+
+.rev-step-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rev-step-btn:hover:not(:disabled) {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: rgba(146, 98, 58, 0.3);
+  transform: translateY(-0.5px);
+}
+
+.rev-step-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.week-summary-bar {
+  animation: fadeInDown 0.25s ease;
+}
+
+#btnToggleWeekSummary.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 700;
 }
 
 /* ══ VISTA DASHBOARD / VIEWS ══ */
@@ -2380,6 +2684,17 @@ textarea.inp {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.cm-move-btn {
+  transition: all 0.15s ease;
+}
+
+.cm-move-btn:hover {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+  transform: scale(1.08);
 }
 
 .cm-final {

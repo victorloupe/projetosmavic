@@ -19,9 +19,9 @@
 <meta name="theme-color" content="#92623a">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="cliente.css?v=111">
-<!-- supabase-js e config.js removidos: o cliente não acessa o banco diretamente.
-     Os dados chegam via Edge Function com autenticação server-side. -->
+<link rel="stylesheet" href="cliente.css?v=112">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="preload">
 
@@ -178,6 +178,34 @@
   </div>
 </div>
 
+<!-- REVISION REQUEST MODAL (CLIENTE SOLICITA AJUSTES) -->
+<div id="revisionRequestModal" class="modal-overlay d-none" onclick="closeRevisionRequestModal()">
+  <div class="modal-card" style="max-width:440px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h5 style="margin:0;font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px;color:var(--accent)">
+        <i class="bi bi-arrow-counterclockwise"></i> Solicitar Ajustes no Projeto
+      </h5>
+      <button class="btn-icon" onclick="closeRevisionRequestModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+      <p style="font-size:13px;color:var(--text2);margin:0;line-height:1.4">
+        Descreva detalhadamente o que você gostaria de alterar ou ajustar. O projeto retornará automaticamente para a etapa de <strong>Desenvolvimento</strong>.
+      </p>
+      <input type="hidden" id="revReqProjId" value="">
+      <div class="fld" style="margin:0">
+        <label style="font-size:11.5px;font-weight:700;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:4px">O que precisa ser alterado? *</label>
+        <textarea id="revReqNotes" class="inp" rows="4" placeholder="Ex: Ajustar a iluminação da sala, trocar o acabamento da marcenaria para tom amadeirado..." style="width:100%;font-size:13px;resize:vertical"></textarea>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+        <button class="btn btn-ghost" onclick="closeRevisionRequestModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btnSubmitRevisionRequest" onclick="submitRevisionRequest()" style="background:#ea580c;border-color:#ea580c;color:#fff;font-weight:700">
+          <i class="bi bi-send"></i> Enviar Solicitação
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM MODAL (substitui o confirm() nativo do navegador) -->
 <div id="confirmOverlay" class="modal-overlay d-none" onclick="closeConfirm()">
   <div class="modal-card" style="max-width:380px" onclick="event.stopPropagation()">
@@ -193,6 +221,6 @@
     </div>
   </div>
 </div>
-<script src="cliente.js?v=116"></script>
+<script src="cliente.js?v=118"></script>
 </body>
 </html>

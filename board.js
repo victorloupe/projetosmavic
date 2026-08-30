@@ -43,12 +43,23 @@ function initPage() {
   const savedType = sessionStorage.getItem('board_fType');
   const savedPrio = sessionStorage.getItem('board_fPrio');
   const savedCli = sessionStorage.getItem('board_fClient');
+  const savedFin = sessionStorage.getItem('board_fFinance');
+  const savedTag = sessionStorage.getItem('board_fTag');
   const savedSearch = sessionStorage.getItem('board_srch');
 
   if(savedType && document.getElementById('fType')) document.getElementById('fType').value = savedType;
   if(savedPrio && document.getElementById('fPrio')) document.getElementById('fPrio').value = savedPrio;
   if(savedCli && document.getElementById('fClient')) document.getElementById('fClient').value = savedCli;
+  if(savedFin && document.getElementById('fFinance')) document.getElementById('fFinance').value = savedFin;
+  if(savedTag && document.getElementById('fTag')) document.getElementById('fTag').value = savedTag;
   if(savedSearch && document.getElementById('srch')) document.getElementById('srch').value = savedSearch;
+
+  if (localStorage.getItem('mavic_weekSummaryOpen') === 'true') {
+    const bar = document.getElementById('weekSummaryBar');
+    const btn = document.getElementById('btnToggleWeekSummary');
+    if (bar) { bar.style.display = 'flex'; bar.classList.remove('d-none'); }
+    if (btn) btn.classList.add('active');
+  }
 
   renderBoard();
 
@@ -63,15 +74,158 @@ function initPage() {
   }
 }
 
+function matchesFinanceFilter(p, filter) {
+  if (!filter) return true;
+  const total = parseFloat(p.value || 0);
+  const pays = p.payments || [];
+  const paid = pays.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const rest = total - paid;
+  const insts = Array.isArray(p.installments) ? p.installments : [];
+  const todayObj = new Date().setHours(0, 0, 0, 0);
+
+  if (filter === 'paid') {
+    return total > 0 && rest <= 0.01;
+  }
+  if (filter === 'pending') {
+    return rest > 0.01;
+  }
+  if (filter === 'overdue') {
+    if (insts.length > 0) {
+      return insts.some(inst => {
+        if (!inst || inst.status === 'Pago' || !inst.dueDate) return false;
+        const dDue = new Date(inst.dueDate + 'T12:00:00');
+        return Math.ceil((dDue - todayObj) / 86400000) < 0;
+      });
+    }
+    if (p.date && rest > 0.01) {
+      const dDue = new Date(p.date + 'T12:00:00');
+      return Math.ceil((dDue - todayObj) / 86400000) < 0;
+    }
+    return false;
+  }
+  if (filter === 'upcoming') {
+    if (insts.length > 0) {
+      return insts.some(inst => {
+        if (!inst || inst.status === 'Pago' || !inst.dueDate) return false;
+        const dDue = new Date(inst.dueDate + 'T12:00:00');
+        const diff = Math.ceil((dDue - todayObj) / 86400000);
+        return diff >= 0 && diff <= 7;
+      });
+    }
+    if (p.date && rest > 0.01) {
+      const dDue = new Date(p.date + 'T12:00:00');
+      const diff = Math.ceil((dDue - todayObj) / 86400000);
+      return diff >= 0 && diff <= 7;
+    }
+    return false;
+  }
+  return true;
+}
+
+function updateTagFilter() {
+  const sel = document.getElementById('fTag');
+  if (!sel) return;
+  const cur = sel.value;
+  const tagSet = new Set();
+  projects.forEach(p => {
+    (Array.isArray(p.tags) ? p.tags : []).forEach(t => {
+      const clean = (t || '').trim();
+      if (clean) tagSet.add(clean);
+    });
+  });
+  const tags = Array.from(tagSet).sort();
+  sel.innerHTML = '<option value="">Todas as Tags</option>' + tags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+  if (cur && tags.includes(cur)) sel.value = cur;
+}
+
+function addTagToInput(tag) {
+  const inp = document.getElementById('projTags');
+  if (!inp) return;
+  const current = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!current.includes(tag)) {
+    current.push(tag);
+    inp.value = current.join(', ');
+  }
+}
+
+function renderWeekSummary() {
+  const bar = document.getElementById('weekSummaryBar');
+  if (!bar) return;
+  
+  const todayStr = today();
+  const next7Str = (typeof addDays === 'function') ? addDays(todayStr, 7) : todayStr;
+
+  // Entregas da semana (próximos 7 dias)
+  const weekProjs = projects.filter(p => !p.archived && !isFinalColumn(p.column) && p.date && p.date >= todayStr && p.date <= next7Str);
+  const countDeliveriesEl = document.getElementById('weekDeliveriesCount');
+  if (countDeliveriesEl) {
+    countDeliveriesEl.textContent = `${weekProjs.length} projeto${weekProjs.length !== 1 ? 's' : ''}`;
+  }
+
+  // Recebimentos previstos da semana
+  let sumReceivables = 0;
+  let countInsts = 0;
+  projects.forEach(p => {
+    if (p.archived) return;
+    (p.installments || []).forEach(inst => {
+      if (inst.status !== 'Pago' && inst.dueDate && inst.dueDate >= todayStr && inst.dueDate <= next7Str) {
+        sumReceivables += parseFloat(inst.amount || 0);
+        countInsts++;
+      }
+    });
+  });
+
+  const sumReceivablesEl = document.getElementById('weekReceivablesSum');
+  if (sumReceivablesEl) {
+    sumReceivablesEl.textContent = fmt(sumReceivables);
+  }
+
+  const itemsEl = document.getElementById('weekSummaryItems');
+  if (itemsEl) {
+    const list = [];
+    weekProjs.slice(0, 3).forEach(wp => {
+      const d = wp.date ? new Date(wp.date + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+      list.push(`<span class="badge" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:11.5px"><i class="bi bi-box-seam me-1"></i> ${escapeHtml(wp.name)} (${d})</span>`);
+    });
+    if (weekProjs.length > 3) {
+      list.push(`<span class="badge" style="background:var(--surface2);border:1px solid var(--border);color:var(--text3);font-size:11.5px">+${weekProjs.length - 3} mais</span>`);
+    }
+    itemsEl.innerHTML = list.join('');
+  }
+}
+
+function toggleWeekSummary() {
+  const bar = document.getElementById('weekSummaryBar');
+  const btn = document.getElementById('btnToggleWeekSummary');
+  if (!bar) return;
+  const isHidden = bar.style.display === 'none' || bar.classList.contains('d-none');
+  if (isHidden) {
+    bar.style.display = 'flex';
+    bar.classList.remove('d-none');
+    if (btn) btn.classList.add('active');
+    localStorage.setItem('mavic_weekSummaryOpen', 'true');
+    renderWeekSummary();
+  } else {
+    bar.style.display = 'none';
+    bar.classList.add('d-none');
+    if (btn) btn.classList.remove('active');
+    localStorage.setItem('mavic_weekSummaryOpen', 'false');
+  }
+}
+
 function clearBoardFilters(){
   const srch = document.getElementById('srch');
   const fType = document.getElementById('fType');
   const fPrio = document.getElementById('fPrio');
   const fClient = document.getElementById('fClient');
+  const fFinance = document.getElementById('fFinance');
+  const fTag = document.getElementById('fTag');
   if (srch) srch.value = '';
   if (fType) fType.value = '';
   if (fPrio) fPrio.value = '';
   if (fClient) fClient.value = '';
+  if (fFinance) fFinance.value = '';
+  if (fTag) fTag.value = '';
   renderBoard();
 }
 
@@ -79,38 +233,60 @@ function renderBoard(){
   const board=document.getElementById('board');
   if(!board) return;
   board.innerHTML='';
+  updateTagFilter();
+  renderWeekSummary();
+
   const fType=document.getElementById('fType')?.value || '';
   const fPrio=document.getElementById('fPrio')?.value || '';
   const fCli=document.getElementById('fClient')?.value || '';
+  const fFin=document.getElementById('fFinance')?.value || '';
+  const fTag=document.getElementById('fTag')?.value || '';
   const srchEl=document.getElementById('srch');
   const srch=srchEl ? srchEl.value.toLowerCase().trim() : '';
 
   // Destaque visual dos filtros ativos e exibição do botão limpar
-  const isFiltered = Boolean(fType || fPrio || fCli || srch);
+  const isFiltered = Boolean(fType || fPrio || fCli || fFin || fTag || srch);
   const clearBtn = document.getElementById('btnClearBoardFilters');
   if (clearBtn) clearBtn.style.display = isFiltered ? 'inline-flex' : 'none';
 
   const fTypeEl = document.getElementById('fType');
   const fPrioEl = document.getElementById('fPrio');
   const fCliEl = document.getElementById('fClient');
+  const fFinEl = document.getElementById('fFinance');
+  const fTagEl = document.getElementById('fTag');
   if (fTypeEl) fTypeEl.classList.toggle('filter-active', Boolean(fType));
   if (fPrioEl) fPrioEl.classList.toggle('filter-active', Boolean(fPrio));
   if (fCliEl) fCliEl.classList.toggle('filter-active', Boolean(fCli));
+  if (fFinEl) fFinEl.classList.toggle('filter-active', Boolean(fFin));
+  if (fTagEl) fTagEl.classList.toggle('filter-active', Boolean(fTag));
   if (srchEl) srchEl.classList.toggle('filter-active', Boolean(srch));
 
   // Persistir filtros no sessionStorage
   sessionStorage.setItem('board_fType', fType);
   sessionStorage.setItem('board_fPrio', fPrio);
   sessionStorage.setItem('board_fClient', fCli);
+  sessionStorage.setItem('board_fFinance', fFin);
+  sessionStorage.setItem('board_fTag', fTag);
   sessionStorage.setItem('board_srch', srchEl ? srchEl.value : '');
 
   let total=0;
   const visibleCols = appColumns.filter(c=>visibleColumns.includes(c.id));
   const isMobile = Boolean(window.matchMedia && window.matchMedia('(max-width:768px)').matches);
 
+  const filterProj = (p, colId) => {
+    if (p.archived || p.column !== colId) return false;
+    if (fType && p.type !== fType) return false;
+    if (fPrio && p.priority !== fPrio) return false;
+    if (fCli && p.client !== fCli) return false;
+    if (!matchesFinanceFilter(p, fFin)) return false;
+    if (fTag && !(Array.isArray(p.tags) && p.tags.includes(fTag))) return false;
+    if (srch && !((p.name || '').toLowerCase().includes(srch) || (p.client || '').toLowerCase().includes(srch) || (p.tags || []).some(t => (t || '').toLowerCase().includes(srch)))) return false;
+    return true;
+  };
+
   // Calcular contagens para os pills mobile
   const columnsWithCounts = visibleCols.map(col => {
-    const colProjs = projects.filter(p=>!p.archived&&p.column===col.id&&(!fType||p.type===fType)&&(!fPrio||p.priority===fPrio)&&(!fCli||p.client===fCli)&&(!srch||p.name?.toLowerCase().includes(srch)||p.client?.toLowerCase().includes(srch)));
+    const colProjs = projects.filter(p => filterProj(p, col.id));
     total += colProjs.length;
     return { id: col.id, icon: col.icon, color: col.color, count: colProjs.length };
   });
@@ -123,7 +299,7 @@ function renderBoard(){
   
   colsToRender.forEach(col=>{
     const isMin=minimizedColumns.includes(col.id);
-    let colProjs=projects.filter(p=>!p.archived&&p.column===col.id&&(!fType||p.type===fType)&&(!fPrio||p.priority===fPrio)&&(!fCli||p.client===fCli)&&(!srch||p.name?.toLowerCase().includes(srch)||p.client?.toLowerCase().includes(srch)));
+    let colProjs=projects.filter(p => filterProj(p, col.id));
     colProjs=sortProjs(colProjs,col.id);
     const colVal = colProjs.reduce((s, p) => s + parseFloat(p.value || 0), 0);
     const colValHtml = colVal > 0 ? `<span class="kcol-val" style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-bg);padding:1px 6px;border-radius:6px;margin-left:4px" title="Faturamento total nesta etapa">${fmt(colVal)}</span>` : '';
@@ -212,10 +388,77 @@ function createCardHTML(p, cardIdx=0){
   const currSubs = activeSubs.length ? activeSubs : (subs.find(s => !s.done) ? [subs.find(s => !s.done)] : []);
   const isCurrent = (sId) => currSubs.some(cs => cs.id === sId);
   const isExp=expandedFin.has(p.id);
+  
+  // Próxima parcela a vencer ou parcela vencida
+  const pendingInsts = (Array.isArray(p.installments) ? p.installments : []).filter(x => x && x.status !== 'Pago');
+  let instBadge = '';
+  if (pendingInsts.length > 0) {
+    const sortedPending = pendingInsts.slice().sort((a, b) => {
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate + 'T12:00:00') - new Date(b.dueDate + 'T12:00:00');
+    });
+    const nextInst = sortedPending[0];
+    if (nextInst && nextInst.dueDate) {
+      const dInst = new Date(nextInst.dueDate + 'T12:00:00');
+      const diffInst = Math.ceil((dInst - new Date().setHours(0,0,0,0))/86400000);
+      const dateStr = dInst.toLocaleDateString('pt-BR');
+      if (diffInst < 0) {
+        instBadge = `<div style="margin-top:4px"><span class="badge b-venc" style="font-size:10px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px" title="Parcela de ${fmt(nextInst.amount)} vencida em ${dateStr}"><i class="bi bi-exclamation-triangle-fill"></i> Parcela vencida (${dateStr} · ${fmt(nextInst.amount)})</span></div>`;
+      } else if (diffInst === 0) {
+        instBadge = `<div style="margin-top:4px"><span class="badge b-urg" style="font-size:10px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px" title="Parcela de ${fmt(nextInst.amount)} vence hoje!"><i class="bi bi-alarm-fill"></i> Parcela vence hoje (${fmt(nextInst.amount)})</span></div>`;
+      } else if (diffInst <= 3) {
+        instBadge = `<div style="margin-top:4px"><span class="badge b-urg" style="font-size:10px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px" title="Parcela de ${fmt(nextInst.amount)} vence em ${diffInst} dias"><i class="bi bi-clock-fill"></i> Parcela em ${diffInst}d (${dateStr})</span></div>`;
+      } else {
+        instBadge = `<div style="margin-top:4px"><span class="badge" style="font-size:10px;padding:2px 6px;background:var(--surface2);color:var(--text2);display:inline-flex;align-items:center;gap:4px" title="Próxima parcela: ${fmt(nextInst.amount)} em ${dateStr}"><i class="bi bi-calendar-event"></i> Próx. Parcela: ${dateStr} (${fmt(nextInst.amount)})</span></div>`;
+      }
+    }
+  }
+
   let finHtml='';
   if(total>0){
-    const hRows=pays.length?pays.map(pg=>`<div class="fin-hist-item"><span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'} · ${pg.method||'Pix'}</span><span class="fv" style="font-family:'Outfit',sans-serif;font-weight:700">+${fmt(pg.amount)}</span></div>`).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:12px">Sem pagamentos</div>';
-    finHtml=`<div class="fin-blk"><div class="fin-sum"><div class="fin-row"><span class="lbl">Contrato</span><span class="val" style="font-family:'Outfit',sans-serif;font-weight:700">${fmt(total)}</span></div><div class="fin-row"><span class="lbl">Recebido</span><span class="val" style="color:var(--green);font-family:'Outfit',sans-serif;font-weight:700">${fmt(paid)}</span></div><div class="fin-row" style="border-top:1px solid var(--border);padding-top:3px;margin-top:2px"><span class="lbl">Saldo</span><span class="val" style="color:${rest>0?'var(--red)':'var(--text3)'};font-family:'Outfit',sans-serif;font-weight:700">${fmt(rest)} <span class="badge ${sClass}" style="font-size:10px">${sLabel}</span></span></div></div><button class="fin-hist-btn" onclick="toggleFinHist(${p.id});event.stopPropagation()"><i class="bi bi-clock-history"></i> ${pays.length} pagamento${pays.length!==1?'s':''} <i class="bi bi-chevron-${isExp?'up':'down'}" style="float:right;margin-top:1px;font-size:10px"></i></button><div class="fin-hist-rows ${isExp?'':'d-none'}">${hRows}</div></div>`;
+    let instListHtml = '';
+    if (Array.isArray(p.installments) && p.installments.length > 0) {
+      instListHtml = `
+        <div style="padding:6px 8px;background:var(--surface2);border-radius:6px;margin-bottom:6px;font-size:11px">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:4px;display:flex;justify-content:space-between">
+            <span><i class="bi bi-calendar-event"></i> Cronograma (${p.installments.length} parcelas)</span>
+          </div>
+          ${p.installments.map(inst => {
+            const isP = inst.status === 'Pago';
+            const dStr = inst.dueDate ? new Date(inst.dueDate + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px dashed var(--border)">
+                <span>${escapeHtml(inst.desc || 'Parcela')} <span style="color:var(--text3);font-size:10px">(${dStr})</span></span>
+                <span style="display:flex;align-items:center;gap:4px">
+                  <strong style="font-family:'Outfit',sans-serif">${fmt(inst.amount)}</strong>
+                  ${!isP ? `
+                    <button type="button" class="btn-quick-pay" style="padding:1px 5px;font-size:9.5px;border-radius:4px" onclick="quickPayFromCard(${p.id}, ${inst.id});event.stopPropagation()" title="Dar baixa nesta parcela com 1 clique">
+                      <i class="bi bi-check2"></i> Receber
+                    </button>
+                    <button type="button" class="cbtn" style="color:#25D366;font-size:11px;padding:2px" onclick="openWhatsAppInstallment(${p.id}, ${inst.id});event.stopPropagation()" title="Lembrar cobrança via WhatsApp"><i class="bi bi-whatsapp"></i></button>
+                  ` : `
+                    <span class="badge" style="font-size:9px;padding:1px 4px;background:rgba(22,163,74,0.15);color:var(--green)">✓ Pago</span>
+                  `}
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    const hRows=pays.length?pays.map(pg=>`
+      <div class="fin-hist-item" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--text3);font-size:11px"><i class="bi bi-calendar3"></i> ${pg.date?new Date(pg.date+'T12:00:00').toLocaleDateString('pt-BR'):'—'} · ${escapeHtml(pg.method||'Pix')}</span>
+        <span style="display:flex;align-items:center;gap:4px">
+          <span class="fv" style="font-family:'Outfit',sans-serif;font-weight:700">+${fmt(pg.amount)}</span>
+          <button class="cbtn" style="color:#25D366;font-size:11px;padding:2px" onclick="openWhatsAppReceipt(${p.id}, ${pg.id});event.stopPropagation()" title="Enviar comprovante pelo WhatsApp"><i class="bi bi-whatsapp"></i></button>
+        </span>
+      </div>
+    `).join(''):'<div class="fin-hist-item" style="color:var(--text3);justify-content:center;font-size:11px">Nenhum pagamento registrado</div>';
+    
+    finHtml=`<div class="fin-blk"><div class="fin-sum"><div class="fin-row"><span class="lbl">Contrato</span><span class="val" style="font-family:'Outfit',sans-serif;font-weight:700">${fmt(total)}</span></div><div class="fin-row"><span class="lbl">Recebido</span><span class="val" style="color:var(--green);font-family:'Outfit',sans-serif;font-weight:700">${fmt(paid)}</span></div><div class="fin-row" style="border-top:1px solid var(--border);padding-top:3px;margin-top:2px"><span class="lbl">Saldo</span><span class="val" style="color:${rest>0?'var(--red)':'var(--text3)'};font-family:'Outfit',sans-serif;font-weight:700">${fmt(rest)} <span class="badge ${sClass}" style="font-size:10px">${sLabel}</span></span></div></div><button class="fin-hist-btn" onclick="toggleFinHist(${p.id});event.stopPropagation()"><i class="bi bi-clock-history"></i> ${pays.length} recebimento${pays.length!==1?'s':''} ${Array.isArray(p.installments)&&p.installments.length?`· ${p.installments.length} parcelas`:''} <i class="bi bi-chevron-${isExp?'up':'down'}" style="float:right;margin-top:1px;font-size:10px"></i></button><div class="fin-hist-rows ${isExp?'':'d-none'}">${instListHtml}${pays.length>0?`<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin:4px 0 2px 2px"><i class="bi bi-cash-stack"></i> Recebimentos Efetuados</div>`:''}${hRows}</div></div>`;
   }
   let checkHtml='';
   if(subs.length){
@@ -240,28 +483,136 @@ function createCardHTML(p, cardIdx=0){
     ? (hasFolder ? `Abrir pasta na nuvem: ${escapeHtml(p.driveLink || p.localPath)}` : 'Vincular pasta na nuvem (Drive)')
     : (hasFolder ? `Abrir pasta no PC: ${escapeHtml(p.localPath)}${subText}` : 'Vincular pasta no computador');
 
+  const revCount = parseInt(p.revisions || 0);
+  const revLimit = parseInt(p.revisionsLimit !== undefined ? p.revisionsLimit : 2);
+  const isOverLimit = revCount > revLimit;
+  const extraRevs = Math.max(0, revCount - revLimit);
+
+  const revBoxStyle = isOverLimit 
+    ? 'background:rgba(221,107,32,0.1);border-color:rgba(221,107,32,0.4);color:#dd6b20' 
+    : '';
+
+  const revBadgeOver = isOverLimit 
+    ? `<span class="badge" style="background:#dd6b20;color:#fff;font-size:9.5px;padding:1px 5px;font-weight:700" title="Limite contratado (${revLimit}) excedido">+${extraRevs} Extra</span>`
+    : '';
+
+  const revHtml = `
+    <div class="kcard-rev-row ${isOverLimit ? 'over-limit' : ''}" style="${revBoxStyle}">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:${isOverLimit ? '#dd6b20' : 'var(--text2)'};cursor:pointer" onclick="openRevisionLogModal(${p.id});event.stopPropagation()" title="Ver histórico e notas das alterações">
+        <i class="bi ${isOverLimit ? 'bi-exclamation-triangle-fill' : 'bi-arrow-repeat'}" style="color:${isOverLimit ? '#dd6b20' : 'var(--accent)'};font-size:12.5px"></i>
+        <span>Alterações</span>
+        ${revBadgeOver}
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button type="button" class="rev-step-btn" onclick="adjustProjRevisions(${p.id}, -1);event.stopPropagation()" title="Diminuir alteração" ${revCount === 0 ? 'disabled style="opacity:0.35;cursor:not-allowed"' : ''}>
+          <i class="bi bi-dash"></i>
+        </button>
+        <span style="font-family:'Outfit',sans-serif;font-weight:700;font-size:12px;min-width:18px;text-align:center;color:${isOverLimit ? '#dd6b20' : (revCount > 0 ? 'var(--accent)' : 'var(--text3)')}">${revCount}</span>
+        <button type="button" class="rev-step-btn" onclick="adjustProjRevisions(${p.id}, 1);event.stopPropagation()" title="Adicionar alteração">
+          <i class="bi bi-plus"></i>
+        </button>
+        <button type="button" class="rev-step-btn" onclick="openRevisionLogModal(${p.id});event.stopPropagation()" title="Ver histórico e notas das alterações" style="margin-left:2px">
+          <i class="bi bi-journal-text"></i>
+        </button>
+      </div>
+    </div>
+  `;
+
+  const revLogs = Array.isArray(p.revisionLogs) ? p.revisionLogs : [];
+  let latestClientRevNoteHtml = '';
+  if (revLogs.length > 0) {
+    const latestLog = revLogs[revLogs.length - 1];
+    if (latestLog && latestLog.text) {
+      const dLog = latestLog.timestamp ? new Date(latestLog.timestamp) : (latestLog.date ? new Date(latestLog.date + 'T12:00:00') : new Date());
+      const dStr = dLog.toLocaleDateString('pt-BR') + (latestLog.timestamp ? ` às ${dLog.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : '');
+      const isClient = latestLog.author && latestLog.author.toLowerCase() !== 'mavic';
+      latestClientRevNoteHtml = `
+        <div class="kcard-rev-note" style="background:${isClient ? 'rgba(234,88,12,0.08)' : 'var(--surface2)'};border:1px solid ${isClient ? 'rgba(234,88,12,0.3)' : 'var(--border)'};border-radius:8px;padding:7px 9px;margin-top:6px;font-size:11.5px;display:flex;flex-direction:column;gap:3px;cursor:pointer" onclick="openRevisionLogModal(${p.id});event.stopPropagation()" title="Clique para ver todo o histórico de alterações">
+          <div style="display:flex;align-items:center;justify-content:space-between;font-weight:700;color:${isClient ? '#ea580c' : 'var(--accent)'};font-size:11px">
+            <span><i class="bi ${isClient ? 'bi-chat-left-dots-fill' : 'bi-journal-text'}"></i> ${isClient ? `Ajuste do Cliente (${escapeHtml(latestLog.author || 'Cliente')}):` : 'Última anotação de alteração:'}</span>
+            <span style="font-size:10px;font-weight:500;color:var(--text3)">${dStr}</span>
+          </div>
+          <div style="color:var(--text);font-size:11.5px;line-height:1.35;word-break:break-word">
+            "${escapeHtml(latestLog.text)}"
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  const tagsList = Array.isArray(p.tags) ? p.tags : [];
+  const tagsHtml = tagsList.map(t => {
+    const clean = (t || '').trim();
+    if (!clean) return '';
+    let style = 'background:var(--surface2);color:var(--text2);border:1px solid var(--border)';
+    const low = clean.toLowerCase();
+    if (low.includes('urgente') || low.includes('crítico')) style = 'background:rgba(229,62,62,0.12);color:var(--red);border:1px solid rgba(229,62,62,0.3)';
+    else if (low.includes('aguardando') || low.includes('esperando') || low.includes('pendente')) style = 'background:rgba(214,158,46,0.12);color:var(--yellow);border:1px solid rgba(214,158,46,0.3)';
+    else if (low.includes('medição') || low.includes('medicao') || low.includes('visita')) style = 'background:rgba(49,130,206,0.12);color:var(--blue);border:1px solid rgba(49,130,206,0.3)';
+    else if (low.includes('render') || low.includes('3d') || low.includes('imagem')) style = 'background:rgba(128,90,213,0.12);color:#805ad5;border:1px solid rgba(128,90,213,0.3)';
+    return `<span class="badge" style="${style};font-size:10px;font-weight:600">${escapeHtml(clean)}</span>`;
+  }).join('');
+
+  const isDevOrAlt = p.column === 'Desenvolvimento' || (p.column || '').toLowerCase().includes('altera') || (p.column || '').toLowerCase().includes('desenv');
+  const hasClientAdjustment = Boolean(p.pendingClientRevision || (isDevOrAlt && revLogs.length > 0 && revLogs[revLogs.length - 1]?.author && revLogs[revLogs.length - 1]?.author.toLowerCase() !== 'mavic'));
+
+  let bellClass = '';
+  let bellIcon = 'bi-bell';
+  let bellTitle = '🔔 Solicitar Aprovação do Cliente';
+  let bellOnClick = `toggleSendToClientReview(event, ${p.id})`;
+
+  if (hasClientAdjustment) {
+    bellClass = 'has-adjustment pulse';
+    bellIcon = 'bi-exclamation-diamond-fill';
+    bellTitle = '⚠️ Ajuste Solicitado pelo Cliente! Clique para ler o que precisa alterar';
+    bellOnClick = `openRevisionLogModal(${p.id});event.stopPropagation()`;
+  } else if (p.column === 'Revisão') {
+    bellClass = 'in-review pulse';
+    bellIcon = 'bi-bell-fill';
+    bellTitle = '🔔 Em Revisão: Aguardando aprovação do cliente · Clique para avisar no WhatsApp';
+  } else if (p.clientApproved) {
+    bellClass = 'approved';
+    bellIcon = 'bi-check-circle-fill';
+    bellTitle = `✓ Aprovado pelo cliente${p.clientApprovedAt ? ' em ' + new Date(p.clientApprovedAt).toLocaleDateString('pt-BR') : ''}`;
+  }
+
   return `<div class="kcard ${dlClass} ${pinnedCards.has(p.id)?'pinned':''}" data-id="${p.id}" draggable="true" onclick="togglePin(event,${p.id})" style="--type-color:${typeColor(p.type)}">
     ${subs.length?`<div class="kcard-prog-bar"><div class="kcard-prog-fill" style="width:${subPct}%;background:${progColor}"></div></div>`:''}
     ${p.image?`<img src="${p.image}" class="kcard-cover" onerror="this.style.display='none'">`:''}
     <div class="kcard-body">
       <div class="kcard-top-row">
         <div class="kcard-name">${escapeHtml(p.name)}</div>
-        <button type="button" class="kcard-folder-btn ${hasFolder ? 'has-local' : ''}" onclick="openCardFolder(event, ${p.id})" title="${folderTitle}">
-          <i class="bi ${folderIcon}"></i>
-        </button>
+        <div style="display:flex;align-items:center;gap:4px">
+          <button type="button" class="kcard-bell-btn ${bellClass}" onclick="${bellOnClick}" title="${bellTitle}">
+            <i class="bi ${bellIcon}"></i>
+          </button>
+          <button type="button" class="kcard-folder-btn ${hasFolder ? 'has-local' : ''}" onclick="openCardFolder(event, ${p.id})" title="${folderTitle}">
+            <i class="bi ${folderIcon}"></i>
+          </button>
+        </div>
       </div>
-      ${p.client?`<div class="kcard-client"><span class="kcard-avatar" style="background:${avatarColor}">${initials}</span>${escapeHtml(p.client)}</div>`:''}
+      ${p.client?`
+        <div class="kcard-client">
+          <span class="kcard-avatar" style="background:${avatarColor}">${initials}</span>
+          <span class="kcard-client-name" title="${escapeHtml(p.client)}">${escapeHtml(p.client)}</span>
+          ${total>0?`<span class="badge ${sClass} kcard-fin-badge">${sLabel}</span>`:''}
+        </div>
+      `:''}
       ${currSubs.length?`<div class="kcard-current-task" title="Foco atual"><i class="bi bi-lightning-charge-fill" style="color:var(--yellow)"></i> <span>${currSubs.map(cs => cs.text).join(', ')}</span></div>`:''}
       <div class="kcard-tags">
-        ${!isFinalColumn(p.column)?`<span class="badge ${pMap[p.priority]||'b-baixa'}">${pIcon[p.priority]||'🟢'} ${p.priority}</span>`:''}
-        <span class="badge" style="background:${typeBg(p.type)};color:${typeColor(p.type)}">${p.type}</span>
-        ${p.originBudgetNumber?`<a href="orcamento.html" class="proj-origin-badge" title="Orçamento de Origem #${p.originBudgetNumber}" onclick="event.stopPropagation()"><i class="bi bi-file-earmark-spreadsheet"></i> #${p.originBudgetNumber}</a>`:''}
-        ${total>0?`<span class="badge ${sClass}" style="margin-left:auto">${sLabel}</span>`:''}
+        <div style="display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap">
+          <span class="badge" style="background:${typeBg(p.type)};color:${typeColor(p.type)}">${p.type}</span>
+          ${p.originBudgetNumber?`<a href="orcamento.html" class="proj-origin-badge" title="Orçamento de Origem #${p.originBudgetNumber}" onclick="event.stopPropagation()"><i class="bi bi-file-earmark-spreadsheet"></i> #${p.originBudgetNumber}</a>`:''}
+          ${tagsHtml}
+        </div>
+        ${revCount > 0 ? `<span class="badge b-rev" style="margin:0 auto" title="Rodada de alteração ${revCount}">Rev ${revCount}</span>` : ''}
+        ${!isFinalColumn(p.column)?`<span class="badge ${pMap[p.priority]||'b-baixa'}" style="margin-left:auto">${pIcon[p.priority]||'🟢'} ${p.priority}</span>`:''}
       </div>
     </div>
     <div class="kcard-exp">
       ${dl?`<div style="font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px" class="${dateCls}"><i class="bi bi-calendar3"></i>${dl.toLocaleDateString('pt-BR')} ${dateBadge}</div>`:''}
-      ${finHtml}${checkHtml}${noteHtml}
+      ${instBadge}
+      ${finHtml}${checkHtml}${noteHtml}${revHtml}${latestClientRevNoteHtml}
       <div class="cact">
         <button class="cbtn ntf" onclick="openNotifyModal(${p.id});event.stopPropagation()" title="Notificar cliente"><i class="bi bi-bell"></i></button>
         <button class="cbtn" style="color:#25D366" onclick="openWhatsApp(${p.id});event.stopPropagation()" title="Enviar WhatsApp"><i class="bi bi-whatsapp"></i></button>
@@ -323,12 +674,83 @@ function setColSort(colId,sort){
 // no index.html) — se ele também fosse fechado aqui, abriria e fecharia no mesmo clique.
 document.addEventListener('click',()=>document.querySelectorAll('.sort-menu:not(#colsMenu)').forEach(m=>m.classList.remove('open')));
 
+function applyColumnChange(p, newCol) {
+  if (!p || !newCol || p.column === newCol) return false;
+  const oldCol = p.column;
+  p.column = newCol;
+
+  const fromAdvStages = ['revisão', 'revisao', 'obra', 'concluído', 'concluido', 'finalizado', 'entregue'];
+  const toDevStages = ['desenvolvimento', 'briefing', 'modelagem', 'estudo'];
+
+  const isFromAdv = fromAdvStages.some(s => (oldCol || '').toLowerCase().includes(s));
+  const isToDev = toDevStages.some(s => (newCol || '').toLowerCase().includes(s));
+
+  if (newCol === 'Revisão' || (newCol || '').toLowerCase().includes('revis')) {
+    p.pendingClientRevision = false;
+  }
+
+  if (isFromAdv && isToDev) {
+    p.revisions = (parseInt(p.revisions) || 0) + 1;
+    showToast(`Projeto retornou para ${newCol}: +1 alteração computada (${p.revisions}ª alteração)!`, 'warning');
+  } else if (isHiddenColumn(newCol)) {
+    showToast(`Movido para ${newCol} — não aparece mais pro cliente`, 'warning');
+  } else {
+    showToast(`Movido para ${newCol}`, 'info');
+  }
+  return true;
+}
+
+function adjustProjRevisions(projId, delta) {
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+  p.revisions = Math.max(0, (parseInt(p.revisions) || 0) + delta);
+  updateCardDOM(projId);
+  scheduleSync();
+  showToast(`Alterações de "${p.name}": ${p.revisions}`, 'info');
+}
+
 // ══════════════════════════════════════════
 //  DRAG & DROP EVENTS
 // ══════════════════════════════════════════
 function bindCardDragEvents(card){
   card.addEventListener('dragstart',e=>{isDragging=true;e.dataTransfer.setData('text/plain',card.dataset.id);setTimeout(()=>card.classList.add('dragging'),0);});
   card.addEventListener('dragend',()=>{card.classList.remove('dragging');setTimeout(()=>isDragging=false,50);});
+
+  // Suporte para arrastar e soltar imagem (PNG/JPG) direto no card para atualizar a capa
+  card.addEventListener('dragover', e => {
+    if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      e.preventDefault();
+      e.stopPropagation();
+      card.classList.add('drag-target-image');
+    }
+  });
+  card.addEventListener('dragleave', e => {
+    if (!card.contains(e.relatedTarget)) {
+      card.classList.remove('drag-target-image');
+    }
+  });
+  card.addEventListener('drop', e => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file && file.type && file.type.startsWith('image/')) {
+        e.preventDefault();
+        e.stopPropagation();
+        card.classList.remove('drag-target-image');
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          const id = parseInt(card.dataset.id);
+          const p = projects.find(x => x.id === id);
+          if (p) {
+            p.image = re.target.result;
+            renderBoard();
+            scheduleSync();
+            showToast(`Capa do projeto "${p.name}" atualizada!`, 'success');
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  });
 
   card.addEventListener('touchstart',e=>{
     const touch=e.touches[0];
@@ -362,9 +784,8 @@ function bindCardDragEvents(card){
       const col=zone.dataset.column,id=parseInt(touchDragId);
       const idx=projects.findIndex(p=>p.id===id);
       if(idx>-1&&projects[idx].column!==col){
-        projects[idx].column=col;renderBoard();scheduleSync();
-        if(isHiddenColumn(col)) showToast(`Movido para ${col} — não aparece mais pro cliente`,'warning');
-        else showToast(`Movido para ${col}`,'info');
+        applyColumnChange(projects[idx], col);
+        renderBoard();scheduleSync();
       }
     }
     document.querySelector(`.kcard[data-id="${touchDragId}"]`)?.classList.remove('dragging');
@@ -389,9 +810,8 @@ function setupDragDrop(){
       const id=parseInt(e.dataTransfer.getData('text/plain'));const col=zone.dataset.column;
       const idx=projects.findIndex(p=>p.id===id);
       if(idx>-1&&projects[idx].column!==col){
-        projects[idx].column=col;renderBoard();scheduleSync();
-        if(isHiddenColumn(col)) showToast(`Movido para ${col} — não aparece mais pro cliente`,'warning');
-        else showToast(`Movido para ${col}`,'info');
+        applyColumnChange(projects[idx], col);
+        renderBoard();scheduleSync();
       }
     });
   });
@@ -405,6 +825,7 @@ function updateCardDOM(pId){
     renderBoard();
     return true;
   }
+  const isHovered = oldCard.matches(':hover') || oldCard.classList.contains('is-hovered');
   const isCompact = oldCard.classList.contains('kcard-compact') || isHiddenColumn(p.column);
   const scrollContainer = oldCard.querySelector('.kcard-exp div[style*="overflow-y:auto"]');
   const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
@@ -415,6 +836,13 @@ function updateCardDOM(pId){
   if (!newCard) {
     renderBoard();
     return true;
+  }
+
+  if (isHovered && !newCard.classList.contains('pinned')) {
+    newCard.classList.add('is-hovered');
+    newCard.addEventListener('mouseleave', () => {
+      newCard.classList.remove('is-hovered');
+    }, { once: true });
   }
 
   oldCard.replaceWith(newCard);
@@ -464,6 +892,9 @@ function openProjectModal(id=null){
     document.getElementById('projValue').value=p.value?toBRLInputStr(p.value):'';
     document.getElementById('projType').value=p.type;
     document.getElementById('projPrio').value=p.priority;
+    document.getElementById('projRevision').value=p.revisions || 0;
+    document.getElementById('projRevLimit').value=p.revisionsLimit !== undefined ? p.revisionsLimit : 2;
+    document.getElementById('projTags').value=(Array.isArray(p.tags) ? p.tags : []).join(', ');
     document.getElementById('projCol').value=p.column;
     document.getElementById('projDate').value=p.date||'';
     document.getElementById('projNote').value=p.note||'';
@@ -489,6 +920,9 @@ function openProjectModal(id=null){
     document.getElementById('projValue').value='';
     document.getElementById('projType').value='Residencial';
     document.getElementById('projPrio').value='Média';
+    document.getElementById('projRevision').value=0;
+    document.getElementById('projRevLimit').value=2;
+    document.getElementById('projTags').value='';
     document.getElementById('projCol').value='Briefing';
     document.getElementById('projDate').value='';
     document.getElementById('projNote').value='';
@@ -497,6 +931,14 @@ function openProjectModal(id=null){
   }
   renderSubsList();renderPaymentsModal();renderProjProdsTable();
   document.getElementById('projectOverlay').classList.add('open');
+}
+
+function stepRevision(delta){
+  const el = document.getElementById('projRevision');
+  if (!el) return;
+  let val = (parseInt(el.value) || 0) + delta;
+  if (val < 0) val = 0;
+  el.value = val;
 }
 
 function hasProjModalChanges() {
@@ -509,13 +951,16 @@ function hasProjModalChanges() {
   const val = document.getElementById('projValue').value.trim();
   const type = document.getElementById('projType').value;
   const prio = document.getElementById('projPrio').value;
+  const rev = parseInt(document.getElementById('projRevision')?.value || 0);
+  const revLimit = parseInt(document.getElementById('projRevLimit')?.value || 2);
+  const tagsStr = (document.getElementById('projTags')?.value || '').trim();
   const col = document.getElementById('projCol').value;
   const note = document.getElementById('projNote').value.trim();
   const date = document.getElementById('projDate').value;
   
   if (!id) {
     // Modo: Criação de Novo Projeto
-    return name !== '' || client !== '' || img !== '' || local !== '' || drive !== '' || val !== '' || note !== '' || date !== '' || tempSubs.length > 0 || tempPayments.length > 0 || tempProds.length > 0;
+    return name !== '' || client !== '' || img !== '' || local !== '' || drive !== '' || val !== '' || note !== '' || date !== '' || rev > 0 || tagsStr !== '' || tempSubs.length > 0 || tempPayments.length > 0 || tempProds.length > 0 || tempInstallments.length > 0;
   } else {
     // Modo: Edição de Projeto Existente
     const p = projects.find(x => x.id === parseInt(id));
@@ -524,6 +969,8 @@ function hasProjModalChanges() {
     const isSubsChanged = JSON.stringify(p.subtasks || []) !== JSON.stringify(tempSubs);
     const isPaysChanged = JSON.stringify(p.payments || []) !== JSON.stringify(tempPayments);
     const isProdsChanged = JSON.stringify(p.products || []) !== JSON.stringify(tempProds);
+    const isInstsChanged = JSON.stringify(p.installments || []) !== JSON.stringify(tempInstallments);
+    const pTagsStr = (Array.isArray(p.tags) ? p.tags : []).join(', ');
     
     return name !== (p.name || '') ||
            client !== (p.client || '') ||
@@ -533,12 +980,16 @@ function hasProjModalChanges() {
            parseCurrencyInput(val) !== (p.value || 0) ||
            type !== (p.type || 'Residencial') ||
            prio !== (p.priority || 'Média') ||
+           rev !== (p.revisions || 0) ||
+           revLimit !== (p.revisionsLimit !== undefined ? p.revisionsLimit : 2) ||
+           tagsStr !== pTagsStr ||
            col !== (p.column || 'Briefing') ||
            note !== (p.note || '') ||
            date !== (p.date || '') ||
            isSubsChanged ||
            isPaysChanged ||
-           isProdsChanged;
+           isProdsChanged ||
+           isInstsChanged;
   }
 }
 
@@ -558,14 +1009,48 @@ function handleClientChange(keepTitle=false) {
   const clientName = document.getElementById('projClient')?.value;
   const wrap = document.getElementById('projClientProdWrap');
   const sel = document.getElementById('projClientProd');
-  if (!wrap || !sel) return;
+  const dueBadge = document.getElementById('projClientDueDayBadge');
+  const dueVal = document.getElementById('projClientDueDayVal');
   
   if (!clientName) {
-    wrap.classList.add('d-none');
+    if (wrap) wrap.classList.add('d-none');
+    if (dueBadge) dueBadge.style.display = 'none';
     return;
   }
   
   const cl = clients.find(c => c.name === clientName);
+  if (dueBadge && dueVal) {
+    if (cl && cl.dueDay) {
+      dueVal.textContent = cl.dueDay;
+      dueBadge.style.display = 'block';
+    } else {
+      dueBadge.style.display = 'none';
+    }
+  }
+
+  // Se o cliente tem dia de vencimento fixo e ainda não há cronograma, sugere automaticamente o pagamento mensal
+  if (!keepTitle && cl && cl.dueDay && (!tempInstallments || tempInstallments.length === 0)) {
+    const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+    if (contractVal > 0) {
+      const targetDay = cl.dueDay;
+      const baseToday = today();
+      const todayDay = parseInt(baseToday.split('-')[2]);
+      const startOffset = todayDay <= targetDay ? 0 : 1;
+      const d = calculateNextDueDateWithTargetDay(baseToday, targetDay, startOffset);
+      tempInstallments = [{
+        id: Date.now(),
+        number: 1,
+        desc: 'Mensalidade do Projeto',
+        amount: contractVal,
+        dueDate: d,
+        status: 'Pendente'
+      }];
+      tempPaymentCondition = 'mensal_unico';
+      renderPaymentsModal();
+    }
+  }
+
+  if (!wrap || !sel) return;
   const availableServices = getServicesForClient(cl ? cl.id : null);
   const clientLegacyProducts = (cl && Array.isArray(cl.products)) ? cl.products : [];
   
@@ -626,6 +1111,10 @@ function saveProject(){
     product:tempProds.map(x=>x.name).join(', '),
     type:document.getElementById('projType').value,
     priority:document.getElementById('projPrio').value,
+    revisions:parseInt(document.getElementById('projRevision')?.value || 0) || 0,
+    revisionsLimit:parseInt(document.getElementById('projRevLimit')?.value || 2),
+    revisionLogs: existingProj?.revisionLogs || [],
+    tags: (document.getElementById('projTags')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
     column:document.getElementById('projCol').value,
     date:document.getElementById('projDate').value,
     note:document.getElementById('projNote').value,
@@ -634,6 +1123,7 @@ function saveProject(){
     archived:false,
     createdAt:id?(projects.find(x=>x.id===parseInt(id))?.createdAt||Date.now()):Date.now()
   };
+  if (typeof reconcileProjectFinancials === 'function') reconcileProjectFinancials(pData);
   if(id){
     const idx=projects.findIndex(x=>x.id===parseInt(id));
     pData.archived=projects[idx]?.archived||false;
@@ -690,6 +1180,11 @@ function testProjDriveLink() {
   window.open(url, '_blank');
 }
 
+// ══════════════════════════════════════════
+//  MODAL DE SELEÇÃO DE SUBPASTAS
+// ══════════════════════════════════════════
+let currentFolderProjId = null;
+
 function openCardFolder(event, projId) {
   if (event) {
     event.stopPropagation();
@@ -698,61 +1193,7 @@ function openCardFolder(event, projId) {
   const p = projects.find(x => x.id === projId);
   if (!p) return;
 
-  const isMob = (typeof isMobileDevice === 'function') && isMobileDevice();
-
-  if (isMob) {
-    // ══════════════════════════════════════════════════
-    // AMBIENTE MOBILE: ABRIR / VINCULAR PASTA NA NUVEM
-    // ══════════════════════════════════════════════════
-    if (p.driveLink && p.driveLink.trim()) {
-      let url = p.driveLink.trim();
-      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-      showToast('Abrindo pasta na nuvem…', 'info');
-      window.open(url, '_blank');
-      return;
-    }
-
-    if (p.localPath && /^https?:\/\//i.test(p.localPath.trim())) {
-      let url = p.localPath.trim();
-      showToast('Abrindo pasta na nuvem…', 'info');
-      window.open(url, '_blank');
-      return;
-    }
-
-    // Solicita o link da pasta na nuvem caso ainda não esteja preenchido
-    showPrompt(
-      `Informe o link da pasta deste projeto na nuvem (Google Drive, OneDrive, Dropbox, etc.):`,
-      (link) => {
-        if (!link || !link.trim()) return;
-        let clean = link.trim().replace(/^["']|["']$/g, '');
-        if (!/^https?:\/\//i.test(clean)) clean = 'https://' + clean;
-        p.driveLink = clean;
-        scheduleSync();
-        renderBoard();
-        showToast('Pasta na nuvem vinculada com sucesso!', 'success');
-        window.open(clean, '_blank');
-      },
-      {
-        title: `Vincular Pasta na Nuvem — ${p.name}`,
-        icon: 'bi bi-cloud-arrow-up',
-        label: 'Link da Pasta na Nuvem (Drive / Celular)',
-        placeholder: 'https://drive.google.com/drive/folders/...',
-        defaultValue: p.driveLink || '',
-        helpText: 'Cole o link compartilhado da pasta no Google Drive ou OneDrive para abrir no celular.',
-        okText: 'Salvar e Abrir'
-      }
-    );
-  } else {
-    // ══════════════════════════════════════════════════
-    // AMBIENTE DESKTOP: ABRIR / VINCULAR PASTA LOCAL
-    // ══════════════════════════════════════════════════
-    if (p.localPath && p.localPath.trim()) {
-      // Abre diretamente no Windows Explorer sem popup
-      abrirPastaLocal(p.localPath, p.type, []);
-      return;
-    }
-
-    // Solicita o caminho da pasta local no PC (Windows Explorer) na 1ª vinculação
+  if (!p.localPath && !p.driveLink) {
     showPrompt(
       `Informe o caminho da pasta deste projeto no seu computador (Windows Explorer):`,
       (caminho) => {
@@ -761,22 +1202,239 @@ function openCardFolder(event, projId) {
         p.localPath = clean;
         scheduleSync();
         renderBoard();
-        showToast('Pasta local vinculada com sucesso!', 'success');
-        openFolderSelectionModal(clean, p.type, p.name, (selectedFolders) => {
-          abrirPastaLocal(clean, p.type, selectedFolders);
-        });
+        showToast('Pasta vinculada!', 'success');
+        openProjFoldersModal(p.id);
       },
       {
-        title: `Vincular Pasta no PC — ${p.name}`,
-        icon: 'bi bi-folder2-open',
+        title: `Vincular Pasta — ${p.name}`,
+        icon: 'bi bi-folder-plus',
         label: 'Caminho no Computador (Windows Explorer)',
         placeholder: 'Ex: D:\\COISAS\\Projetos\\' + p.name,
         defaultValue: p.localPath || '',
-        helpText: p.driveLink ? `Dica: Este projeto já possui pasta na nuvem. Digite aqui a pasta local do computador.` : 'Dica: Você pode copiar o caminho da barra de endereço do Windows Explorer e colar aqui.',
-        okText: 'Salvar e Continuar'
+        helpText: 'Cole o caminho completo da pasta no seu computador.',
+        okText: 'Salvar e Abrir'
       }
     );
+    return;
   }
+
+  openProjFoldersModal(p.id);
+}
+
+function openProjFoldersModal(projId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+  currentFolderProjId = projId;
+
+  document.getElementById('pfModalTitle').textContent = `Pastas: ${p.name}`;
+  document.getElementById('pfLocalPathText').textContent = p.localPath || '(Nenhum caminho local configurado)';
+  
+  const btnRoot = document.getElementById('pfBtnRootFolder');
+  if (btnRoot) {
+    btnRoot.onclick = () => {
+      if (p.localPath) {
+        abrirPastaLocal(p.localPath, p.type, p.selectedFolders);
+      } else {
+        showToast('Nenhum caminho local configurado', 'warning');
+      }
+    };
+  }
+
+  const btnDrive = document.getElementById('pfBtnDriveFolder');
+  if (btnDrive) {
+    if (p.driveLink && p.driveLink.trim()) {
+      btnDrive.style.display = 'inline-flex';
+      btnDrive.onclick = () => {
+        let url = p.driveLink.trim();
+        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+        window.open(url, '_blank');
+      };
+    } else {
+      btnDrive.style.display = 'none';
+    }
+  }
+
+  const folders = Array.isArray(p.selectedFolders) && p.selectedFolders.length 
+    ? p.selectedFolders 
+    : getProjectDefaultFolders(p.type);
+
+  const listEl = document.getElementById('pfSubfoldersList');
+  if (listEl) {
+    if (!folders || !folders.length) {
+      listEl.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:6px">Nenhuma subpasta configurada.</div>';
+    } else {
+      listEl.innerHTML = folders.map(f => {
+        let icon = 'bi-folder2';
+        const fLow = f.toLowerCase();
+        if (fLow.includes('render') || fLow.includes('print') || fLow.includes('imagem') || fLow.includes('foto')) icon = 'bi-images';
+        else if (fLow.includes('doc') || fLow.includes('texto') || fLow.includes('brief')) icon = 'bi-file-earmark-text';
+        else if (fLow.includes('plant') || fLow.includes('cad') || fLow.includes('dwg')) icon = 'bi-bounding-box';
+        else if (fLow.includes('exec') || fLow.includes('marcen') || fLow.includes('obra')) icon = 'bi-hammer';
+        else if (fLow.includes('3d') || fLow.includes('skp') || fLow.includes('model')) icon = 'bi-box';
+        else if (fLow.includes('final') || fLow.includes('apresent')) icon = 'bi-award';
+
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">
+            <span style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--text)">
+              <i class="bi ${icon}" style="color:var(--accent);font-size:14px"></i>
+              <span>${escapeHtml(f)}</span>
+            </span>
+            <button type="button" class="btn btn-ghost btn-xs" onclick="abrirSubpastaEspecifica('${escapeHtml(p.localPath || '')}', '${escapeHtml(f)}');event.stopPropagation()" style="font-size:11.5px;padding:3px 8px;border-radius:6px;display:flex;align-items:center;gap:4px">
+              <i class="bi bi-box-arrow-up-right"></i> Abrir
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  document.getElementById('projFoldersOverlay').classList.add('open');
+}
+
+function closeProjFoldersModal() {
+  const el = document.getElementById('projFoldersOverlay');
+  if (el) el.classList.remove('open');
+  currentFolderProjId = null;
+}
+
+function editFolderFromModal() {
+  if (!currentFolderProjId) return;
+  const p = projects.find(x => x.id === currentFolderProjId);
+  if (!p) return;
+
+  showPrompt(
+    `Alterar caminho local no Windows Explorer:`,
+    (caminho) => {
+      if (caminho === null) return;
+      p.localPath = (caminho || '').trim().replace(/^["']|["']$/g, '');
+      scheduleSync();
+      renderBoard();
+      openProjFoldersModal(p.id);
+      showToast('Caminho atualizado!', 'success');
+    },
+    {
+      title: `Caminho da Pasta — ${p.name}`,
+      icon: 'bi bi-pencil-square',
+      label: 'Caminho no Computador (Windows Explorer)',
+      placeholder: 'Ex: D:\\COISAS\\Projetos\\' + p.name,
+      defaultValue: p.localPath || '',
+      okText: 'Salvar Caminho'
+    }
+  );
+}
+
+// ══════════════════════════════════════════
+//  MODAL DE HISTÓRICO DE ALTERAÇÕES
+// ══════════════════════════════════════════
+let currentRevLogProjId = null;
+
+function openRevisionLogModal(projId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+  currentRevLogProjId = projId;
+
+  const revCount = parseInt(p.revisions || 0);
+  const revLimit = parseInt(p.revisionsLimit !== undefined ? p.revisionsLimit : 2);
+  const isOver = revCount > revLimit;
+  const extra = Math.max(0, revCount - revLimit);
+
+  document.getElementById('revLogModalTitle').textContent = `Alterações: ${p.name}`;
+  
+  const summaryBox = document.getElementById('revLogSummaryBox');
+  if (summaryBox) {
+    summaryBox.innerHTML = `
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">Status de Alterações</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">
+          <b>${revCount}</b> rodada${revCount !== 1 ? 's' : ''} realizada${revCount !== 1 ? 's' : ''} <span style="font-size:11.5px;color:var(--text3);font-weight:400">(Limite incluso: ${revLimit})</span>
+        </div>
+      </div>
+      <div>
+        ${isOver 
+          ? `<span class="badge" style="background:#dd6b20;color:#fff;font-weight:700;font-size:11px;padding:3px 8px"><i class="bi bi-exclamation-triangle-fill"></i> +${extra} Extra a Faturar</span>` 
+          : `<span class="badge b-pago" style="font-size:11px;padding:3px 8px">Dentro do Limite</span>`}
+      </div>
+    `;
+  }
+
+  renderRevisionLogsList(p);
+  const inp = document.getElementById('newRevLogText');
+  if (inp) inp.value = '';
+
+  document.getElementById('revisionLogOverlay').classList.add('open');
+}
+
+function closeRevisionLogModal() {
+  const el = document.getElementById('revisionLogOverlay');
+  if (el) el.classList.remove('open');
+  currentRevLogProjId = null;
+}
+
+function renderRevisionLogsList(p) {
+  const listEl = document.getElementById('revLogsList');
+  if (!listEl) return;
+  const logs = Array.isArray(p.revisionLogs) ? p.revisionLogs : [];
+  if (!logs.length) {
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px 4px;text-align:center">Nenhuma anotação de alteração registrada ainda.</div>';
+    return;
+  }
+
+  listEl.innerHTML = logs.map((lg, idx) => {
+    const isClient = lg.author && lg.author.toLowerCase() !== 'mavic';
+    const dLog = lg.timestamp ? new Date(lg.timestamp) : (lg.date ? new Date(lg.date + 'T12:00:00') : new Date());
+    const dStr = dLog.toLocaleDateString('pt-BR') + (lg.timestamp ? ` às ${dLog.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : '');
+    
+    return `
+      <div style="background:${isClient ? 'rgba(234,88,12,0.06)' : 'var(--surface2)'};border:1px solid ${isClient ? 'rgba(234,88,12,0.3)' : 'var(--border)'};border-radius:8px;padding:9px 12px;display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text3)">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-weight:700;color:${isClient ? '#ea580c' : 'var(--accent)'}"><i class="bi ${isClient ? 'bi-chat-left-dots-fill' : 'bi-arrow-repeat'}"></i> Alteração #${lg.number || (idx + 1)}</span>
+            ${isClient ? `<span class="badge" style="background:rgba(234,88,12,0.15);color:#ea580c;font-size:9.5px;padding:1px 5px;font-weight:700"><i class="bi bi-person-fill"></i> Solicitado por ${escapeHtml(lg.author || 'Cliente')}</span>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span><i class="bi bi-clock"></i> ${dStr}</span>
+            <button type="button" class="btn-icon btn-xs" onclick="deleteRevisionLogEntry(${p.id}, ${lg.id})" style="color:var(--danger);width:18px;height:18px;padding:0" title="Excluir nota"><i class="bi bi-trash3"></i></button>
+          </div>
+        </div>
+        <div style="font-size:12.5px;color:var(--text);line-height:1.45;white-space:pre-wrap;background:var(--surface);padding:6px 8px;border-radius:6px;border:1px solid var(--border)">${escapeHtml(lg.text)}</div>
+      </div>
+    `;
+  }).reverse().join('');
+}
+
+function addNewRevisionLogEntry() {
+  if (!currentRevLogProjId) return;
+  const p = projects.find(x => x.id === currentRevLogProjId);
+  if (!p) return;
+
+  const inp = document.getElementById('newRevLogText');
+  const txt = inp?.value?.trim();
+  if (!txt) return showToast('Descreva a solicitação da alteração', 'warning');
+
+  if (!Array.isArray(p.revisionLogs)) p.revisionLogs = [];
+  p.revisions = (parseInt(p.revisions) || 0) + 1;
+  
+  p.revisionLogs.push({
+    id: Date.now(),
+    number: p.revisions,
+    date: today(),
+    text: txt
+  });
+
+  inp.value = '';
+  scheduleSync();
+  updateCardDOM(p.id);
+  openRevisionLogModal(p.id);
+  showToast(`Alteração #${p.revisions} registrada!`, 'success');
+}
+
+function deleteRevisionLogEntry(projId, logId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p || !Array.isArray(p.revisionLogs)) return;
+  p.revisionLogs = p.revisionLogs.filter(l => l.id !== logId);
+  scheduleSync();
+  renderRevisionLogsList(p);
+  showToast('Registro de alteração removido', 'info');
 }
 
 function archiveCurrentProject(){
@@ -853,8 +1511,10 @@ function addPayment(){
     }
   }
   tempPayments.push({id:Date.now(), installmentId: matchedInstId, amount, date, method, desc: instDesc});
-  document.getElementById('newPayAmount').value='';renderPaymentsModal();
+  document.getElementById('newPayAmount').value='';
+  renderPaymentsModal();
 }
+
 function delPayment(id){
   const payToDelete = tempPayments.find(x => x.id === id);
   if (tempInstallments && tempInstallments.length > 0 && payToDelete) {
@@ -878,44 +1538,690 @@ function delPayment(id){
       delete inst.method;
     }
   }
-  tempPayments=tempPayments.filter(x=>x.id!==id);renderPaymentsModal();
+  tempPayments=tempPayments.filter(x=>x.id!==id);
+  renderPaymentsModal();
 }
-function renderPaymentsModal(){
-  const c=document.getElementById('paysContainer');
-  const total=tempPayments.reduce((s,x)=>s+parseFloat(x.amount||0),0);
-  document.getElementById('payProgress').textContent=fmt(total);
 
-  let instHtml = '';
+function quickPayInstallment(instId) {
+  const inst = (tempInstallments || []).find(x => String(x.id) === String(instId));
+  if (!inst) return;
+
+  const fullAmount = parseFloat(inst.amount || 0);
+  const clientDueDay = getClientDueDay();
+
+  showPrompt(
+    `Registrar Recebimento — "${inst.desc || 'Parcela'}"\nInforme o valor integral ou parcial recebido (R$):`,
+    (valStr) => {
+      if (valStr === null || valStr === undefined) return;
+      const payAmount = parseCurrencyInput(valStr);
+      if (isNaN(payAmount) || payAmount <= 0) return showToast('Informe um valor válido maior que zero', 'warning');
+
+      const payDate = today();
+      const payMethod = document.getElementById('newPayMethod')?.value || 'Pix';
+
+      if (payAmount >= fullAmount - 0.01) {
+        // Pagamento Integral
+        inst.status = 'Pago';
+        inst.paidDate = payDate;
+        inst.method = payMethod;
+        inst.amount = payAmount;
+
+        tempPayments.push({
+          id: Date.now(),
+          installmentId: inst.id,
+          amount: payAmount,
+          date: payDate,
+          method: payMethod,
+          desc: inst.desc || 'Pagamento'
+        });
+
+        renderPaymentsModal();
+        showToast(`Recebimento integral de ${fmt(payAmount)} registrado!`, 'success');
+      } else {
+        // Pagamento Parcial
+        const remainder = Math.round((fullAmount - payAmount) * 100) / 100;
+        const targetDay = clientDueDay || 10;
+        const nextDueDate = calculateNextDueDateWithTargetDay(inst.dueDate || today(), targetDay, 1);
+
+        inst.status = 'Pago';
+        inst.paidDate = payDate;
+        inst.method = payMethod;
+        inst.amount = payAmount;
+
+        tempPayments.push({
+          id: Date.now(),
+          installmentId: inst.id,
+          amount: payAmount,
+          date: payDate,
+          method: payMethod,
+          desc: `${inst.desc || 'Parcela'} (Parcial)`
+        });
+
+        // Cria parcela de saldo restante com vencimento no próximo ciclo
+        tempInstallments.push({
+          id: Date.now() + 1,
+          number: tempInstallments.length + 1,
+          desc: `${inst.desc || 'Parcela'} (Saldo Restante)`,
+          amount: remainder,
+          dueDate: nextDueDate,
+          status: 'Pendente'
+        });
+
+        renderPaymentsModal();
+        showToast(`Recebimento parcial de ${fmt(payAmount)} registrado! Saldo de ${fmt(remainder)} programado para ${formatDateSafe(nextDueDate)}.`, 'success');
+      }
+    },
+    {
+      title: 'Registrar Recebimento',
+      icon: 'bi bi-cash-coin',
+      label: 'Valor Recebido (R$)',
+      defaultValue: toBRLInputStr(fullAmount),
+      okText: 'Confirmar Recebimento'
+    }
+  );
+}
+
+function editInstallment(instId) {
+  const inst = (tempInstallments || []).find(x => String(x.id) === String(instId));
+  if (!inst) return;
+
+  const curDesc = inst.desc || '';
+  const curVal = toBRLInputStr(inst.amount || 0);
+
+  showPrompt(`Editar Parcela "${curDesc}"\nInforme o novo valor (R$):`, (valStr) => {
+    if (valStr === null || valStr === undefined) return;
+    const newAmount = parseCurrencyInput(valStr);
+    if (isNaN(newAmount) || newAmount <= 0) return showToast('Valor inválido', 'warning');
+    
+    inst.amount = newAmount;
+    renderPaymentsModal();
+    showToast('Valor da parcela atualizado!', 'success');
+  }, {
+    title: `Editar Parcela — ${curDesc}`,
+    icon: 'bi bi-pencil-square',
+    label: 'Valor da Parcela (R$)',
+    defaultValue: curVal,
+    okText: 'Salvar'
+  });
+}
+
+function updateInstallmentDate(instId, newDate) {
+  const inst = (tempInstallments || []).find(x => String(x.id) === String(instId));
+  if (inst) {
+    inst.dueDate = newDate;
+    renderPaymentsModal();
+  }
+}
+
+function deleteInstallment(instId) {
+  const inst = (tempInstallments || []).find(x => String(x.id) === String(instId));
+  const desc = inst ? `"${inst.desc}"` : 'esta parcela';
+  showConfirm(`Deseja excluir ${desc} do cronograma?`, () => {
+    tempInstallments = (tempInstallments || []).filter(x => String(x.id) !== String(instId));
+    renderPaymentsModal();
+    showToast('Parcela removida do cronograma', 'info');
+  });
+}
+
+function getClientDueDay(clientName) {
+  if (!clientName) clientName = document.getElementById('projClient')?.value;
+  if (!clientName) return null;
+  const cl = clients.find(c => c.name === clientName);
+  if (cl && cl.dueDay && cl.dueDay >= 1 && cl.dueDay <= 31) {
+    return parseInt(cl.dueDay);
+  }
+  return null;
+}
+
+function calculateNextDueDateWithTargetDay(baseDateStr, targetDay, monthOffset = 1) {
+  const base = baseDateStr ? new Date(baseDateStr + 'T12:00:00') : new Date();
+  let year = base.getFullYear();
+  let month = base.getMonth() + monthOffset;
+  
+  while (month > 11) {
+    month -= 12;
+    year += 1;
+  }
+  while (month < 0) {
+    month += 12;
+    year -= 1;
+  }
+  
+  const day = targetDay || base.getDate();
+  const maxDayInMonth = new Date(year, month + 1, 0).getDate();
+  const clampedDay = Math.min(day, maxDayInMonth);
+  
+  const mStr = String(month + 1).padStart(2, '0');
+  const dStr = String(clampedDay).padStart(2, '0');
+  return `${year}-${mStr}-${dStr}`;
+}
+
+function addCustomInstallment() {
+  const num = (tempInstallments?.length || 0) + 1;
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+  const currentInstSum = (tempInstallments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const defaultAmount = Math.max(0, contractVal - currentInstSum);
+  const clientDueDay = getClientDueDay();
+
+  let defaultDueDate = document.getElementById('projDate')?.value;
+  if (!defaultDueDate) {
+    if (clientDueDay) {
+      const offset = (tempInstallments && tempInstallments.length > 0) ? tempInstallments.length : 1;
+      defaultDueDate = calculateNextDueDateWithTargetDay(today(), clientDueDay, offset);
+    } else {
+      defaultDueDate = addDays(today(), 15);
+    }
+  }
+
+  showPrompt('Descrição da nova parcela:', (desc) => {
+    if (!desc || !desc.trim()) return;
+    const newInst = {
+      id: Date.now(),
+      number: num,
+      desc: desc.trim(),
+      amount: defaultAmount > 0 ? defaultAmount : 100,
+      dueDate: defaultDueDate,
+      status: 'Pendente'
+    };
+    tempInstallments = tempInstallments || [];
+    tempInstallments.push(newInst);
+    renderPaymentsModal();
+    showToast('Nova parcela adicionada ao cronograma!', 'success');
+  }, {
+    title: 'Adicionar Parcela ao Cronograma',
+    icon: 'bi bi-calendar-plus',
+    label: 'Descrição da Parcela (ex: Entrada, Parcela 2, Saldo na Entrega)',
+    defaultValue: `Parcela ${num}`,
+    okText: 'Adicionar'
+  });
+}
+
+function convertToVista() {
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+  const paidVal = tempPayments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const finalVal = contractVal > 0 ? contractVal : (paidVal > 0 ? paidVal : 0);
+
+  if (finalVal <= 0) {
+    return showToast('Informe o valor do contrato primeiro', 'warning');
+  }
+
+  showConfirm('Deseja converter o cronograma para 1 parcela única À Vista no valor total?', () => {
+    const isPaid = paidVal >= finalVal - 0.01;
+    const latestPay = tempPayments[tempPayments.length - 1] || {};
+    const singleInst = {
+      id: Date.now(),
+      number: 1,
+      desc: 'Pagamento Integral À Vista',
+      amount: finalVal,
+      dueDate: latestPay.date || document.getElementById('projDate')?.value || today(),
+      status: isPaid ? 'Pago' : 'Pendente',
+      paidDate: isPaid ? (latestPay.date || today()) : null,
+      method: isPaid ? (latestPay.method || 'Pix') : null
+    };
+
+    tempInstallments = [singleInst];
+    tempPaymentCondition = 'vista';
+    renderPaymentsModal();
+    showToast('Cronograma convertido para À Vista!', 'success');
+  });
+}
+
+function rebalanceInstallments() {
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+  if (contractVal <= 0) return showToast('Defina o valor do contrato primeiro', 'warning');
+  if (!tempInstallments || !tempInstallments.length) return showToast('Nenhum cronograma para reajustar', 'warning');
+
+  const paidInsts = tempInstallments.filter(x => x.status === 'Pago');
+  const pendingInsts = tempInstallments.filter(x => x.status !== 'Pago');
+
+  const totalPaidInInsts = paidInsts.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+  const remaining = contractVal - totalPaidInInsts;
+
+  if (pendingInsts.length === 0) {
+    if (Math.abs(contractVal - totalPaidInInsts) > 0.01 && remaining > 0) {
+      tempInstallments.push({
+        id: Date.now(),
+        number: tempInstallments.length + 1,
+        desc: `Adicional / Ajuste`,
+        amount: Math.round(remaining * 100) / 100,
+        dueDate: document.getElementById('projDate')?.value || addDays(today(), 15),
+        status: 'Pendente'
+      });
+    }
+  } else {
+    const portion = Math.max(0, Math.floor((remaining / pendingInsts.length) * 100) / 100);
+    let accumulated = 0;
+    pendingInsts.forEach((inst, idx) => {
+      if (idx === pendingInsts.length - 1) {
+        inst.amount = Math.max(0, Math.round((remaining - accumulated) * 100) / 100);
+      } else {
+        inst.amount = portion;
+        accumulated += portion;
+      }
+    });
+  }
+
+  renderPaymentsModal();
+  showToast('Parcelas ajustadas ao valor do contrato!', 'success');
+}
+
+function generateSchedule5050() {
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+  if (contractVal <= 0) return showToast('Defina o valor do contrato primeiro', 'warning');
+
+  const halfVal = Math.round((contractVal / 2) * 100) / 100;
+  const restVal = Math.round((contractVal - halfVal) * 100) / 100;
+  const clientDueDay = getClientDueDay();
+  const projDueDate = document.getElementById('projDate')?.value;
+  
+  let secondDueDate = projDueDate;
+  if (!secondDueDate) {
+    if (clientDueDay) {
+      secondDueDate = calculateNextDueDateWithTargetDay(today(), clientDueDay, 1);
+    } else {
+      secondDueDate = addDays(today(), 15);
+    }
+  }
+
+  showConfirm(`Gerar cronograma 50% Entrada (${fmt(halfVal)}) + 50% Saldo na Entrega (${fmt(restVal)})?`, () => {
+    tempInstallments = [
+      { id: Date.now(), number: 1, desc: 'Entrada (50%)', amount: halfVal, dueDate: today(), status: 'Pendente' },
+      { id: Date.now() + 1, number: 2, desc: 'Saldo na Entrega (50%)', amount: restVal, dueDate: secondDueDate, status: 'Pendente' }
+    ];
+    tempPaymentCondition = '50_50';
+    renderPaymentsModal();
+    showToast('Cronograma 50/50 gerado!', 'success');
+  }, { title: 'Gerar 50/50', okText: 'Gerar' });
+}
+
+function generateSchedule3x() {
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+  if (contractVal <= 0) return showToast('Defina o valor do contrato primeiro', 'warning');
+
+  const part = Math.floor((contractVal / 3) * 100) / 100;
+  const lastPart = Math.round((contractVal - (part * 2)) * 100) / 100;
+  const clientDueDay = getClientDueDay();
+
+  let date2, date3;
+  if (clientDueDay) {
+    date2 = calculateNextDueDateWithTargetDay(today(), clientDueDay, 1);
+    date3 = calculateNextDueDateWithTargetDay(today(), clientDueDay, 2);
+  } else {
+    date2 = addDays(today(), 30);
+    date3 = addDays(today(), 60);
+  }
+
+  showConfirm(`Gerar cronograma em 3 parcelas de ~${fmt(part)}?`, () => {
+    tempInstallments = [
+      { id: Date.now(), number: 1, desc: '1ª Parcela', amount: part, dueDate: today(), status: 'Pendente' },
+      { id: Date.now() + 1, number: 2, desc: '2ª Parcela', amount: part, dueDate: date2, status: 'Pendente' },
+      { id: Date.now() + 2, number: 3, desc: '3ª Parcela', amount: lastPart, dueDate: date3, status: 'Pendente' }
+    ];
+    tempPaymentCondition = '3x';
+    renderPaymentsModal();
+    showToast('Cronograma em 3x gerado!', 'success');
+  }, { title: 'Gerar 3x', okText: 'Gerar' });
+}
+
+function generateScheduleSingleMonthly() {
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+  if (contractVal <= 0) return showToast('Defina o valor do contrato primeiro', 'warning');
+  
+  const clientDueDay = getClientDueDay();
+  const targetDay = clientDueDay || 10;
+  const baseToday = today();
+  const todayDay = parseInt(baseToday.split('-')[2]);
+  const startOffset = todayDay <= targetDay ? 0 : 1;
+  const d = calculateNextDueDateWithTargetDay(baseToday, targetDay, startOffset);
+
+  showConfirm(`Gerar 1 cobrança mensal de ${fmt(contractVal)} com vencimento em ${formatDateSafe(d)} (todo dia ${targetDay})?`, () => {
+    tempInstallments = [
+      {
+        id: Date.now(),
+        number: 1,
+        desc: 'Mensalidade do Projeto',
+        amount: contractVal,
+        dueDate: d,
+        status: 'Pendente'
+      }
+    ];
+    tempPaymentCondition = 'mensal_unico';
+    renderPaymentsModal();
+    showToast(`Cobrança mensal gerada para ${formatDateSafe(d)}!`, 'success');
+  }, { title: 'Gerar Cobrança Mensal', okText: 'Gerar' });
+}
+
+function generateScheduleMonthly() {
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+  if (contractVal <= 0) return showToast('Defina o valor do contrato primeiro', 'warning');
+  
+  const clientDueDay = getClientDueDay();
+  const dayText = clientDueDay ? ` (Vencimento programado: todo dia ${clientDueDay})` : '';
+
+  showPrompt(
+    `Informe a quantidade de parcelas mensais${dayText}:`,
+    (qtyStr) => {
+      if (!qtyStr) return;
+      const n = parseInt(qtyStr);
+      if (isNaN(n) || n < 1 || n > 36) return showToast('Informe um número de parcelas entre 1 e 36', 'warning');
+
+      const targetDay = clientDueDay || 10;
+      const part = Math.floor((contractVal / n) * 100) / 100;
+      const diff = Math.round((contractVal - (part * n)) * 100) / 100;
+
+      const insts = [];
+      const baseToday = today();
+      const todayDay = parseInt(baseToday.split('-')[2]);
+
+      const startOffset = todayDay <= targetDay ? 0 : 1;
+
+      for (let i = 0; i < n; i++) {
+        const isLast = (i === n - 1);
+        const amt = isLast ? Math.round((part + diff) * 100) / 100 : part;
+        const d = calculateNextDueDateWithTargetDay(baseToday, targetDay, startOffset + i);
+        
+        insts.push({
+          id: Date.now() + i,
+          number: i + 1,
+          desc: `${i + 1}ª Parcela`,
+          amount: amt,
+          dueDate: d,
+          status: 'Pendente'
+        });
+      }
+
+      tempInstallments = insts;
+      tempPaymentCondition = `${n}x_mensal`;
+      renderPaymentsModal();
+      showToast(`Cronograma mensal gerado (${n}x todo dia ${targetDay})!`, 'success');
+    },
+    {
+      title: 'Gerar Parcelamento Mensal',
+      icon: 'bi bi-calendar2-range',
+      label: 'Quantidade de Parcelas Mensais',
+      defaultValue: '4',
+      helpText: clientDueDay 
+        ? `As parcelas serão programadas automaticamente para todo dia ${clientDueDay} (vencimento padrão cadastrado para este cliente).` 
+        : 'As parcelas serão agendadas mensalmente com vencimento todo dia 10.',
+      okText: 'Gerar Cronograma'
+    }
+  );
+}
+
+function quickPayFromCard(projId, instId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+  const inst = (p.installments || []).find(x => String(x.id) === String(instId));
+  if (!inst) return;
+
+  const fullAmount = parseFloat(inst.amount || 0);
+  const clientDueDay = getClientDueDay(p.client);
+
+  showPrompt(
+    `Receber Parcela — "${p.name}"\n${inst.desc || 'Parcela'}\nInforme o valor integral ou parcial recebido (R$):`,
+    (valStr) => {
+      if (valStr === null || valStr === undefined) return;
+      const payAmount = parseCurrencyInput(valStr);
+      if (isNaN(payAmount) || payAmount <= 0) return showToast('Informe um valor válido maior que zero', 'warning');
+
+      const payDate = today();
+      const payMethod = 'Pix';
+
+      if (payAmount >= fullAmount - 0.01) {
+        // Integral
+        inst.status = 'Pago';
+        inst.paidDate = payDate;
+        inst.method = payMethod;
+        inst.amount = payAmount;
+
+        p.payments = p.payments || [];
+        p.payments.push({
+          id: Date.now(),
+          installmentId: inst.id,
+          amount: payAmount,
+          date: payDate,
+          method: payMethod,
+          desc: inst.desc || 'Recebimento de Parcela'
+        });
+      } else {
+        // Parcial
+        const remainder = Math.round((fullAmount - payAmount) * 100) / 100;
+        const targetDay = clientDueDay || 10;
+        const nextDueDate = calculateNextDueDateWithTargetDay(inst.dueDate || today(), targetDay, 1);
+
+        inst.status = 'Pago';
+        inst.paidDate = payDate;
+        inst.method = payMethod;
+        inst.amount = payAmount;
+
+        p.payments = p.payments || [];
+        p.payments.push({
+          id: Date.now(),
+          installmentId: inst.id,
+          amount: payAmount,
+          date: payDate,
+          method: payMethod,
+          desc: `${inst.desc || 'Parcela'} (Parcial)`
+        });
+
+        p.installments.push({
+          id: Date.now() + 1,
+          number: p.installments.length + 1,
+          desc: `${inst.desc || 'Parcela'} (Saldo Restante)`,
+          amount: remainder,
+          dueDate: nextDueDate,
+          status: 'Pendente'
+        });
+      }
+
+      p.paid = (p.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+
+      if (typeof reconcileProjectFinancials === 'function') {
+        reconcileProjectFinancials(p);
+      }
+
+      updateCardDOM(p.id);
+      scheduleSync();
+      if (typeof renderDashboard === 'function') renderDashboard();
+      showToast(`Recebimento de ${fmt(payAmount)} confirmado!`, 'success');
+    },
+    {
+      title: 'Registrar Recebimento',
+      icon: 'bi bi-cash-coin',
+      label: 'Valor Recebido (R$)',
+      defaultValue: toBRLInputStr(fullAmount),
+      okText: 'Confirmar'
+    }
+  );
+}
+
+const DEFAULT_SUBTASKS_BY_TYPE = {
+  'Residencial': [
+    'Briefing e Levantamento de Medidas',
+    'Estudo Preliminar e Layout 2D',
+    'Modelagem 3D e Renders',
+    'Apresentação e Aprovação do Cliente',
+    'Projeto Executivo e Detalhamento'
+  ],
+  'Comercial': [
+    'Briefing e Identidade da Marca',
+    'Layout Comercial e Fluxo',
+    'Modelagem 3D e Renders',
+    'Projeto Luminotécnico e Pontos',
+    'Executivo e Memorial Descritivo'
+  ],
+  'Fachada Comercial': [
+    'Medição e Levantamento no Local',
+    'Proposta 3D de Fachada',
+    'Renders Diurno e Noturno',
+    'Detalhamento de Comunicação Visual'
+  ],
+  'Interiores': [
+    'Briefing de Estilo e Necessidades',
+    'Layout e Distribuição dos Ambientes',
+    'Modelagem 3D e Renders Realistas',
+    'Especificação de Materiais e Móveis',
+    'Detalhamento de Marcenaria'
+  ],
+  'Marcenaria': [
+    'Levantamento Técnico no Local',
+    'Desenho 3D dos Mobiliários',
+    'Plano de Corte e Detalhamento',
+    'Aprovação Final com Cliente'
+  ],
+  '3D / Render': [
+    'Importação e Ajuste do Modelo 3D',
+    'Texturização e Iluminação Realista',
+    'Renders Preliminares',
+    'Pós-produção e Renders em Alta'
+  ]
+};
+
+function onProjTypeChange() {
+  const type = document.getElementById('projType')?.value;
+  if (!type) return;
+  const tpl = DEFAULT_SUBTASKS_BY_TYPE[type] || DEFAULT_SUBTASKS_BY_TYPE['Residencial'];
+  if (!tpl || !tpl.length) return;
+
+  if (!tempSubs || tempSubs.length === 0) {
+    tempSubs = tpl.map((text, idx) => ({ id: Date.now() + idx, text, done: false, current: false }));
+    renderSubsList();
+    showToast(`Checklist padrão carregado para ${type}!`, 'info');
+  }
+}
+
+function onProjValueInput() {
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+  const btnRebalance = document.getElementById('btnRebalanceInsts');
+  if (!btnRebalance) return;
+
   if (tempInstallments && tempInstallments.length > 0) {
-    instHtml = `
-      <div style="margin-bottom:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">
-        <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:6px;display:flex;justify-content:space-between">
-          <span><i class="bi bi-calendar-event"></i> Cronograma (${tempInstallments.length} parcelas)</span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          ${tempInstallments.map(inst => {
-            const isPaid = inst.status === 'Pago';
-            const dateStr = inst.dueDate ? new Date(inst.dueDate + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
-            return `
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:2px 0">
-                <span>${inst.desc} · <span style="color:var(--text3)">Venc: ${dateStr}</span></span>
-                <span style="display:inline-flex;align-items:center;gap:6px">
-                  <strong style="font-family:'Outfit',sans-serif;font-weight:700">${fmt(inst.amount)}</strong>
-                  <span class="badge" style="font-size:9.5px;padding:1px 5px;background:${isPaid ? 'rgba(22,163,74,0.15)' : 'var(--surface)'};color:${isPaid ? 'var(--green)' : 'var(--text3)'}">${isPaid ? '✓ Pago' : '⏳ Pendente'}</span>
-                </span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `;
+    const totalInstsVal = tempInstallments.reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+    if (contractVal > 0 && Math.abs(contractVal - totalInstsVal) > 0.01) {
+      btnRebalance.style.display = 'inline-flex';
+      const diff = contractVal - totalInstsVal;
+      btnRebalance.innerHTML = `<i class="bi bi-arrow-repeat"></i> Ajustar parcelas (${diff > 0 ? '+' : ''}${fmt(diff)})`;
+    } else {
+      btnRebalance.style.display = 'none';
+    }
+  } else {
+    btnRebalance.style.display = 'none';
+  }
+}
+
+function renderPaymentsModal(){
+  const totalPaid = tempPayments.reduce((s,x)=>s+parseFloat(x.amount||0),0);
+  const contractVal = parseCurrencyInput(document.getElementById('projValue')?.value) || 0;
+
+  // Atualiza badge de progresso no topo da seção de recebimentos
+  const progEl = document.getElementById('payProgress');
+  if (progEl) {
+    const totalRef = contractVal > 0 ? contractVal : totalPaid;
+    progEl.textContent = `${fmt(totalPaid)} / ${fmt(totalRef)}`;
+    progEl.className = `badge ${contractVal > 0 && totalPaid >= contractVal - 0.01 ? 'b-pago' : totalPaid > 0 ? 'b-parcial' : 'b-pendente'}`;
   }
 
-  if(!tempPayments.length){
-    c.innerHTML = instHtml + '<div class="empty-state" style="padding:16px"><i class="bi bi-cash-coin"></i><span>Nenhum pagamento registrado</span></div>';
-    return;
+  // Conciliação automática de status das parcelas com base nos pagamentos
+  if (tempInstallments && tempInstallments.length > 0) {
+    const dummyObj = { value: contractVal, paid: totalPaid, payments: tempPayments, installments: tempInstallments };
+    if (typeof reconcileProjectFinancials === 'function') {
+      reconcileProjectFinancials(dummyObj);
+    }
   }
-  c.innerHTML = instHtml + tempPayments.map(p=>`<div class="pay-item"><span>+ ${fmt(p.amount)} em ${new Date(p.date+'T12:00:00').toLocaleDateString('pt-BR')} <span style="color:var(--text3)">· ${p.method||'Pix'}</span></span><button class="cbtn del" onclick="delPayment(${p.id})"><i class="bi bi-trash3"></i></button></div>`).join('');
+
+  // 1. Renderiza o container de Cronograma de Parcelas
+  const instContainer = document.getElementById('projInstsContainer');
+  if (instContainer) {
+    if (!tempInstallments || !tempInstallments.length) {
+      instContainer.innerHTML = `
+        <div style="padding:10px;text-align:center;color:var(--text3);font-size:11px">
+          <i class="bi bi-calendar-x" style="font-size:14px;margin-right:4px"></i> Nenhum cronograma configurado.
+          <button type="button" class="btn btn-ghost btn-sm" style="font-size:10px;padding:1px 6px;margin-left:6px" onclick="addCustomInstallment()">
+            <i class="bi bi-plus-circle"></i> Criar Parcela
+          </button>
+        </div>
+      `;
+    } else {
+      instContainer.innerHTML = tempInstallments.map((inst, idx) => {
+        const isPaid = inst.status === 'Pago';
+        const dueDate = inst.dueDate || '';
+        let timingBadge = '';
+        let cardClass = isPaid ? 'paid' : 'pending';
+
+        if (isPaid) {
+          timingBadge = `<span class="badge" style="font-size:9.5px;padding:1px 5px;background:rgba(22,163,74,0.15);color:var(--green)">✓ Pago</span>`;
+        } else if (dueDate) {
+          const dDue = new Date(dueDate + 'T12:00:00');
+          const diff = Math.ceil((dDue - new Date().setHours(0,0,0,0)) / 86400000);
+          if (diff < 0) {
+            cardClass = 'overdue';
+            timingBadge = `<span class="badge b-venc" style="font-size:9.5px;padding:1px 5px" title="Vencido há ${Math.abs(diff)} dias">⚠️ Vencida (${Math.abs(diff)}d)</span>`;
+          } else if (diff === 0) {
+            timingBadge = `<span class="badge b-urg" style="font-size:9.5px;padding:1px 5px">Hoje</span>`;
+          } else if (diff <= 3) {
+            timingBadge = `<span class="badge b-urg" style="font-size:9.5px;padding:1px 5px">${diff}d</span>`;
+          } else {
+            timingBadge = `<span class="badge" style="font-size:9.5px;padding:1px 5px;background:var(--surface);color:var(--text3)">⏳ Pendente</span>`;
+          }
+        } else {
+          timingBadge = `<span class="badge" style="font-size:9.5px;padding:1px 5px;background:var(--surface);color:var(--text3)">⏳ Pendente</span>`;
+        }
+
+        return `
+          <div class="inst-card ${cardClass}">
+            <div class="inst-header">
+              <span class="inst-desc">${escapeHtml(inst.desc || `Parcela ${idx+1}`)}</span>
+              <div class="inst-actions">
+                ${!isPaid ? `
+                  <button type="button" class="btn-quick-pay" onclick="quickPayInstallment(${inst.id})" title="Dar baixa nesta parcela agora">
+                    <i class="bi bi-check2"></i> Receber
+                  </button>
+                ` : `
+                  <span style="font-size:10px;color:var(--green);font-weight:600"><i class="bi bi-check-circle-fill"></i> Quitado</span>
+                `}
+                <button type="button" class="cbtn" onclick="editInstallment(${inst.id})" title="Editar valor da parcela" style="font-size:11px;padding:2px 4px">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button type="button" class="cbtn del" onclick="deleteInstallment(${inst.id})" title="Remover do cronograma" style="font-size:11px;padding:2px 4px">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </div>
+            <div class="inst-body">
+              <div style="display:flex;align-items:center;gap:4px">
+                <span style="font-size:10.5px;color:var(--text3)">Venc:</span>
+                <input type="date" class="inp inp-sm" style="padding:1px 4px;font-size:10.5px;height:22px;width:auto;border:1px solid var(--border)" value="${dueDate}" onchange="updateInstallmentDate(${inst.id}, this.value)" ${isPaid ? 'disabled style="opacity:0.7"' : ''}>
+                ${timingBadge}
+              </div>
+              <strong style="font-family:'Outfit',sans-serif;font-size:12px">${fmt(inst.amount)}</strong>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  // 2. Renderiza o container de Histórico de Recebimentos
+  const paysEl = document.getElementById('paysContainer');
+  if (paysEl) {
+    if (!tempPayments.length) {
+      paysEl.innerHTML = '<div class="empty-state" style="padding:12px;font-size:11.5px"><i class="bi bi-cash-coin"></i><span>Nenhum pagamento registrado</span></div>';
+    } else {
+      paysEl.innerHTML = tempPayments.map(p => `
+        <div class="pay-item" style="padding:6px 10px;font-size:12px">
+          <span style="display:flex;align-items:center;gap:6px">
+            <strong style="font-family:'Outfit',sans-serif;font-weight:700;color:var(--green)">+${fmt(p.amount)}</strong>
+            <span style="color:var(--text2);font-size:11px">${p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span>
+            <span style="color:var(--text3);font-size:11px">· ${escapeHtml(p.method || 'Pix')}</span>
+          </span>
+          <button class="cbtn del" onclick="delPayment(${p.id})" title="Excluir este recebimento" style="padding:2px 4px"><i class="bi bi-trash3"></i></button>
+        </div>
+      `).join('');
+    }
+  }
+
+  // 3. Atualiza botão de reajuste de parcelas ao valor do contrato
+  onProjValueInput();
 }
 
 // ══════════════════════════════════════════
@@ -1022,6 +2328,84 @@ function sendNotification(){
   closeNotifyModal();scheduleSync();renderBoard();showToast('Aviso enviado!','success');
 }
 
+function toggleSendToClientReview(event, projId) {
+  if (event) event.stopPropagation();
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+
+  const cl = clients.find(c => (c.name || '').toLowerCase().trim() === (p.client || '').toLowerCase().trim());
+
+  if (p.column !== 'Revisão') {
+    showConfirm(
+      `Deseja mover o projeto "<strong>${escapeHtml(p.name)}</strong>" para a coluna <strong>Revisão</strong> para que o cliente avalie e aprove no painel?`,
+      () => {
+        p.column = 'Revisão';
+        p.pendingClientRevision = false;
+        updateCardDOM(p.id);
+        renderBoard();
+        scheduleSync();
+
+        if (cl && cl.phone) {
+          showConfirm(
+            `Projeto colocado em Revisão! Deseja enviar mensagem no WhatsApp de <strong>${escapeHtml(p.client)}</strong> avisando que o projeto está pronto para aprovação?`,
+            () => {
+              openWhatsAppApprovalRequest(p.id);
+            },
+            {
+              title: 'Avisar Cliente no WhatsApp',
+              icon: 'bi bi-whatsapp',
+              okText: 'Abrir WhatsApp'
+            }
+          );
+        } else {
+          showToast(`Projeto "${p.name}" colocado em Revisão para aprovação do cliente!`, 'success');
+        }
+      },
+      {
+        title: 'Enviar para Aprovação do Cliente',
+        icon: 'bi bi-bell-fill',
+        okText: 'Colocar em Revisão',
+        danger: false
+      }
+    );
+  } else {
+    showConfirm(
+      `O projeto "<strong>${escapeHtml(p.name)}</strong>" está aguardando a aprovação do cliente.<br><br>Deseja reenviar o link de avaliação no WhatsApp?`,
+      () => {
+        openWhatsAppApprovalRequest(p.id);
+      },
+      {
+        title: 'Aprovação do Cliente — Revisão',
+        icon: 'bi bi-bell-fill',
+        okText: 'Avisar no WhatsApp',
+        danger: false,
+        cancelText: 'Fechar'
+      }
+    );
+  }
+}
+
+function openWhatsAppApprovalRequest(projId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+  const cl = clients.find(c => (c.name || '').toLowerCase().trim() === (p.client || '').toLowerCase().trim());
+  if (!cl || !cl.phone) return showToast('Cliente sem WhatsApp cadastrado', 'warning');
+
+  const raw = cl.phone.replace(/\D/g, '');
+  const num = raw.length <= 11 ? '55' + raw : raw;
+  const clientFirstName = (cl.name || 'Cliente').trim().split(' ')[0];
+  const link = cl.token ? buildLink(cl.name, cl.token) : '';
+
+  let msg = `Olá, *${clientFirstName}*! Tudo bem?\n\n`;
+  msg += `Seu projeto *${p.name}* está pronto para sua avaliação e aprovação! 🌟\n\n`;
+  if (link) {
+    msg += `Acesse seu painel exclusivo para conferir e aprovar com 1 clique:\n👉 ${link}\n\n`;
+  }
+  msg += `Qualquer dúvida ou ajuste necessário, estou à disposição!`;
+
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
 // ══════════════════════════════════════════
 //  SELECT & FILTER UPDATES
 // ══════════════════════════════════════════
@@ -1051,19 +2435,104 @@ function updateClientFilter(){
 //  MANAGE COLUMNS
 // ══════════════════════════════════════════
 function colIconOptions(sel){return COL_ICONS.map(o=>`<option value="${o.v}" ${o.v===sel?'selected':''}>${o.l}</option>`).join('');}
+
+function renderColManagerRow(c) {
+  const isFinal = isFinalColumn(c.id);
+  const isHidden = isHiddenColumn(c.id);
+  return `
+    <div class="cm-row" data-orig="${escapeHtml(c.id || '')}">
+      <div class="cm-reorder-wrap" style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">
+        <button type="button" class="btn-icon btn-xs cm-move-btn" onclick="moveColumnRow(this, -1);event.stopPropagation()" title="Mover coluna para cima" style="width:24px;height:16px;padding:0;font-size:10px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer">
+          <i class="bi bi-chevron-up"></i>
+        </button>
+        <button type="button" class="btn-icon btn-xs cm-move-btn" onclick="moveColumnRow(this, 1);event.stopPropagation()" title="Mover coluna para baixo" style="width:24px;height:16px;padding:0;font-size:10px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer">
+          <i class="bi bi-chevron-down"></i>
+        </button>
+      </div>
+      <select class="inp inp-sm cm-icon" style="min-width:90px">${colIconOptions(c.icon)}</select>
+      <input type="color" class="cm-color" value="${c.color || DEFAULT_COL_COLOR}" title="Cor da coluna">
+      <input class="inp inp-sm cm-name-inp" value="${escapeHtml(c.id || '')}" placeholder="Nome da coluna" style="flex:1">
+      <label class="cm-final" title="Etapa concluída (conta nos relatórios e some o selo de prioridade — o projeto ainda aparece pro cliente)">
+        <input type="checkbox" class="cm-isfinal" ${isFinal ? 'checked' : ''}>
+        <i class="bi bi-flag-fill"></i>
+      </label>
+      <label class="cm-hidden" title="Projeto encerrado (já entregue/pago — some do painel do cliente e vira cartão compacto no quadro)">
+        <input type="checkbox" class="cm-hideclient" ${isHidden ? 'checked' : ''}>
+        <i class="bi bi-eye-slash-fill"></i>
+      </label>
+      <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.cm-row').remove()" title="Excluir coluna">
+        <i class="bi bi-trash3"></i>
+      </button>
+    </div>
+  `;
+}
+
+function moveColumnRow(btn, dir) {
+  const row = btn.closest('.cm-row');
+  if (!row) return;
+  const parent = row.parentNode;
+  if (dir === -1) {
+    const prev = row.previousElementSibling;
+    if (prev) {
+      parent.insertBefore(row, prev);
+      row.style.transition = 'transform 0.15s ease';
+      row.style.transform = 'translateY(-2px)';
+      setTimeout(() => row.style.transform = '', 150);
+    }
+  } else if (dir === 1) {
+    const next = row.nextElementSibling;
+    if (next) {
+      parent.insertBefore(next, row);
+      row.style.transition = 'transform 0.15s ease';
+      row.style.transform = 'translateY(2px)';
+      setTimeout(() => row.style.transform = '', 150);
+    }
+  }
+}
+
 function openManageColumnsModal(){
-  document.getElementById('colManagerList').innerHTML=appColumns.map(c=>`<div class="cm-row" data-orig="${c.id}"><select class="inp inp-sm cm-icon">${colIconOptions(c.icon)}</select><input type="color" class="cm-color" value="${c.color||DEFAULT_COL_COLOR}" title="Cor da coluna"><input class="inp inp-sm" value="${c.id}" style="flex:1"><label class="cm-final" title="Etapa concluída (conta nos relatórios e some o selo de prioridade — o projeto ainda aparece pro cliente)"><input type="checkbox" class="cm-isfinal" ${isFinalColumn(c.id)?'checked':''}><i class="bi bi-flag-fill"></i></label><label class="cm-hidden" title="Projeto encerrado (já entregue/pago — some do painel do cliente e vira cartão compacto no quadro)"><input type="checkbox" class="cm-hideclient" ${isHiddenColumn(c.id)?'checked':''}><i class="bi bi-eye-slash-fill"></i></label><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="bi bi-trash3"></i></button></div>`).join('');
+  document.getElementById('colManagerList').innerHTML = appColumns.map(c => renderColManagerRow(c)).join('');
   document.getElementById('colsOverlay').classList.add('open');
 }
+
 function closeManageColumnsModal(){document.getElementById('colsOverlay').classList.remove('open');}
-function addColInput(){document.getElementById('colManagerList').innerHTML+=`<div class="cm-row" data-orig=""><select class="inp inp-sm cm-icon">${colIconOptions()}</select><input type="color" class="cm-color" value="${DEFAULT_COL_COLOR}" title="Cor da coluna"><input class="inp inp-sm" placeholder="Nome da coluna" style="flex:1"><label class="cm-final" title="Etapa concluída (conta nos relatórios e some o selo de prioridade — o projeto ainda aparece pro cliente)"><input type="checkbox" class="cm-isfinal"><i class="bi bi-flag-fill"></i></label><label class="cm-hidden" title="Projeto encerrado (já entregue/pago — some do painel do cliente e vira cartão compacto no quadro)"><input type="checkbox" class="cm-hideclient"><i class="bi bi-eye-slash-fill"></i></label><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()"><i class="bi bi-trash3"></i></button></div>`;}
+
+function addColInput(){
+  const list = document.getElementById('colManagerList');
+  if (!list) return;
+  const newRowWrapper = document.createElement('div');
+  newRowWrapper.innerHTML = renderColManagerRow({ id: '', icon: 'bi-folder', color: DEFAULT_COL_COLOR, isFinal: false, hideClient: false });
+  list.appendChild(newRowWrapper.firstElementChild);
+}
+
 function saveColumnsConfig(){
-  const rows=document.querySelectorAll('#colManagerList .cm-row'),newCols=[],map={};
-  rows.forEach(r=>{const orig=r.dataset.orig,icon=r.querySelector('select').value,color=r.querySelectorAll('input')[0].value,name=r.querySelectorAll('input')[1].value.trim(),isFinal=r.querySelector('.cm-isfinal').checked,hideClient=r.querySelector('.cm-hideclient').checked;if(name){newCols.push({id:name,icon,color,isFinal,hideClient});if(orig&&orig!==name)map[orig]=name;}});
-  if(!newCols.length)return showToast('Ao menos uma coluna!','warning');
-  projects.forEach(p=>{if(map[p.column])p.column=map[p.column];if(!newCols.find(c=>c.id===p.column))p.column=newCols[0].id;});
-  appColumns=newCols;visibleColumns=appColumns.map(c=>c.id);minimizedColumns=[];
-  updateProjColSelect();renderBoard();closeManageColumnsModal();scheduleSync();showToast('Colunas atualizadas!','success');
+  const rows = document.querySelectorAll('#colManagerList .cm-row');
+  const newCols = [], map = {};
+  rows.forEach(r => {
+    const orig = r.dataset.orig;
+    const icon = r.querySelector('select')?.value || 'bi-folder';
+    const color = r.querySelector('input[type="color"]')?.value || DEFAULT_COL_COLOR;
+    const name = r.querySelector('.cm-name-inp')?.value?.trim() || '';
+    const isFinal = r.querySelector('.cm-isfinal')?.checked || false;
+    const hideClient = r.querySelector('.cm-hideclient')?.checked || false;
+    if (name) {
+      newCols.push({ id: name, icon, color, isFinal, hideClient });
+      if (orig && orig !== name) map[orig] = name;
+    }
+  });
+  if (!newCols.length) return showToast('Ao menos uma coluna!', 'warning');
+  projects.forEach(p => {
+    if (map[p.column]) p.column = map[p.column];
+    if (!newCols.find(c => c.id === p.column)) p.column = newCols[0].id;
+  });
+  appColumns = newCols;
+  visibleColumns = appColumns.map(c => c.id);
+  minimizedColumns = [];
+  updateProjColSelect();
+  renderBoard();
+  closeManageColumnsModal();
+  scheduleSync();
+  showToast('Ordem e configurações das colunas atualizadas com sucesso!', 'success');
 }
 
 
@@ -1073,10 +2542,8 @@ function moveNext(id){
   const cols=appColumns.filter(c=>visibleColumns.includes(c.id));
   const idx=cols.findIndex(c=>c.id===p.column);
   if(idx===-1||idx===cols.length-1)return showToast('Já na última etapa','info');
-  p.column=cols[idx+1].id;
+  applyColumnChange(p, cols[idx+1].id);
   renderBoard();scheduleSync();
-  if(isHiddenColumn(p.column)) showToast(`➡ ${p.column} — não aparece mais pro cliente`,'warning');
-  else showToast(`➡ ${p.column}`,'info');
 }
 
 function toggleFinHist(id){
@@ -1156,6 +2623,28 @@ Segue o resumo financeiro do projeto *{Projeto}*:
 Dúvidas, estamos à disposição!
 _Equipe MAVIC Projetos_`,
 
+  installment: `Olá, *{Cliente}*!
+
+Passando para enviar o lembrete sobre a parcela do projeto *{Projeto}*:
+
+*Parcela:* {ProximaParcelaDesc}
+*Valor:* {ProximaParcelaValor}
+*Vencimento:* {ProximaParcelaData}
+{DadosPix}
+Dúvidas, estamos à total disposição!
+_Equipe MAVIC Projetos_`,
+
+  receipt: `Olá, *{Cliente}*!
+
+Confirmamos com sucesso o recebimento referente ao projeto *{Projeto}*! 🎉
+
+*Valor recebido:* {ValorUltimoPagamento}
+*Total pago até o momento:* {ValorPago}
+*Saldo restante:* {SaldoPendente}
+
+Muito obrigado pela parceria e confiança! ✨
+_Equipe MAVIC Projetos_`,
+
   completed: `Olá, *{Cliente}*!
 
 Projeto *{Projeto}* concluído com sucesso! 🎉
@@ -1211,6 +2700,15 @@ function buildWhatsAppMsg(projId, customTemplate = null){
     subtaskText = `*Foco atual:*\n` + currSubs.map(cs => `• ${cs.text}`).join('\n');
   }
 
+  const lastPay = pays.length ? pays[pays.length - 1] : null;
+  const lastPayStr = lastPay ? `${fmt(lastPay.amount)} (${lastPay.method || 'Pix'})` : fmt(paid);
+  
+  const pendingInsts = (p.installments || []).filter(i => i.status !== 'Pago');
+  const nextInst = pendingInsts.length ? pendingInsts[0] : null;
+  const nextInstDesc = nextInst ? (nextInst.desc || 'Parcela') : 'Parcela';
+  const nextInstVal = nextInst ? fmt(nextInst.amount) : fmt(rest);
+  const nextInstDate = nextInst && nextInst.dueDate ? new Date(nextInst.dueDate + 'T12:00:00').toLocaleDateString('pt-BR') : dl;
+
   const waLinkBlock=link?`\n*Seu painel:*\n${link}\n`:'';
   const waPixBlock=pixKey?`\n*Dados para PIX:*\n*Chave:* ${pixKey}\n*Titular:* ${pixName}\n*Banco:* ${pixBank}\n`:'';
   const waDriveBlock=(p.driveLink && p.driveLink.trim())?`\n*Pasta de arquivos:*\n${p.driveLink.trim()}\n`:'';
@@ -1229,6 +2727,10 @@ function buildWhatsAppMsg(projId, customTemplate = null){
     .replace(/{ValorTotal}/g, fmt(total))
     .replace(/{ValorPago}/g, fmt(paid))
     .replace(/{SaldoPendente}/g, rest <= 0 ? 'Quitado' : fmt(rest))
+    .replace(/{ValorUltimoPagamento}/g, lastPayStr)
+    .replace(/{ProximaParcelaDesc}/g, nextInstDesc)
+    .replace(/{ProximaParcelaValor}/g, nextInstVal)
+    .replace(/{ProximaParcelaData}/g, nextInstDate)
     .replace(/{Observacao}/g, p.note ? `_${p.note}_` : '')
     .replace(/{TarefaAtual}/g, subtaskText);
 
@@ -1247,6 +2749,45 @@ function buildWhatsAppMsg(projId, customTemplate = null){
   }
 
   return { msg, waLinkBlock, waPixBlock, waDriveBlock, hasLinkTag, hasPixTag, hasDriveTag };
+}
+
+function openWhatsAppReceipt(projId, payId) {
+  openWhatsApp(projId);
+  const p = projects.find(x => x.id === projId);
+  const pay = (p?.payments || []).find(x => x.id === payId) || (p?.payments || [])[p?.payments?.length - 1];
+  
+  const presetSel = document.getElementById('waPresetSelect');
+  if (presetSel) presetSel.value = 'receipt';
+  applyWaPreset('receipt');
+
+  if (pay) {
+    const ta = document.getElementById('waMsg');
+    if (ta) {
+      ta.value = ta.value
+        .replace(/{ValorUltimoPagamento}/g, `${fmt(pay.amount)} (${pay.method || 'Pix'})`);
+    }
+  }
+}
+
+function openWhatsAppInstallment(projId, instId) {
+  openWhatsApp(projId);
+  const p = projects.find(x => x.id === projId);
+  const inst = (p?.installments || []).find(x => x.id === instId);
+  
+  const presetSel = document.getElementById('waPresetSelect');
+  if (presetSel) presetSel.value = 'installment';
+  applyWaPreset('installment');
+
+  if (inst) {
+    const ta = document.getElementById('waMsg');
+    if (ta) {
+      const dStr = inst.dueDate ? new Date(inst.dueDate + 'T12:00:00').toLocaleDateString('pt-BR') : 'A combinar';
+      ta.value = ta.value
+        .replace(/{ProximaParcelaDesc}/g, inst.desc || 'Parcela')
+        .replace(/{ProximaParcelaValor}/g, fmt(inst.amount))
+        .replace(/{ProximaParcelaData}/g, dStr);
+    }
+  }
 }
 
 function applyWaPreset(presetKey) {

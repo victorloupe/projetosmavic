@@ -52,20 +52,26 @@ Deno.serve(async (req) => {
     const myProjects = allProjects
       .filter(p => (p.client as string)?.toLowerCase().trim() === nome)
       .map(p => ({
-        id:        p.id,
-        name:      p.name,
-        column:    p.column,
-        type:      p.type,
-        priority:  p.priority,
-        date:      p.date,
-        value:     p.value,
-        payments:  p.payments,
-        subtasks:  p.subtasks,
-        products:  p.products,
-        note:      p.note,
-        image:     p.image,
-        driveLink: p.driveLink,
-        archived:  p.archived,
+        id:             p.id,
+        name:           p.name,
+        column:         p.column,
+        type:           p.type,
+        priority:       p.priority,
+        date:           p.date,
+        value:          p.value,
+        payments:       p.payments,
+        installments:   p.installments,
+        subtasks:       p.subtasks,
+        products:       p.products,
+        note:           p.note,
+        image:          p.image,
+        driveLink:      p.driveLink,
+        archived:       p.archived,
+        revisions:      p.revisions,
+        revisionsLimit: p.revisionsLimit,
+        revisionLogs:   p.revisionLogs,
+        clientApproved: p.clientApproved,
+        clientApprovedAt: p.clientApprovedAt,
       }))
 
     // Filtrar notificações apenas deste cliente
@@ -97,14 +103,16 @@ Deno.serve(async (req) => {
     })
   }
 
-  // ── POST: marcar aviso como lido ─────────────────────────────────────────
+  // ── POST: ações do cliente ─────────────────────────────────────────
   if (req.method === 'POST') {
     const body = await req.json() as {
-      action: 'mark_read' | 'mark_global_read'
+      action: 'mark_read' | 'mark_global_read' | 'approve_project' | 'request_revision'
       nome: string
       token?: string
       notifId?: number
       noticeId?: number
+      projectId?: number
+      notes?: string
     }
 
     const nome  = body.nome?.trim().toLowerCase()
@@ -124,11 +132,68 @@ Deno.serve(async (req) => {
     if (!cli) return json({ error: 'client_not_found' }, 404)
     if (cli.token && token !== cli.token) return json({ error: 'invalid_token' }, 401)
 
-    // Marcar notificação individual como lida
+    type Project = Record<string, unknown>
+    const allProjects: Project[] = (store['projects'] ?? []) as Project[]
+
+    // 1. Aprovar Projeto (Cliente confirma aprovação)
+    if (body.action === 'approve_project' && body.projectId !== undefined) {
+      const targetProj = allProjects.find(p => p.id === body.projectId)
+      if (!targetProj) return json({ error: 'project_not_found' }, 404)
+      if ((targetProj.client as string)?.toLowerCase().trim() !== nome) return json({ error: 'forbidden' }, 403)
+
+      const updatedProjects = allProjects.map(p => {
+        if (p.id !== body.projectId) return p
+        return {
+          ...p,
+          column: 'Concluído',
+          clientApproved: true,
+          clientApprovedAt: new Date().toISOString()
+        }
+      })
+
+      await supabase.from('mavic_store').upsert([{ key: 'projects', data: updatedProjects }], { onConflict: 'key' })
+      return json({ ok: true })
+    }
+
+    // 2. Solicitar Ajustes (Projeto volta para Desenvolvimento com +1 Revisão)
+    if (body.action === 'request_revision' && body.projectId !== undefined) {
+      const targetProj = allProjects.find(p => p.id === body.projectId)
+      if (!targetProj) return json({ error: 'project_not_found' }, 404)
+      if ((targetProj.client as string)?.toLowerCase().trim() !== nome) return json({ error: 'forbidden' }, 403)
+
+      type Column = { id: string }
+      const cfg = (store['config'] ?? {}) as Record<string, unknown>
+      const cols = (cfg.columns ?? []) as Column[]
+      const altCol = cols.find(c => (c.id || '').toLowerCase().includes('altera'))?.id
+      const devCol = cols.find(c => (c.id || '').toLowerCase().includes('desenv'))?.id
+      const targetColumn = altCol || devCol || 'Alteração'
+
+      const updatedProjects = allProjects.map(p => {
+        if (p.id !== body.projectId) return p
+        const currentRevs = Number(p.revisions || 0) + 1
+        const logs = Array.isArray(p.revisionLogs) ? [...p.revisionLogs] : []
+        logs.push({
+          id: Date.now(),
+          timestamp: new Date().toISOString(),
+          text: body.notes || 'Ajustes solicitados pelo cliente',
+          author: cli.name || 'Cliente'
+        })
+        return {
+          ...p,
+          column: targetColumn,
+          revisions: currentRevs,
+          revisionLogs: logs
+        }
+      })
+
+      await supabase.from('mavic_store').upsert([{ key: 'projects', data: updatedProjects }], { onConflict: 'key' })
+      return json({ ok: true })
+    }
+
+    // 3. Marcar notificação individual como lida
     if (body.action === 'mark_read' && body.notifId !== undefined) {
       type Notification = Record<string, unknown>
       const notifications: Notification[] = (store['notifications'] ?? []) as Notification[]
-      // Só pode marcar como lida uma notificação que pertence a este cliente (mesmo token)
       const target = notifications.find(n => n.id === body.notifId)
       if (!target) return json({ error: 'notification_not_found' }, 404)
       if (target.clientToken !== cli.token) return json({ error: 'forbidden' }, 403)
@@ -137,11 +202,10 @@ Deno.serve(async (req) => {
       return json({ ok: true })
     }
 
-    // Marcar aviso global como lido por este cliente
+    // 4. Marcar aviso global como lido por este cliente
     if (body.action === 'mark_global_read' && body.noticeId !== undefined) {
       type GlobalNotice = Record<string, unknown>
       const globalNotices: GlobalNotice[] = (store['global_notices'] ?? []) as GlobalNotice[]
-      // Só pode marcar como lido um aviso que era realmente destinado a este cliente
       const target = globalNotices.find(gn => gn.id === body.noticeId)
       if (!target) return json({ error: 'notice_not_found' }, 404)
       const targetedAtMe = !!target.targetAll ||

@@ -76,9 +76,8 @@ function selectClient(id, userClick=false){
   document.getElementById('cliAddress').value=cl.address||'';
   document.getElementById('cliEmail').value=cl.email||'';
   document.getElementById('cliDoc').value=formatDocMask(cl.doc||'');
+  document.getElementById('cliDueDay').value=cl.dueDay || '';
   document.getElementById('cliDoc').classList.remove('inp-invalid');
-  document.getElementById('tokenOkMsg').classList.add('d-none');
-  document.getElementById('contactOkMsg').classList.add('d-none');
 
   // Renderizar estatísticas do cliente (LTV e projetos)
   const cliProjs = (projects || []).filter(p => p && p.client && p.client.toLowerCase().trim() === cl.name.toLowerCase().trim());
@@ -153,29 +152,52 @@ function openClientWaDirect() {
 
 function updateCliLink(cl){document.getElementById('cliLinkBox').textContent=cl.token?buildLink(cl.name,cl.token):'⚠️ Defina um token';}
 
-function saveClientContact(){
-  const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
-  const rawPhone = document.getElementById('cliPhone').value.trim();
+function saveClientFull() {
+  const cl = clients.find(x => x.id === currentCliId);
+  if (!cl) return;
+
+  const rawPhone = (document.getElementById('cliPhone')?.value || '').trim();
   cl.phone = formatPhoneMask(rawPhone);
-  document.getElementById('cliPhone').value = cl.phone;
-  cl.address=document.getElementById('cliAddress').value.trim();
-  cl.email=document.getElementById('cliEmail').value.trim();
-  cl.doc=formatDocMask(document.getElementById('cliDoc').value.trim());
-  document.getElementById('cliDoc').value = cl.doc;
+  if (document.getElementById('cliPhone')) document.getElementById('cliPhone').value = cl.phone;
+
+  cl.address = (document.getElementById('cliAddress')?.value || '').trim();
+  cl.email = (document.getElementById('cliEmail')?.value || '').trim();
+  cl.doc = formatDocMask((document.getElementById('cliDoc')?.value || '').trim());
+  if (document.getElementById('cliDoc')) document.getElementById('cliDoc').value = cl.doc;
+
+  const rawDay = parseInt(document.getElementById('cliDueDay')?.value);
+  cl.dueDay = (rawDay >= 1 && rawDay <= 31) ? rawDay : null;
+
+  const t = (document.getElementById('cliToken')?.value || '').trim();
+  if (t) {
+    if (/[\s&?#]/.test(t)) {
+      return showToast('O token não pode conter espaços ou os caracteres & ? #', 'warning');
+    }
+    cl.token = t;
+    updateCliLink(cl);
+  }
+
   scheduleSync();
-  const ok=document.getElementById('contactOkMsg');ok.classList.remove('d-none');
-  setTimeout(()=>ok.classList.add('d-none'),2500);
-  showToast('Contato salvo!','success');
+  renderCliList();
+
+  const btn = document.getElementById('btnSaveClientFull');
+  if (btn) {
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Salvo!';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-success');
+    setTimeout(() => {
+      btn.innerHTML = origHtml;
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-primary');
+    }, 1800);
+  }
+
+  showToast('Dados do cliente salvos com sucesso!', 'success');
 }
 
-function saveToken(){
-  const cl=clients.find(x=>x.id===currentCliId);if(!cl)return;
-  const t=document.getElementById('cliToken').value.trim();if(!t)return showToast('Digite o token','warning');
-  if(/[\s&?#]/.test(t))return showToast('Sem espaços ou & ? #','warning');
-  cl.token=t;updateCliLink(cl);renderCliList();
-  document.getElementById('tokenOkMsg').classList.remove('d-none');setTimeout(()=>document.getElementById('tokenOkMsg').classList.add('d-none'),3000);
-  scheduleSync();showToast('Token salvo!','success');
-}
+function saveClientContact(){ saveClientFull(); }
+function saveToken(){ saveClientFull(); }
 
 function genToken(){document.getElementById('cliToken').value=genTokenStr();showToast('Gere e clique em Salvar','info');}
 

@@ -79,8 +79,36 @@
 <div class="board-view" id="boardView">
   <div class="board-header">
     <h4 style="font-weight:700;color:var(--accent);margin:0">Quadro de Projetos</h4>
-    <button class="btn btn-primary btn-sm" onclick="openProjectModal()" style="white-space:nowrap"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn btn-ghost btn-sm" id="btnToggleWeekSummary" onclick="toggleWeekSummary()" style="white-space:nowrap;display:flex;align-items:center;gap:6px">
+        <i class="bi bi-calendar-week"></i> Esta Semana
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="openProjectModal()" style="white-space:nowrap"><i class="bi bi-plus-lg"></i> Novo Projeto</button>
+    </div>
   </div>
+  
+  <!-- BARRA DE VISÃO DA SEMANA -->
+  <div class="week-summary-bar d-none" id="weekSummaryBar" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 18px;margin:0 20px 10px;box-shadow:var(--sh);display:none;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(146,98,58,0.12);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px"><i class="bi bi-calendar-check"></i></div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">Entregas em 7 dias</div>
+          <div id="weekDeliveriesCount" style="font-size:14px;font-weight:700;color:var(--text);font-family:'Outfit',sans-serif">0 projetos</div>
+        </div>
+      </div>
+      <div style="height:24px;width:1px;background:var(--border)"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(56,161,105,0.12);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:16px"><i class="bi bi-cash-stack"></i></div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">Previsão a Receber (7 dias)</div>
+          <div id="weekReceivablesSum" style="font-size:14px;font-weight:700;color:var(--green);font-family:'Outfit',sans-serif">R$ 0,00</div>
+        </div>
+      </div>
+    </div>
+    <div id="weekSummaryItems" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--text2)"></div>
+  </div>
+
   <div class="toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
     <div class="toolbar-filters" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:280px">
       <input type="text" class="inp inp-sm" id="srch" placeholder="Buscar projeto ou cliente…" oninput="renderBoard()" style="max-width:180px">
@@ -93,6 +121,16 @@
       </select>
       <select class="inp inp-sm" id="fClient" onchange="renderBoard()" style="width:auto">
         <option value="">Todos os Clientes</option>
+      </select>
+      <select class="inp inp-sm" id="fFinance" onchange="renderBoard()" style="width:auto">
+        <option value="">Status Financeiro</option>
+        <option value="overdue">⚠️ Parcela Vencida</option>
+        <option value="upcoming">⏳ Parcela a Vencer (7d)</option>
+        <option value="pending">🟡 Pendente / Parcial</option>
+        <option value="paid">🟢 100% Quitado</option>
+      </select>
+      <select class="inp inp-sm" id="fTag" onchange="renderBoard()" style="width:auto">
+        <option value="">Todas as Tags</option>
       </select>
       <button class="btn btn-ghost btn-xs" id="btnClearBoardFilters" onclick="clearBoardFilters()" title="Limpar todos os filtros" style="color:var(--danger);display:none;align-items:center;gap:4px;border-radius:6px;padding:4px 8px">
         <i class="bi bi-x-circle"></i> Limpar filtros
@@ -113,6 +151,7 @@
   </div>
   <div class="board-col-pills" id="boardColPills"></div>
   <div class="board-outer"><div class="board" id="board"></div></div>
+  <img src="LOGO NOVA.png" alt="" class="board-watermark-logo" onerror="this.style.display='none'">
 </div>
 
 
@@ -131,7 +170,13 @@
       <!-- COL 1 -->
       <div style="border-right:1px solid var(--border);padding-right:18px">
         <div class="sec">Detalhes</div>
-        <div class="fld"><label class="flbl">Cliente *</label><select class="inp inp-sm" id="projClient" onchange="handleClientChange()"><option value="">Selecione…</option></select></div>
+        <div class="fld">
+          <label class="flbl">Cliente *</label>
+          <select class="inp inp-sm" id="projClient" onchange="handleClientChange()"><option value="">Selecione…</option></select>
+          <div id="projClientDueDayBadge" style="display:none;font-size:11px;color:var(--accent);margin-top:3px;font-weight:600">
+            <i class="bi bi-calendar2-check"></i> Vencimento padrão: todo dia <b id="projClientDueDayVal">10</b>
+          </div>
+        </div>
         <div class="fld"><label class="flbl">Nome *</label><input class="inp inp-sm" id="projName" oninput="document.getElementById('projModalTitle').textContent=this.value||'Novo Projeto'"></div>
         
         <!-- SELETOR DE PRODUTOS CADASTRADOS DO CLIENTE (CRM) -->
@@ -140,13 +185,37 @@
           <select class="inp inp-sm" id="projClientProd" onchange="applyProjClientProd()"><option value="">Produto da tabela (opcional)…</option></select>
         </div>
         
-        <div class="row2">
-          <div class="fld"><label class="flbl">Tipo</label><select class="inp inp-sm project-type-select" id="projType"></select></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fld"><label class="flbl">Tipo</label><select class="inp inp-sm project-type-select" id="projType" onchange="onProjTypeChange()"></select></div>
           <div class="fld"><label class="flbl">Prioridade</label><select class="inp inp-sm" id="projPrio"><option value="Alta">🔴 Alta</option><option value="Média" selected>🟡 Média</option><option value="Baixa">🟢 Baixa</option></select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fld">
+            <label class="flbl" title="Rodada de alterações solicitadas pelo cliente">Revisão Atual</label>
+            <div style="display:flex;align-items:center;gap:2px">
+              <button type="button" class="cbtn" onclick="stepRevision(-1)" style="height:32px;width:26px;padding:0;border:1px solid var(--border);border-radius:4px">-</button>
+              <input type="number" min="0" max="99" class="inp inp-sm" id="projRevision" value="0" style="height:32px;text-align:center;padding:0 2px;flex:1">
+              <button type="button" class="cbtn" onclick="stepRevision(1)" style="height:32px;width:26px;padding:0;border:1px solid var(--border);border-radius:4px">+</button>
+            </div>
+          </div>
+          <div class="fld">
+            <label class="flbl" title="Quantidade de alterações inclusas sem custo adicional">Limite Incluso</label>
+            <input type="number" min="0" max="99" class="inp inp-sm" id="projRevLimit" value="2" placeholder="Ex: 2" style="height:32px;text-align:center">
+          </div>
         </div>
         <div class="row2">
           <div class="fld"><label class="flbl">Etapa (Coluna)</label><select class="inp inp-sm" id="projCol"></select></div>
           <div class="fld"><label class="flbl">Prazo de Entrega</label><input type="date" class="inp inp-sm" id="projDate"></div>
+        </div>
+        <div class="fld">
+          <label class="flbl"><i class="bi bi-tags"></i> Etiquetas / Tags</label>
+          <input class="inp inp-sm" id="projTags" placeholder="Ex: #AguardandoCliente, #Urgente, #RenderFinal">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+            <button type="button" class="btn btn-xs btn-ghost" onclick="addTagToInput('#AguardandoCliente')" style="font-size:10.5px;padding:2px 6px">+#AguardandoCliente</button>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="addTagToInput('#Urgente')" style="font-size:10.5px;padding:2px 6px">+#Urgente</button>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="addTagToInput('#MediçãoPendente')" style="font-size:10.5px;padding:2px 6px">+#MediçãoPendente</button>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="addTagToInput('#RenderFinal')" style="font-size:10.5px;padding:2px 6px">+#RenderFinal</button>
+          </div>
         </div>
         <div class="fld"><label class="flbl">Capa (URL da Imagem)</label><input class="inp inp-sm" id="projImage" placeholder="https://imagem.jpg"></div>
         <div class="fld">
@@ -178,53 +247,99 @@
           <div class="sec" style="margin:0">Tarefas do Projeto</div>
           <span class="badge" id="subProgress">0/0</span>
         </div>
-        <div style="display:flex;gap:7px;margin-bottom:14px">
-          <input class="inp inp-sm" id="newSubTask" placeholder="Nova tarefa…">
-          <button class="btn btn-primary btn-sm" onclick="addSubtask()">+</button>
+        <div style="display:flex;gap:7px;margin-bottom:14px;align-items:center">
+          <input class="inp inp-sm" id="newSubTask" placeholder="Nova tarefa…" style="height:32px">
+          <button type="button" class="btn btn-primary btn-sm" onclick="addSubtask()" title="Adicionar tarefa" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:8px;flex-shrink:0">
+            <i class="bi bi-plus-lg" style="font-size:13px"></i>
+          </button>
         </div>
         <div class="subs-box" id="subsContainer"></div>
       </div>
       
       <!-- COL 3 -->
       <div>
-        <div class="sec">Produtos Vinculados</div>
-        <div style="display:grid;grid-template-columns:1fr 90px 32px;gap:5px;margin-bottom:12px">
-          <input class="inp inp-sm" id="newProdName" placeholder="Serviço…">
-          <input type="text" inputmode="decimal" class="inp inp-sm" id="newProdPrice" placeholder="R$ 0,00" oninput="maskCurrencyInput(this)">
-          <button class="btn btn-primary btn-sm" onclick="addProdToProj()">+</button>
+        <!-- PRODUTOS VINCULADOS -->
+        <div class="sec" style="margin-bottom:6px">Produtos Vinculados</div>
+        <div style="display:grid;grid-template-columns:1fr 90px 32px;gap:5px;margin-bottom:8px;align-items:center">
+          <input class="inp inp-sm" id="newProdName" placeholder="Serviço…" style="height:32px">
+          <input type="text" inputmode="decimal" class="inp inp-sm" id="newProdPrice" placeholder="R$ 0,00" oninput="maskCurrencyInput(this)" style="height:32px">
+          <button type="button" class="btn btn-primary btn-sm" onclick="addProdToProj()" title="Adicionar produto" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:8px;flex-shrink:0">
+            <i class="bi bi-plus-lg" style="font-size:13px"></i>
+          </button>
         </div>
-        <div style="border:1px solid var(--border);border-radius:8px;max-height:140px;overflow-y:auto;margin-bottom:18px">
+        <div style="border:1px solid var(--border);border-radius:8px;max-height:110px;overflow-y:auto;margin-bottom:12px;background:var(--surface2)">
           <table style="width:100%;border-collapse:collapse;font-size:12px">
             <tbody id="projProdsTable"></tbody>
           </table>
         </div>
+
+        <!-- VALOR TOTAL DO CONTRATO -->
+        <div class="fld" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <label class="flbl" style="margin:0">Valor total do contrato</label>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnRebalanceInsts" style="font-size:10.5px;padding:1px 6px;display:none;color:var(--accent)" onclick="rebalanceInstallments()" title="Ajustar parcelas pendentes para cobrir a diferença do contrato">
+              <i class="bi bi-arrow-repeat"></i> Ajustar parcelas
+            </button>
+          </div>
+          <input type="text" inputmode="decimal" class="inp inp-sm" id="projValue" placeholder="R$ 0,00" oninput="maskCurrencyInput(this); onProjValueInput();">
+          <div style="font-size:10.5px;color:var(--text3);margin-top:2px"><i class="bi bi-info-circle"></i> Preenchido pelos produtos ou editado livremente</div>
+        </div>
+
+        <!-- CRONOGRAMA DE PARCELAS -->
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:4px">
+            <div class="sec" style="margin:0;font-size:11.5px"><i class="bi bi-calendar-event"></i> Cronograma de Parcelas</div>
+            <div style="display:flex;gap:3px;align-items:center">
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:9.5px;padding:1px 5px" onclick="generateSchedule5050()" title="Gerar 50% Entrada + 50% Entrega">
+                50/50
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:9.5px;padding:1px 5px" onclick="generateSchedule3x()" title="Gerar 3 parcelas iguais">
+                3x
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:9.5px;padding:1px 5px" onclick="generateScheduleSingleMonthly()" title="Gerar 1 cobrança mensal no dia habitual">
+                Mensalidade
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:9.5px;padding:1px 5px" onclick="generateScheduleMonthly()" title="Gerar parcelamento mensal em dia fixo (Nx)">
+                Parcelar
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:9.5px;padding:1px 5px" onclick="convertToVista()" title="Transformar em 1 parcela única quitada/à vista">
+                À Vista
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" style="font-size:9.5px;padding:1px 5px" onclick="addCustomInstallment()" title="Adicionar nova parcela ao cronograma">
+                <i class="bi bi-plus-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div class="insts-box" id="projInstsContainer" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px;background:var(--surface2)"></div>
+        </div>
         
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div class="sec" style="margin:0">Financeiro (Pagamentos)</div>
-          <span class="badge b-pago" id="payProgress">R$ 0,00</span>
+        <!-- RECEBIMENTOS (ENTRADAS) -->
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div class="sec" style="margin:0;font-size:11.5px"><i class="bi bi-cash-stack"></i> Recebimentos (Entradas)</div>
+            <span class="badge b-pago" id="payProgress" style="font-size:10.5px">R$ 0,00</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 76px 120px 32px;gap:5px;margin-bottom:6px;align-items:center">
+            <input type="text" inputmode="decimal" class="inp inp-sm" id="newPayAmount" placeholder="R$ Recebido" oninput="maskCurrencyInput(this)" style="font-size:11.5px;height:32px">
+            <select class="inp inp-sm" id="newPayMethod" title="Forma de pagamento" style="font-size:11px;padding:2px 4px;height:32px">
+              <option value="Pix">Pix</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Cartão">Cartão</option>
+              <option value="Transferência">Transf.</option>
+              <option value="Boleto">Boleto</option>
+              <option value="Outro">Outro</option>
+            </select>
+            <input type="date" class="inp inp-sm" id="newPayDate" style="font-size:11px;padding:2px 4px;height:32px">
+            <button type="button" class="btn btn-primary btn-sm" onclick="addPayment()" title="Registrar recebimento" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:8px;flex-shrink:0">
+              <i class="bi bi-plus-lg" style="font-size:13px"></i>
+            </button>
+          </div>
+          <div class="pays-box" id="paysContainer" style="max-height:110px;overflow-y:auto"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 82px 130px 32px;gap:5px;margin-bottom:12px">
-          <input type="text" inputmode="decimal" class="inp inp-sm" id="newPayAmount" placeholder="R$ Recebido" oninput="maskCurrencyInput(this)">
-          <select class="inp inp-sm" id="newPayMethod" title="Forma de pagamento">
-            <option value="Pix">Pix</option>
-            <option value="Dinheiro">Dinheiro</option>
-            <option value="Cartão">Cartão</option>
-            <option value="Transferência">Transf.</option>
-            <option value="Boleto">Boleto</option>
-            <option value="Outro">Outro</option>
-          </select>
-          <input type="date" class="inp inp-sm" id="newPayDate">
-          <button class="btn btn-primary btn-sm" onclick="addPayment()">+</button>
-        </div>
-        <div class="pays-box" id="paysContainer" style="max-height:120px;overflow-y:auto"></div>
-        <div class="fld" style="margin-top:14px;margin-bottom:12px">
-          <label class="flbl">Valor total do contrato</label>
-          <input type="text" inputmode="decimal" class="inp inp-sm" id="projValue" placeholder="R$ 0,00" oninput="maskCurrencyInput(this)">
-          <div style="font-size:11px;color:var(--text3);margin-top:3px"><i class="bi bi-info-circle"></i> Preenchido automaticamente se você adicionar produtos vinculados, mas pode ser editado direto aqui</div>
-        </div>
+        
         <div class="fld" style="margin-bottom:0">
           <label class="flbl"><i class="bi bi-chat-left-text"></i> Observações do Projeto</label>
-          <textarea class="inp" id="projNote" rows="3" placeholder="Dados técnicos, observações de obra..." style="resize:vertical"></textarea>
+          <textarea class="inp" id="projNote" rows="2" placeholder="Dados técnicos, observações de obra..." style="resize:vertical"></textarea>
         </div>
       </div>
     </div>
@@ -475,7 +590,9 @@
           <select class="inp inp-sm" id="waPresetSelect" style="width:auto;font-size:11.5px;padding:3px 8px" onchange="applyWaPreset(this.value)">
             <option value="default">Template Padrão</option>
             <option value="update">Atualização de Etapa</option>
-            <option value="payment">Lembrete de Pagamento</option>
+            <option value="payment">Resumo Financeiro</option>
+            <option value="installment">Lembrete de Parcela</option>
+            <option value="receipt">Comprovante de Pagamento</option>
             <option value="completed">Conclusão do Projeto</option>
           </select>
         </div>
@@ -496,13 +613,75 @@
 </div>
 </div>
 
-<!-- ══ SHARE LINK FALLBACK ══ -->
-<div class="overlay" id="shareLinkOverlay" onclick="if(event.target===this)this.classList.remove('open')">
-<div class="mbox msm">
-  <div class="mhdr"><h5><i class="bi bi-share"></i> Link do Cliente</h5><button class="btn-icon btn-sm" onclick="document.getElementById('shareLinkOverlay').classList.remove('open')"><i class="bi bi-x-lg"></i></button></div>
-  <div class="mbody">
-    <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Copie e envie ao cliente:</p>
-    <div style="display:flex;gap:7px"><input class="inp" id="shareLinkInput" readonly style="font-family:'Courier New',monospace;font-size:12px"><button class="btn btn-primary" onclick="copyShareInput()"><i class="bi bi-clipboard"></i></button></div>
+<!-- ══ MODAL DE SELEÇÃO DE SUBPASTAS DO PROJETO ══ -->
+<div class="overlay" id="projFoldersOverlay" onclick="if(event.target===this)closeProjFoldersModal()">
+<div class="mbox mmd">
+  <div class="mhdr">
+    <h5 style="color:var(--accent);display:flex;align-items:center;gap:8px">
+      <i class="bi bi-folder2-open"></i> <span id="pfModalTitle">Pastas do Projeto</span>
+    </h5>
+    <button class="btn-icon btn-sm" onclick="closeProjFoldersModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody" style="display:flex;flex-direction:column;gap:12px">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Caminho no Computador</div>
+      <div id="pfLocalPathText" style="font-size:12.5px;color:var(--text);font-family:monospace;word-break:break-all"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn btn-primary btn-sm" id="pfBtnRootFolder" style="flex:1;min-width:180px;display:flex;align-items:center;justify-content:center;gap:6px">
+        <i class="bi bi-folder-symlink"></i> Abrir Pasta Raiz
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm" id="pfBtnDriveFolder" style="display:none;align-items:center;gap:6px">
+        <i class="bi bi-cloud-arrow-up"></i> Abrir no Drive / Celular
+      </button>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+        <i class="bi bi-diagram-3"></i> Subpastas Rápidas
+      </div>
+      <div id="pfSubfoldersList" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto"></div>
+    </div>
+  </div>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center">
+    <button type="button" class="btn btn-ghost btn-sm" id="pfBtnEditPath" onclick="editFolderFromModal()" style="font-size:12px">
+      <i class="bi bi-pencil"></i> Alterar Caminho
+    </button>
+    <button type="button" class="btn btn-ghost" onclick="closeProjFoldersModal()">Fechar</button>
+  </div>
+</div>
+</div>
+
+<!-- ══ MODAL DE HISTÓRICO DE ALTERAÇÕES ══ -->
+<div class="overlay" id="revisionLogOverlay" onclick="if(event.target===this)closeRevisionLogModal()">
+<div class="mbox mmd">
+  <div class="mhdr">
+    <h5 style="color:var(--accent);display:flex;align-items:center;gap:8px">
+      <i class="bi bi-clock-history"></i> <span id="revLogModalTitle">Histórico de Alterações</span>
+    </h5>
+    <button class="btn-icon btn-sm" onclick="closeRevisionLogModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody" style="display:flex;flex-direction:column;gap:12px">
+    <div id="revLogSummaryBox" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between"></div>
+
+    <div class="fld">
+      <label class="flbl"><i class="bi bi-plus-circle"></i> Registrar Nova Solicitação de Alteração</label>
+      <div style="display:flex;gap:6px">
+        <input class="inp inp-sm" id="newRevLogText" placeholder="Ex: Cliente pediu troca da textura de madeira e tom da fachada…" style="flex:1">
+        <button type="button" class="btn btn-primary btn-sm" onclick="addNewRevisionLogEntry()" style="white-space:nowrap">
+          <i class="bi bi-plus-lg"></i> Adicionar
+        </button>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px"><i class="bi bi-journal-text"></i> Registro de Rodadas</div>
+      <div id="revLogsList" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto"></div>
+    </div>
+  </div>
+  <div class="mftr">
+    <button class="btn btn-ghost" onclick="closeRevisionLogModal()">Fechar</button>
   </div>
 </div>
 </div>

@@ -110,7 +110,12 @@
                 <span style="font-size:11px;color:var(--text3);display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="cliSubtitle">Cliente cadastrado</span>
               </div>
             </div>
-            <button id="cliDeleteBtn" class="cli-del-btn" title="Remover cliente"><i class="bi bi-trash3"></i></button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button id="btnSaveClientFull" class="btn btn-primary btn-sm" onclick="saveClientFull()" style="display:inline-flex;align-items:center;gap:6px;font-weight:600;padding:6px 14px;border-radius:8px">
+                <i class="bi bi-check2"></i> Salvar
+              </button>
+              <button id="cliDeleteBtn" class="cli-del-btn" title="Remover cliente"><i class="bi bi-trash3"></i></button>
+            </div>
           </div>
           
           <!-- MINI STATS DO CLIENTE (LTV / HISTÓRICO) -->
@@ -135,24 +140,26 @@
                 <input class="inp inp-sm" id="cliDoc" placeholder="000.000.000-00" oninput="maskDocInput(this)" onblur="checkDocValidity(this)">
               </div>
               <div>
+                <label class="flbl"><i class="bi bi-calendar2-check" style="color:var(--accent)"></i> Dia de Vencimento Padrão</label>
+                <input type="number" min="1" max="31" class="inp inp-sm" id="cliDueDay" placeholder="Ex: 10 (todo dia 10)">
+              </div>
+            </div>
+            <div class="cli-form-grid">
+              <div style="grid-column: span 2">
                 <label class="flbl"><i class="bi bi-geo-alt" style="color:var(--accent)"></i> Endereço</label>
                 <input class="inp inp-sm" id="cliAddress" placeholder="Rua, número, cidade">
               </div>
             </div>
-            <button class="btn btn-ghost btn-sm" style="width:100%" onclick="saveClientContact()"><i class="bi bi-check2"></i> Salvar Contato</button>
-            <div id="contactOkMsg" class="d-none" style="font-size:12px;color:var(--green);margin-top:6px;text-align:center"><i class="bi bi-check-circle"></i> Contato atualizado com sucesso!</div>
           </div>
           
           <!-- TOKEN DE ACESSO -->
           <div class="cli-section-box">
             <div class="sec">🔑 Token de Acesso</div>
             <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Senha do painel do cliente (sem espaços ou &amp;?#)</p>
-            <div class="cli-token-grid">
+            <div class="cli-token-grid" style="display:grid;grid-template-columns:1fr 34px;gap:6px">
               <input class="inp inp-sm" id="cliToken" placeholder="Ex: joao2025" style="font-family:'Courier New',monospace;letter-spacing:1px;font-weight:700">
-              <button class="btn btn-primary btn-sm" onclick="saveToken()"><i class="bi bi-check2-circle"></i> Salvar</button>
               <button class="btn btn-ghost btn-sm" onclick="genToken()" title="Gerar aleatório"><i class="bi bi-arrow-clockwise"></i></button>
             </div>
-            <div id="tokenOkMsg" class="d-none" style="font-size:12px;color:var(--green);margin-top:6px"><i class="bi bi-check-circle"></i> Token salvo!</div>
           </div>
           
           <!-- LINK DO PAINEL -->

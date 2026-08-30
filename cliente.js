@@ -925,6 +925,10 @@ function clientRequestRevision(projId) {
   const p = projects.find(x => x.id === projId);
   if (!p) return;
 
+  const targetCol = getRevisionTargetColumn();
+  const targetColEl = document.getElementById('revReqTargetCol');
+  if (targetColEl) targetColEl.textContent = targetCol;
+
   document.getElementById('revReqProjId').value = String(projId);
   document.getElementById('revReqNotes').value = '';
   document.getElementById('revisionRequestModal').classList.remove('d-none');

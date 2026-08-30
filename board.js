@@ -2364,7 +2364,13 @@ function toggleSendToClientReview(event, projId) {
             {
               title: 'Avisar Cliente no WhatsApp',
               icon: 'bi bi-whatsapp',
-              okText: 'Abrir WhatsApp'
+              okText: 'Abrir WhatsApp',
+              extraBtn: {
+                text: 'Copiar Mensagem',
+                icon: 'bi bi-clipboard',
+                className: 'btn btn-ghost',
+                onClick: () => copyWhatsAppApprovalRequest(p.id)
+              }
             }
           );
         } else {
@@ -2389,10 +2395,42 @@ function toggleSendToClientReview(event, projId) {
         icon: 'bi bi-bell-fill',
         okText: 'Avisar no WhatsApp',
         danger: false,
-        cancelText: 'Fechar'
+        cancelText: 'Cancelar',
+        extraBtn: {
+          text: 'Copiar Mensagem',
+          icon: 'bi bi-clipboard',
+          className: 'btn btn-ghost',
+          onClick: () => copyWhatsAppApprovalRequest(p.id)
+        }
       }
     );
   }
+}
+
+function getWhatsAppApprovalMessage(projId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p) return '';
+  const cl = clients.find(c => (c.name || '').toLowerCase().trim() === (p.client || '').toLowerCase().trim());
+  if (cl && !cl.token) {
+    cl.token = genTokenStr();
+    scheduleSync();
+  }
+  const clientFirstName = (cl?.name || p.client || 'Cliente').trim().split(' ')[0];
+  const link = cl?.token ? buildLink(cl.name, cl.token) : '';
+
+  let msg = `Olá, *${clientFirstName}*! Tudo bem?\n\n`;
+  msg += `Seu projeto *${p.name}* está pronto para sua avaliação e aprovação! 🌟\n\n`;
+  if (link) {
+    msg += `Acesse seu painel exclusivo para conferir e aprovar com 1 clique:\n👉 ${link}\n\n`;
+  }
+  msg += `Qualquer dúvida ou ajuste necessário, estou à disposição!`;
+  return msg;
+}
+
+function copyWhatsAppApprovalRequest(projId) {
+  const msg = getWhatsAppApprovalMessage(projId);
+  if (!msg) return showToast('Projeto não encontrado', 'warning');
+  copyTextToClipboard(msg, 'Mensagem copiada para a área de transferência! 📋');
 }
 
 function openWhatsAppApprovalRequest(projId) {
@@ -2403,17 +2441,18 @@ function openWhatsAppApprovalRequest(projId) {
 
   const raw = cl.phone.replace(/\D/g, '');
   const num = raw.length <= 11 ? '55' + raw : raw;
-  const clientFirstName = (cl.name || 'Cliente').trim().split(' ')[0];
-  const link = cl.token ? buildLink(cl.name, cl.token) : '';
+  const msg = getWhatsAppApprovalMessage(projId);
 
-  let msg = `Olá, *${clientFirstName}*! Tudo bem?\n\n`;
-  msg += `Seu projeto *${p.name}* está pronto para sua avaliação e aprovação! 🌟\n\n`;
-  if (link) {
-    msg += `Acesse seu painel exclusivo para conferir e aprovar com 1 clique:\n👉 ${link}\n\n`;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(msg).then(() => {
+      showToast('Mensagem copiada e abrindo WhatsApp! 📱', 'success');
+      setTimeout(() => window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank'), 200);
+    }).catch(() => {
+      window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
+    });
+  } else {
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
   }
-  msg += `Qualquer dúvida ou ajuste necessário, estou à disposição!`;
-
-  window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 // ══════════════════════════════════════════

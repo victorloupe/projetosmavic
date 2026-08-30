@@ -1082,33 +1082,121 @@ function showToast(msg,type='success'){
   }));
 }
 
+function copyTextToClipboard(text, successMsg = 'Copiado para a área de transferência! 📋') {
+  if (!text) return;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+      .then(() => showToast(successMsg, 'success'))
+      .catch(() => fallbackCopyText(text, successMsg));
+  } else {
+    fallbackCopyText(text, successMsg);
+  }
+}
+
+function fallbackCopyText(text, successMsg) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    ta.style.left = '-9999px';
+    ta.setAttribute('readonly', '');
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (successful) {
+      showToast(successMsg || 'Copiado para a área de transferência! 📋', 'success');
+      return;
+    }
+  } catch (err) {}
+  const shareInput = document.getElementById('shareLinkInput');
+  const shareOverlay = document.getElementById('shareLinkOverlay');
+  if (shareInput && shareOverlay) {
+    shareInput.value = text;
+    shareOverlay.classList.add('open');
+  } else {
+    showToast('Não foi possível copiar automaticamente.', 'warning');
+  }
+}
+
 // ══════════════════════════════════════════
 //  CONFIRM MODAL (substitui o confirm() nativo do navegador)
 // ══════════════════════════════════════════
-// Injeta o modal uma única vez, no padrão visual do sistema (.overlay/.mbox),
-// pra nenhuma página precisar duplicar esse HTML.
 (function injectConfirmModal(){
-  if(document.getElementById('confirmOverlay')) return;
-  const wrap=document.createElement('div');
-  wrap.innerHTML=`<div class="overlay" id="confirmOverlay" onclick="if(event.target===this)closeConfirm()">
-    <div class="mbox msm">
-      <div class="mhdr"><h5 id="confirmTitle" style="color:var(--accent)"><i class="bi bi-question-circle"></i> Confirmar ação</h5></div>
-      <div class="mbody"><p id="confirmMsg" style="font-size:14px;color:var(--text2);line-height:1.5;margin:0"></p></div>
-      <div class="mftr"><button class="btn btn-ghost" onclick="closeConfirm()">Cancelar</button><button class="btn btn-danger" id="confirmBtnOk">Confirmar</button></div>
-    </div>
-  </div>`;
-  document.body.appendChild(wrap.firstElementChild);
+  let overlay = document.getElementById('confirmOverlay');
+  if (!overlay) {
+    const wrap=document.createElement('div');
+    wrap.innerHTML=`<div class="overlay" id="confirmOverlay" onclick="if(event.target===this)closeConfirm()">
+      <div class="mbox msm" style="max-width:440px">
+        <div class="mhdr">
+          <h5 id="confirmTitle" style="color:var(--accent);display:flex;align-items:center;gap:6px"><i class="bi bi-question-circle"></i> Confirmar ação</h5>
+          <button class="btn-icon btn-sm" onclick="closeConfirm()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="mbody"><div id="confirmMsg" style="font-size:14px;color:var(--text2);line-height:1.5;margin:0"></div></div>
+        <div class="mftr" id="confirmFooter" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="confirmBtnCancel" onclick="closeConfirm()">Cancelar</button>
+          <div id="confirmExtraBtns" style="display:inline-flex;gap:8px"></div>
+          <button class="btn btn-danger" id="confirmBtnOk">Confirmar</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(wrap.firstElementChild);
+  }
 })();
 
 let _confirmCallback=null;
 function showConfirm(message,onConfirm,opts={}){
   const overlay=document.getElementById('confirmOverlay');
-  if(!overlay){ onConfirm(); return; } // fallback de segurança, nunca deve cair aqui
-  document.getElementById('confirmTitle').innerHTML=`<i class="${opts.icon||'bi bi-question-circle'}"></i> ${opts.title||'Confirmar ação'}`;
-  document.getElementById('confirmMsg').innerHTML=message;
+  if(!overlay){ onConfirm(); return; }
+  
+  const titleEl = document.getElementById('confirmTitle');
+  if (titleEl) titleEl.innerHTML=`<i class="${opts.icon||'bi bi-question-circle'}"></i> ${opts.title||'Confirmar ação'}`;
+  
+  const msgEl = document.getElementById('confirmMsg');
+  if (msgEl) msgEl.innerHTML=message;
+  
+  const btnCancel = document.getElementById('confirmBtnCancel');
+  if (btnCancel) {
+    btnCancel.textContent = opts.cancelText || 'Cancelar';
+    btnCancel.style.display = opts.hideCancel ? 'none' : 'inline-flex';
+  }
+
+  const extraContainer = document.getElementById('confirmExtraBtns');
+  if (extraContainer) {
+    extraContainer.innerHTML = '';
+    const extraList = Array.isArray(opts.extraBtns) ? opts.extraBtns : (opts.extraBtn ? [opts.extraBtn] : []);
+    extraList.forEach(btnInfo => {
+      if (!btnInfo) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = btnInfo.className || 'btn btn-ghost';
+      if (btnInfo.style) btn.style.cssText = btnInfo.style;
+      btn.innerHTML = (btnInfo.icon ? `<i class="${btnInfo.icon}"></i> ` : '') + (btnInfo.text || 'Copiar');
+      if (btnInfo.title) btn.title = btnInfo.title;
+      btn.onclick = (e) => {
+        if (typeof btnInfo.onClick === 'function') {
+          btnInfo.onClick(e);
+        }
+        if (btnInfo.closeOnClick) {
+          closeConfirm();
+        }
+      };
+      extraContainer.appendChild(btn);
+    });
+  }
+
   const btn=document.getElementById('confirmBtnOk');
-  btn.textContent=opts.okText||'Confirmar';
-  btn.className=opts.danger===false?'btn btn-primary':'btn btn-danger';
+  if (btn) {
+    btn.textContent=opts.okText||'Confirmar';
+    btn.className=opts.danger===false?'btn btn-primary':'btn btn-danger';
+    if (opts.okIcon) {
+      btn.innerHTML = `<i class="${opts.okIcon}"></i> ${opts.okText || 'Confirmar'}`;
+    }
+    btn.style.display = opts.hideOk ? 'none' : 'inline-flex';
+  }
+  
   _confirmCallback=onConfirm;
   overlay.classList.add('open');
 }

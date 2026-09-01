@@ -1135,7 +1135,7 @@ function fallbackCopyText(text, successMsg) {
           <button class="btn-icon btn-sm" onclick="closeConfirm()"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="mbody"><div id="confirmMsg" style="font-size:14px;color:var(--text2);line-height:1.5;margin:0"></div></div>
-        <div class="mftr" id="confirmFooter" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:nowrap">
+        <div class="mftr confirm-ftr" id="confirmFooter">
           <button class="btn btn-ghost" id="confirmBtnCancel" onclick="closeConfirm()">Cancelar</button>
           <div id="confirmExtraBtns" style="display:inline-flex;gap:8px"></div>
           <button class="btn btn-danger" id="confirmBtnOk">Confirmar</button>
@@ -1210,7 +1210,8 @@ function closeConfirm(){
   _confirmCallback=null;
 }
 document.addEventListener('click',(e)=>{
-  if(e.target && e.target.id==='confirmBtnOk'){
+  // closest(): o botão pode conter um <i>, e nesse caso e.target é o ícone
+  if(e.target && e.target.closest && e.target.closest('#confirmBtnOk')){
     const cb=_confirmCallback;
     closeConfirm();
     if(cb) cb();

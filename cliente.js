@@ -305,15 +305,19 @@ async function loadData(){
 // ══════════════════════════════════════════
 async function postEdgeFn(body){
   try{
-    await fetch(EDGE_FN,{
+    const res = await fetch(EDGE_FN,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({...body, nome:clientName, token:clientToken})
     });
-  }catch(e){console.warn('Falha ao sincronizar com Edge Function:', e);}
+    return !!(res && res.ok);
+  }catch(e){console.warn('Falha ao sincronizar com Edge Function:', e); return false;}
 }
 
+// Retorna true se a mudança chegou ao servidor (Supabase direto ou Edge Function).
 async function syncProjectChangeToServer(updatedProj) {
+  let remoteOk = false;
+
   // 1. Atualiza cache local do cliente
   try {
     localStorage.setItem('mavic_projects_' + clientName, JSON.stringify(projects));
@@ -378,7 +382,8 @@ async function syncProjectChangeToServer(updatedProj) {
               upsertPayload.push({ key: 'notifications', data: notifList });
             }
 
-            await sb.from('mavic_store').upsert(upsertPayload, { onConflict: 'key' });
+            const { error: upErr } = await sb.from('mavic_store').upsert(upsertPayload, { onConflict: 'key' });
+            if (!upErr) remoteOk = true;
           }
         }
       }
@@ -389,12 +394,15 @@ async function syncProjectChangeToServer(updatedProj) {
 
   // 4. Também notifica via Edge Function
   try {
-    await postEdgeFn({
+    const edgeOk = await postEdgeFn({
       action: updatedProj.column === 'Desenvolvimento' ? 'request_revision' : 'approve_project',
       projectId: updatedProj.id,
       notes: updatedProj.notes
     });
+    if (edgeOk) remoteOk = true;
   } catch (e) {}
+
+  return remoteOk;
 }
 
 function showError(icon,title,msg){
@@ -535,10 +543,32 @@ function deleteNotice(id, type) {
 //  CONFIRM MODAL (substitui o confirm() nativo do navegador)
 // ══════════════════════════════════════════
 let _confirmCallback = null;
-function showConfirm(message, onConfirm) {
+function showConfirm(message, onConfirm, opts = {}) {
   const overlay = document.getElementById('confirmOverlay');
   if (!overlay) { onConfirm(); return; }
+
+  const titleEl = document.getElementById('confirmTitle');
+  if (titleEl) titleEl.innerHTML = `<i class="${opts.icon || 'bi bi-question-circle'}"></i> ${opts.title || 'Confirmar ação'}`;
+
   document.getElementById('confirmMsg').innerHTML = message;
+
+  const cancelBtn = document.getElementById('confirmBtnCancel');
+  if (cancelBtn) cancelBtn.textContent = opts.cancelText || 'Cancelar';
+
+  const okBtn = document.getElementById('confirmBtnOk');
+  if (okBtn) {
+    okBtn.innerHTML = (opts.okIcon ? `<i class="${opts.okIcon}"></i> ` : '') + (opts.okText || 'Confirmar');
+    if (opts.danger === false) {
+      okBtn.style.background = 'var(--green)';
+      okBtn.style.border = '1px solid var(--green)';
+      okBtn.style.color = '#fff';
+    } else {
+      okBtn.style.background = 'var(--red-bg)';
+      okBtn.style.border = '1px solid var(--red)';
+      okBtn.style.color = 'var(--red)';
+    }
+  }
+
   _confirmCallback = onConfirm;
   overlay.classList.remove('d-none');
 }
@@ -546,12 +576,15 @@ function closeConfirm() {
   document.getElementById('confirmOverlay')?.classList.add('d-none');
   _confirmCallback = null;
 }
+// Chamado diretamente pelo onclick do botão (o .modal-card usa stopPropagation,
+// então um listener delegado no document nunca receberia este clique).
+function confirmYes() {
+  const cb = _confirmCallback;
+  closeConfirm();
+  if (cb) cb();
+}
 document.addEventListener('click', (e) => {
-  if (e.target && e.target.id === 'confirmBtnOk') {
-    const cb = _confirmCallback;
-    closeConfirm();
-    if (cb) cb();
-  }
+  if (e.target && e.target.closest && e.target.closest('#confirmBtnOk')) confirmYes();
 });
 
 async function dismissGlobalNotice(id) {
@@ -911,12 +944,22 @@ function clientApproveProject(projId) {
       calcFinance();
       showToast('🎉 Projeto aprovado com sucesso! Muito obrigado!', 'success');
 
-      await syncProjectChangeToServer({
+      const ok = await syncProjectChangeToServer({
         id: p.id,
         column: 'Concluído',
         clientApproved: true,
         clientApprovedAt: p.clientApprovedAt
       });
+      if (!ok) {
+        showToast('Não conseguimos confirmar a aprovação no servidor. Verifique sua conexão ou avise o escritório.', 'warning');
+      }
+    },
+    {
+      title: 'Aprovar Projeto',
+      icon: 'bi bi-check-circle-fill',
+      okText: 'Sim, aprovar',
+      okIcon: 'bi bi-check-lg',
+      danger: false
     }
   );
 }
@@ -978,13 +1021,16 @@ async function submitRevisionRequest() {
   calcFinance();
   showToast(`Solicitação de ajustes enviada! O projeto retornou para ${targetCol}.`, 'success');
 
-  await syncProjectChangeToServer({
+  const ok = await syncProjectChangeToServer({
     id: p.id,
     column: targetCol,
     revisions: p.revisions,
     revisionLogs: p.revisionLogs,
     notes: notes
   });
+  if (!ok) {
+    showToast('Não conseguimos confirmar a solicitação no servidor. Verifique sua conexão ou avise o escritório.', 'warning');
+  }
 }
 
 function scrollToNotif(e,projectName){

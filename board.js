@@ -576,6 +576,12 @@ function createCardHTML(p, cardIdx=0){
     bellTitle = `✓ Aprovado pelo cliente${p.clientApprovedAt ? ' em ' + new Date(p.clientApprovedAt).toLocaleDateString('pt-BR') : ''}`;
   }
 
+  const pTimeLogs = p.timeLogs || [];
+  const pTotalMins = pTimeLogs.reduce((s, l) => s + parseInt(l.minutes || 0), 0);
+  const pTimeStr = formatMinutes(pTotalMins);
+  const activeTimer = (typeof getActiveTimer === 'function') ? getActiveTimer() : null;
+  const isRunningOnThis = activeTimer && activeTimer.projectId === p.id && !activeTimer.pausedAt;
+
   return `<div class="kcard ${dlClass} ${pinnedCards.has(p.id)?'pinned':''}" data-id="${p.id}" draggable="true" onclick="togglePin(event,${p.id})" style="--type-color:${typeColor(p.type)}">
     ${subs.length?`<div class="kcard-prog-bar"><div class="kcard-prog-fill" style="width:${subPct}%;background:${progColor}"></div></div>`:''}
     ${p.image?`<img src="${p.image}" class="kcard-cover" onerror="this.style.display='none'">`:''}
@@ -604,6 +610,12 @@ function createCardHTML(p, cardIdx=0){
           <span class="badge" style="background:${typeBg(p.type)};color:${typeColor(p.type)}">${p.type}</span>
           ${p.originBudgetNumber?`<a href="orcamento.html" class="proj-origin-badge" title="Orçamento de Origem #${p.originBudgetNumber}" onclick="event.stopPropagation()"><i class="bi bi-file-earmark-spreadsheet"></i> #${p.originBudgetNumber}</a>`:''}
           ${tagsHtml}
+          <span class="card-time-badge ${isRunningOnThis ? 'running' : ''}" onclick="openTimeTracker(${p.id});event.stopPropagation()" title="${isRunningOnThis ? 'Cronômetro ativo — clique para ver detalhes' : 'Total trabalhado: clique para apontar horas'}">
+            <i class="bi ${isRunningOnThis ? 'bi-stopwatch-fill' : 'bi-stopwatch'}"></i> ${pTimeStr}
+          </span>
+          <button type="button" class="btn-card-timer ${isRunningOnThis ? 'active' : ''}" onclick="toggleGlobalTimer(${p.id});event.stopPropagation()" title="${isRunningOnThis ? 'Pausar/Ver cronômetro' : 'Iniciar cronômetro nesta etapa'}">
+            <i class="bi ${isRunningOnThis ? 'bi-pause-fill' : 'bi-play-fill'}"></i>
+          </button>
         </div>
         ${revCount > 0 ? `<span class="badge b-rev" style="margin:0 auto" title="Rodada de alteração ${revCount}">Rev ${revCount}</span>` : ''}
         ${!isFinalColumn(p.column)?`<span class="badge ${pMap[p.priority]||'b-baixa'}" style="margin-left:auto">${pIcon[p.priority]||'🟢'} ${p.priority}</span>`:''}
@@ -614,6 +626,7 @@ function createCardHTML(p, cardIdx=0){
       ${instBadge}
       ${finHtml}${checkHtml}${noteHtml}${revHtml}${latestClientRevNoteHtml}
       <div class="cact">
+        <button class="cbtn" style="color:var(--accent)" onclick="openTimeTracker(${p.id});event.stopPropagation()" title="Apontamento de Horas & Lucratividade"><i class="bi bi-stopwatch"></i></button>
         <button class="cbtn ntf" onclick="openNotifyModal(${p.id});event.stopPropagation()" title="Notificar cliente"><i class="bi bi-bell"></i></button>
         <button class="cbtn" style="color:#25D366" onclick="openWhatsApp(${p.id});event.stopPropagation()" title="Enviar WhatsApp"><i class="bi bi-whatsapp"></i></button>
         <button class="cbtn shr" onclick="shareLink(${p.id});event.stopPropagation()" title="Link do cliente"><i class="bi bi-share"></i></button>
@@ -640,10 +653,14 @@ function createCompactCardHTML(p){
     ? (hasFolder ? `Abrir pasta na nuvem: ${escapeHtml(p.driveLink || p.localPath)}` : 'Vincular pasta na nuvem (Drive)')
     : (hasFolder ? `Abrir pasta no PC: ${escapeHtml(p.localPath)}${subText}` : 'Vincular pasta no computador');
 
+  const pTimeLogs = p.timeLogs || [];
+  const pTotalMins = pTimeLogs.reduce((s, l) => s + parseInt(l.minutes || 0), 0);
+  const pTimeStr = formatMinutes(pTotalMins);
+
   return `<div class="kcard-compact" data-id="${p.id}" draggable="true">
     <div class="kcard-compact-info" onclick="editProject(${p.id})">
       <div class="kcard-compact-name">${escapeHtml(p.name)}</div>
-      <div class="kcard-compact-sub">${escapeHtml(p.client||'—')} · ${escapeHtml(p.column)}</div>
+      <div class="kcard-compact-sub">${escapeHtml(p.client||'—')} · ${escapeHtml(p.column)} <span class="card-time-badge" style="font-size:9.5px;padding:1px 4px;margin-left:4px" onclick="openTimeTracker(${p.id});event.stopPropagation()"><i class="bi bi-stopwatch"></i> ${pTimeStr}</span></div>
     </div>
     <div class="kcard-compact-acts">
       <button class="btn btn-ghost btn-sm ${hasFolder ? 'has-local' : ''}" onclick="openCardFolder(event, ${p.id})" title="${folderTitle}"><i class="bi ${folderIcon}"></i></button>
@@ -729,25 +746,39 @@ function bindCardDragEvents(card){
       card.classList.remove('drag-target-image');
     }
   });
-  card.addEventListener('drop', e => {
+  card.addEventListener('drop', async e => {
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
       if (file && file.type && file.type.startsWith('image/')) {
         e.preventDefault();
         e.stopPropagation();
         card.classList.remove('drag-target-image');
-        const reader = new FileReader();
-        reader.onload = (re) => {
-          const id = parseInt(card.dataset.id);
-          const p = projects.find(x => x.id === id);
-          if (p) {
-            p.image = re.target.result;
-            renderBoard();
-            scheduleSync();
-            showToast(`Capa do projeto "${p.name}" atualizada!`, 'success');
+        const id = parseInt(card.dataset.id);
+        const p = projects.find(x => x.id === id);
+        if (!p) return;
+
+        showToast(`Enviando capa do projeto "${p.name}" para a nuvem...`, 'info');
+        try {
+          let publicUrl = '';
+          if (typeof uploadToSupabaseStorage === 'function') {
+            publicUrl = await uploadToSupabaseStorage(file, 'covers');
+          } else {
+            const re = await new Promise((res, rej) => {
+              const r = new FileReader();
+              r.onload = () => res(r.result);
+              r.onerror = rej;
+              r.readAsDataURL(file);
+            });
+            publicUrl = re;
           }
-        };
-        reader.readAsDataURL(file);
+          p.image = publicUrl;
+          renderBoard();
+          scheduleSync();
+          showToast(`Capa do projeto "${p.name}" atualizada com sucesso!`, 'success');
+        } catch(err) {
+          console.error('Falha ao subir capa:', err);
+          showToast('Erro ao enviar capa para o Supabase Storage. Verifique se o bucket "mavic_files" foi criado.', 'error');
+        }
       }
     }
   });
@@ -906,6 +937,12 @@ function openProjectModal(id=null){
     tempPaymentCondition=p.paymentCondition||'';
     tempSelectedFolders=p.selectedFolders ? [...p.selectedFolders] : null;
     document.getElementById('btnDelProj').style.display='block';
+    const ttBtn = document.getElementById('btnProjTimeTracker');
+    if (ttBtn) {
+      const pMins = (p.timeLogs || []).reduce((s, l) => s + parseInt(l.minutes || 0), 0);
+      ttBtn.style.display = 'inline-flex';
+      ttBtn.innerHTML = `<i class="bi bi-stopwatch" style="color:var(--accent)"></i> Horas (${formatMinutes(pMins)}) & Lucro`;
+    }
     document.getElementById('btnArchProj').textContent=p.archived?'Desarquivar':'Arquivar';
     
     handleClientChange(true);
@@ -928,9 +965,72 @@ function openProjectModal(id=null){
     document.getElementById('projNote').value='';
     tempSubs=[];tempPayments=[];tempProds=[];tempInstallments=[];tempPaymentCondition='';tempSelectedFolders=null;
     document.getElementById('btnDelProj').style.display='none';
+    const ttBtn = document.getElementById('btnProjTimeTracker');
+    if (ttBtn) ttBtn.style.display = 'none';
   }
+  updateProjCoverPreview();
   renderSubsList();renderPaymentsModal();renderProjProdsTable();
   document.getElementById('projectOverlay').classList.add('open');
+}
+
+function updateProjCoverPreview() {
+  const urlInp = document.getElementById('projImage');
+  const previewBox = document.getElementById('projCoverPreviewBox');
+  const previewImg = document.getElementById('projCoverPreviewImg');
+  if (!urlInp || !previewBox || !previewImg) return;
+  const url = urlInp.value.trim();
+  if (url) {
+    previewImg.src = url;
+    previewBox.style.display = 'block';
+  } else {
+    previewBox.style.display = 'none';
+    previewImg.src = '';
+  }
+}
+
+function removeProjCoverImage() {
+  const urlInp = document.getElementById('projImage');
+  if (urlInp) urlInp.value = '';
+  updateProjCoverPreview();
+}
+
+async function handleProjImageFileSelect(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  const btn = document.getElementById('btnUploadProjCover');
+  const origHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin" style="width:12px;height:12px;display:inline-block"></span> Enviando...';
+  }
+  showToast('Enviando imagem para a nuvem...', 'info');
+  try {
+    let publicUrl = '';
+    if (typeof uploadToSupabaseStorage === 'function') {
+      publicUrl = await uploadToSupabaseStorage(file, 'covers');
+    } else {
+      const re = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      publicUrl = re;
+    }
+    const urlInp = document.getElementById('projImage');
+    if (urlInp) urlInp.value = publicUrl;
+    updateProjCoverPreview();
+    showToast('Capa enviada com sucesso!', 'success');
+  } catch(err) {
+    console.error('Falha no upload da capa:', err);
+    showToast('Falha ao enviar imagem. Verifique se o bucket "mavic_files" foi criado no Supabase.', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+    input.value = '';
+  }
 }
 
 function stepRevision(delta){

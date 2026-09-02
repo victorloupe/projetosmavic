@@ -2632,18 +2632,19 @@ function compressOrcImage(file, maxDimension = 1200, quality = 0.82) {
 async function handleOrcFilesSelected(files) {
   if (!files || !files.length) return;
   
-  showToast(`Processando ${files.length} arquivo(s)...`, 'info');
+  showToast(`Enviando ${files.length} arquivo(s) para a nuvem...`, 'info');
   
+  let successCount = 0;
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const isImg = file.type ? file.type.startsWith('image/') : /\.(jpg|jpeg|png|webp|gif)$/i.test(file.name);
     
     try {
-      let dataUrl = '';
-      if (isImg) {
-        dataUrl = await compressOrcImage(file, 1200, 0.82);
+      let fileUrl = '';
+      if (typeof uploadToSupabaseStorage === 'function') {
+        fileUrl = await uploadToSupabaseStorage(file, 'budgets');
       } else {
-        dataUrl = await new Promise((res, rej) => {
+        fileUrl = isImg ? await compressOrcImage(file, 1200, 0.82) : await new Promise((res, rej) => {
           const r = new FileReader();
           r.onload = () => res(r.result);
           r.onerror = rej;
@@ -2657,16 +2658,21 @@ async function handleOrcFilesSelected(files) {
         type: file.type || 'application/octet-stream',
         size: formatFileSize(file.size),
         isImage: isImg,
-        data: dataUrl,
+        url: fileUrl,
+        data: fileUrl,
         createdAt: new Date().toISOString()
       });
+      successCount++;
     } catch (err) {
-      console.error('Erro ao ler arquivo:', err);
+      console.error('Erro ao subir arquivo:', err);
+      showToast(`Falha ao enviar "${file.name}". Verifique se o bucket "mavic_files" foi criado no Supabase.`, 'error');
     }
   }
   
   renderOrcAttachments();
-  showToast('Arquivos anexados com sucesso!', 'success');
+  if (successCount > 0) {
+    showToast(`${successCount} arquivo(s) anexado(s) com sucesso!`, 'success');
+  }
   
   const inp = document.getElementById('orcFileInput');
   if (inp) inp.value = '';
@@ -2721,7 +2727,8 @@ function renderOrcAttachments() {
   
   grid.innerHTML = tempOrcAttachments.map(att => {
     const iconClass = getFileIconClass(att.name, att.type);
-    const isImg = att.isImage && att.data;
+    const fileSrc = att.url || att.data;
+    const isImg = att.isImage && fileSrc;
     
     return `
       <div class="orc-attachment-card" data-id="${att.id}">
@@ -2730,7 +2737,7 @@ function renderOrcAttachments() {
         </button>
         <div class="orc-attach-preview-box" onclick="viewOrcAttachment('${att.id}')" title="Clique para visualizar">
           ${isImg 
-            ? `<img src="${att.data}" alt="${escapeHtml(att.name)}" class="orc-attach-thumb">`
+            ? `<img src="${fileSrc}" alt="${escapeHtml(att.name)}" class="orc-attach-thumb" crossorigin="anonymous">`
             : `<i class="bi ${iconClass} orc-attach-icon"></i>`
           }
         </div>
@@ -2769,13 +2776,17 @@ function viewOrcAttachment(id) {
   
   if (!overlay) return;
   
+  const fileSrc = att.url || att.data;
   title.textContent = att.name;
-  dlBtn.href = att.data;
+  dlBtn.href = fileSrc;
   dlBtn.download = att.name;
+  if (fileSrc && fileSrc.startsWith('http')) {
+    dlBtn.target = '_blank';
+  }
   
   if (att.isImage) {
     icon.className = 'bi bi-image';
-    imgEl.src = att.data;
+    imgEl.src = fileSrc;
     imgEl.style.display = 'block';
     docWrap.style.display = 'none';
   } else {
@@ -2786,7 +2797,10 @@ function viewOrcAttachment(id) {
     docIcon.className = `bi ${iconClass}`;
     docName.textContent = att.name;
     docSize.textContent = att.size || '';
-    docOpenBtn.href = att.data;
+    docOpenBtn.href = fileSrc;
+    if (fileSrc && fileSrc.startsWith('http')) {
+      docOpenBtn.target = '_blank';
+    }
   }
   
   overlay.classList.add('open');

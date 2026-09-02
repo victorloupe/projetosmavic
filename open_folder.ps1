@@ -64,6 +64,11 @@ try {
         $targetPath = $targetPath.TrimEnd('\')
     }
 
+    # Valida se e um caminho absoluto valido no Windows (ex: C:\... ou \\servidor\pasta)
+    if ($targetPath -notmatch '^[a-zA-Z]:\\' -and $targetPath -notmatch '^\\\\') {
+        exit
+    }
+
     # 5. Cria a pasta raiz do projeto se nao existir
     if (-not (Test-Path -LiteralPath $targetPath)) {
         New-Item -ItemType Directory -Path $targetPath -Force | Out-Null

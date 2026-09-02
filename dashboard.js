@@ -78,6 +78,12 @@ function renderDashboard(){
     const periodSub = period === 'month' ? 'deste mês' : period === 'year' ? `em ${currentYear}` : 'ativos';
     const totalClientsCount = Array.isArray(clients) ? clients.length : 0;
 
+    let totalMinutesWorked = 0;
+    active.forEach(p => {
+      (p.timeLogs || []).forEach(l => { totalMinutesWorked += parseInt(l.minutes || 0); });
+    });
+    const totalHoursWorked = (totalMinutesWorked / 60).toFixed(1);
+
     dashCards.innerHTML = `
       <div class="dash-card dc-accent">
         <div class="dc-top"><div class="dc-lbl">Faturamento Total</div><div class="dc-icon" style="background:var(--accent-bg);color:var(--accent)"><i class="bi bi-cash-stack"></i></div></div>
@@ -93,6 +99,11 @@ function renderDashboard(){
         <div class="dc-top"><div class="dc-lbl">Saldo a Receber</div><div class="dc-icon" style="background:var(--red-bg);color:var(--red)"><i class="bi bi-hourglass-split"></i></div></div>
         <div class="dc-val">${fmt(totalPend)}</div>
         <div class="dc-sub">${pendingProjs.length} projetos com pendência</div>
+      </div>
+      <div class="dash-card">
+        <div class="dc-top"><div class="dc-lbl">Horas Trabalhadas</div><div class="dc-icon" style="background:var(--accent-bg);color:var(--accent)"><i class="bi bi-stopwatch"></i></div></div>
+        <div class="dc-val" style="color:var(--accent)">${totalHoursWorked}h</div>
+        <div class="dc-sub">${formatMinutes(totalMinutesWorked)} apontados</div>
       </div>
       <div class="dash-card">
         <div class="dc-top"><div class="dc-lbl">Concluídos</div><div class="dc-icon" style="background:var(--green-bg);color:var(--green)"><i class="bi bi-flag"></i></div></div>

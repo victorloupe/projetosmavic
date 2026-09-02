@@ -140,6 +140,22 @@ function renderRelatorios() {
   }
   const pendingBudgetsVal = activeBudgets.reduce((s, b) => s + Math.max(0, parseFloat(b.total || 0) - (parseFloat(b.discount) || 0)), 0);
   
+  let totalFilteredMinutes = 0;
+  let totalFilteredLogsCount = 0;
+  billingProjects.forEach(p => {
+    (p.timeLogs || []).forEach(l => {
+      let lDate = l.date;
+      let matchDate = true;
+      if (yearFilter && (!lDate || !lDate.startsWith(yearFilter))) matchDate = false;
+      if (monthFilter && (!lDate || lDate.substring(5, 7) !== monthFilter)) matchDate = false;
+      if (matchDate) {
+        totalFilteredMinutes += parseInt(l.minutes || 0);
+        totalFilteredLogsCount++;
+      }
+    });
+  });
+  const totalFilteredHours = (totalFilteredMinutes / 60).toFixed(1);
+
   document.getElementById('repTotalBilled').textContent = fmt(totalBilled);
   document.getElementById('repTotalPaid').textContent = fmt(totalPaid);
   document.getElementById('repPaidPct').textContent = `${paidPct}% do faturamento`;
@@ -147,6 +163,11 @@ function renderRelatorios() {
   document.getElementById('repRestPct').textContent = `${restPct}% pendente`;
   document.getElementById('repPendingOrcCount').textContent = activeBudgets.length;
   document.getElementById('repPendingOrcValue').textContent = `${fmt(pendingBudgetsVal)} em negociação`;
+  
+  const repHoursEl = document.getElementById('repHoursWorked');
+  const repHoursSubEl = document.getElementById('repHoursSub');
+  if (repHoursEl) repHoursEl.textContent = `${totalFilteredHours}h`;
+  if (repHoursSubEl) repHoursSubEl.textContent = `${formatMinutes(totalFilteredMinutes)} (${totalFilteredLogsCount} sessões)`;
   
   setTimeout(() => {
     initMonthlyRevenueChart(clientFilter, yearFilter, typeFilter, stageFilter, priorityFilter, monthFilter);

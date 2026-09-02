@@ -192,6 +192,81 @@ async function shareOrOpenPdfBlob(pdfBlob, filename, { title = '', text = '', pr
   }
 }
 
+// ══════════════════════════════════════════
+//  SUPABASE STORAGE & IMAGE COMPRESSION
+// ══════════════════════════════════════════
+// Comprime imagens antes do upload para economizar banda e agilizar carregamento
+async function compressImageForUpload(file, maxWidth = 1600, quality = 0.82) {
+  if (!file || !file.type || !file.type.startsWith('image/')) return file;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const compFile = new File([blob], (file.name || 'imagem.jpg').replace(/\.[^.]+$/, '.jpg'), {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          });
+          resolve(compFile);
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Faz upload de arquivos/imagens diretamente para o bucket 'mavic_files' no Supabase Storage
+async function uploadToSupabaseStorage(file, folder = 'uploads') {
+  if (!sb || !sb.storage) {
+    throw new Error('Supabase Storage não está disponível.');
+  }
+
+  // Comprime imagens antes de subir para a nuvem
+  let fileToUpload = file;
+  if (file.type && file.type.startsWith('image/')) {
+    try {
+      fileToUpload = await compressImageForUpload(file, 1600, 0.82);
+    } catch(e) {
+      console.warn('Falha na compressão da imagem:', e);
+    }
+  }
+
+  const cleanName = (file.name || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${cleanName}`;
+
+  const { data, error } = await sb.storage.from('mavic_files').upload(path, fileToUpload, {
+    cacheControl: '31536000',
+    upsert: true
+  });
+
+  if (error) {
+    console.error('Supabase Storage upload error:', error);
+    throw error;
+  }
+
+  const { data: urlData } = sb.storage.from('mavic_files').getPublicUrl(path);
+  return urlData?.publicUrl || '';
+}
+
 // Uma coluna conta como "concluída" se estiver marcada com isFinal.
 // Compatibilidade: configs salvas antes desse campo existir caem no nome
 // literal "Concluído", pra não quebrar dados já sincronizados.
@@ -1135,7 +1210,7 @@ function fallbackCopyText(text, successMsg) {
           <button class="btn-icon btn-sm" onclick="closeConfirm()"><i class="bi bi-x-lg"></i></button>
         </div>
         <div class="mbody"><div id="confirmMsg" style="font-size:14px;color:var(--text2);line-height:1.5;margin:0"></div></div>
-        <div class="mftr" id="confirmFooter" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:nowrap">
+        <div class="mftr confirm-ftr" id="confirmFooter">
           <button class="btn btn-ghost" id="confirmBtnCancel" onclick="closeConfirm()">Cancelar</button>
           <div id="confirmExtraBtns" style="display:inline-flex;gap:8px"></div>
           <button class="btn btn-danger" id="confirmBtnOk">Confirmar</button>
@@ -1210,7 +1285,8 @@ function closeConfirm(){
   _confirmCallback=null;
 }
 document.addEventListener('click',(e)=>{
-  if(e.target && e.target.id==='confirmBtnOk'){
+  // closest(): o botão pode conter um <i>, e nesse caso e.target é o ícone
+  if(e.target && e.target.closest && e.target.closest('#confirmBtnOk')){
     const cb=_confirmCallback;
     closeConfirm();
     if(cb) cb();
@@ -1658,19 +1734,34 @@ const MOBILE_TABS=[
   {href:'relatorio.html',   icon:'bi-graph-up-arrow',             label:'Relatórios',  match:['relatorio.html']},
   {href:'clientes.html',    icon:'bi-people',                     label:'Clientes',    match:['clientes.html']},
   {href:'servicos.html',    icon:'bi-box-seam',                   label:'Serviços',    match:['servicos.html']},
+  {href:'javascript:void(0)', icon:'bi-stopwatch',                label:'Cronômetro',  isTimer:true},
 ];
-(function injectMobileTabBar(){
-  if(document.getElementById('mtabBar')) return;
-  if(!document.querySelector('.nav')) return; // só nas páginas admin
+
+function getMobileTabBarHtml(){
   const current=location.pathname.split('/').pop();
-  const wrap=document.createElement('div');
-  wrap.innerHTML=`<nav class="mtab-bar" id="mtabBar">${MOBILE_TABS.map(t=>{
-    const active=t.match.includes(current);
+  return MOBILE_TABS.map(t=>{
+    if(t.isTimer){
+      return `<a class="mtab-item" id="mtabTimerBtn" href="javascript:void(0)" onclick="onMobileTimerClick(event)" title="Cronômetro" aria-label="Cronômetro">
+        <span class="mtab-bubble">
+          <i class="bi bi-stopwatch" id="mtabTimerIcon"></i>
+          <span class="mtab-timer-dot" id="mtabTimerDot" style="display:none"></span>
+        </span>
+      </a>`;
+    }
+    const active=t.match && t.match.includes(current);
     return `<a class="mtab-item${active?' active':''}" href="${t.href}" title="${t.label}" aria-label="${t.label}">
       <span class="mtab-bubble"><i class="bi ${t.icon}"></i></span>
     </a>`;
-  }).join('')}</nav>`;
+  }).join('');
+}
+
+(function injectMobileTabBar(){
+  if(document.getElementById('mtabBar')) return;
+  if(!document.querySelector('.nav') && !document.querySelector('nav.nav')) return; // só nas páginas admin
+  const wrap=document.createElement('div');
+  wrap.innerHTML=`<nav class="mtab-bar" id="mtabBar">${getMobileTabBarHtml()}</nav>`;
   document.body.appendChild(wrap.firstElementChild);
+  if(typeof updateMobileTimerIndicator === 'function') updateMobileTimerIndicator();
 })();
 
 // ══════════════════════════════════════════
@@ -1889,6 +1980,8 @@ function openSettings(){
   document.getElementById('companyDoc').classList.remove('inp-invalid');
   document.getElementById('companyEmail').value=localStorage.getItem('mavic_companyEmail')||'';
   document.getElementById('companyInsta').value=localStorage.getItem('mavic_companyInsta')||'';
+  const hrRateEl = document.getElementById('hourlyRate');
+  if (hrRateEl) hrRateEl.value = localStorage.getItem('mavic_hourlyRate') || '80';
   document.getElementById('stProjCnt').textContent=projects.length;
   document.getElementById('stCliCnt').textContent=clients.length;
   document.getElementById('settingsOverlay').classList.add('open');
@@ -1903,6 +1996,7 @@ function hasSettingsChanges() {
   const companyDoc = document.getElementById('companyDoc')?.value.trim() || '';
   const companyEmail = document.getElementById('companyEmail')?.value.trim() || '';
   const companyInsta = document.getElementById('companyInsta')?.value.trim() || '';
+  const hourlyRate = document.getElementById('hourlyRate')?.value.trim() || '80';
 
   return clientUrl !== (localStorage.getItem('mavic_clientUrl') || 'cliente.html') ||
          pixKey !== (localStorage.getItem('mavic_pixKey') || '') ||
@@ -1912,7 +2006,8 @@ function hasSettingsChanges() {
          companyName !== (localStorage.getItem('mavic_companyName') || '') ||
          companyDoc !== (localStorage.getItem('mavic_companyDoc') || '') ||
          companyEmail !== (localStorage.getItem('mavic_companyEmail') || '') ||
-         companyInsta !== (localStorage.getItem('mavic_companyInsta') || '');
+         companyInsta !== (localStorage.getItem('mavic_companyInsta') || '') ||
+         hourlyRate !== (localStorage.getItem('mavic_hourlyRate') || '80');
 }
 
 function closeSettings(confirmIfDirty = false){
@@ -1937,6 +2032,8 @@ function saveSettings(){
   localStorage.setItem('mavic_companyDoc',document.getElementById('companyDoc').value.trim());
   localStorage.setItem('mavic_companyEmail',document.getElementById('companyEmail').value.trim());
   localStorage.setItem('mavic_companyInsta',document.getElementById('companyInsta').value.trim());
+  const hrRateEl = document.getElementById('hourlyRate');
+  if (hrRateEl) localStorage.setItem('mavic_hourlyRate', hrRateEl.value.trim() || '80');
   closeSettings();scheduleSync();showToast('Configurações salvas!','success');
   // Trigger update if defined
   if (typeof updateOrcPreviewLabels === 'function') updateOrcPreviewLabels();
@@ -2187,15 +2284,27 @@ function deleteProject(id,fromArch=false){
 //  INITIALIZATION & NAV HIGHLIGHT WITH SLIDING PILL
 // ══════════════════════════════════════════
 function highlightActiveTab() {
+  const currentPath = window.location.pathname;
+  const isHome = currentPath === '/' || currentPath.endsWith('/') || currentPath.endsWith('index.html');
+
   const tabs = document.querySelectorAll('.nav-tab');
   tabs.forEach(tab => {
     const href = tab.getAttribute('href');
     if (href) {
-      const match = window.location.pathname.endsWith(href) || 
-                    (href === 'index.html' && (window.location.pathname === '/' || window.location.pathname.endsWith('ProjetosMavic/') || window.location.pathname.endsWith('ProjetosMavic/index.html')));
+      const match = (href === 'index.html' && isHome) || (href !== 'index.html' && currentPath.endsWith(href));
       tab.classList.toggle('on', match);
     }
   });
+
+  const mtabs = document.querySelectorAll('.mtab-item');
+  mtabs.forEach(tab => {
+    const href = tab.getAttribute('href');
+    if (href) {
+      const match = (href === 'index.html' && isHome) || (href !== 'index.html' && currentPath.endsWith(href));
+      tab.classList.toggle('active', match);
+    }
+  });
+
   initNavTabIndicator();
 }
 
@@ -2213,7 +2322,6 @@ function initNavTabIndicator() {
   const activeTab = navTabs.querySelector('.nav-tab.on');
   if (!activeTab) return;
 
-  // Recupera posição anterior salva ao clicar para transição contínua
   const prevRectStr = sessionStorage.getItem('mavic_nav_prev_pill');
   let hadPrev = false;
 
@@ -2222,10 +2330,6 @@ function initNavTabIndicator() {
       const prev = JSON.parse(prevRectStr);
       sessionStorage.removeItem('mavic_nav_prev_pill');
       if (prev && typeof prev.left === 'number' && typeof prev.width === 'number') {
-        indicator.style.transition = 'none';
-        indicator.style.transform = `translateX(${prev.left}px)`;
-        indicator.style.width = `${prev.width}px`;
-        indicator.classList.add('ready');
         hadPrev = true;
       }
     } catch (e) {}
@@ -2292,6 +2396,1052 @@ function initNavTabIndicator() {
   }
 }
 
+// ══════════════════════════════════════════
+//  SHARED LAYOUT & COMPONENT INJECTION
+// ══════════════════════════════════════════
+function injectSharedLayout() {
+  if (window.location.pathname.includes('login.html') || window.location.pathname.includes('cliente.html')) {
+    return;
+  }
+
+  // 1. Loading Indicator
+  if (!document.getElementById('loading')) {
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'loading';
+    loadingDiv.id = 'loading';
+    loadingDiv.innerHTML = `
+      <div class="spin"></div>
+      <div style="font-weight:600;font-size:14px">Carregando MAVIC…</div>
+      <div style="font-size:12px;color:var(--text3)">Conectando ao banco de dados</div>
+    `;
+    document.body.prepend(loadingDiv);
+  }
+
+  // 2. Setup Banner
+  if (!document.getElementById('setupBanner')) {
+    const bannerDiv = document.createElement('div');
+    bannerDiv.className = 'setup-banner d-none';
+    bannerDiv.id = 'setupBanner';
+    bannerDiv.innerHTML = `
+      <span><i class="bi bi-exclamation-triangle"></i> Supabase não configurado — dados salvos localmente.</span>
+      <button class="btn btn-sm" style="background:var(--yellow);color:#fff" onclick="openSettings()">Configurar agora</button>
+    `;
+    const loadingEl = document.getElementById('loading');
+    if (loadingEl && loadingEl.nextSibling) {
+      document.body.insertBefore(bannerDiv, loadingEl.nextSibling);
+    } else {
+      document.body.prepend(bannerDiv);
+    }
+  }
+
+  // 3. Top Navigation Bar
+  if (!document.querySelector('nav.nav') && !document.getElementById('appNav')) {
+    const navEl = document.createElement('nav');
+    navEl.className = 'nav';
+    navEl.id = 'appNav';
+    navEl.innerHTML = `
+      <div class="nav-brand">
+        <img id="navLogo" src="LOGO NOVA.png" alt="MAVIC" class="nav-logo" onerror="this.style.display='none'">
+        <div>
+          <div class="nav-name">MAVIC Projetos</div>
+          <div class="nav-sync ok" id="syncStatus"><i class="bi bi-cloud-check"></i> Sincronizado</div>
+        </div>
+      </div>
+      <div class="nav-sep"></div>
+      <div class="nav-tabs">
+        <a class="nav-tab" href="index.html"><i class="bi bi-kanban"></i> Quadro</a>
+        <a class="nav-tab" href="dashboard.html"><i class="bi bi-speedometer2"></i> Dashboard</a>
+        <a class="nav-tab" href="orcamento.html"><i class="bi bi-file-earmark-spreadsheet"></i> Orçamentos</a>
+        <a class="nav-tab" href="pagamentos.html"><i class="bi bi-credit-card"></i> Pagamentos</a>
+        <a class="nav-tab" href="relatorio.html"><i class="bi bi-graph-up-arrow"></i> Relatórios</a>
+        <a class="nav-tab" href="clientes.html"><i class="bi bi-people"></i> Clientes</a>
+        <a class="nav-tab" href="servicos.html"><i class="bi bi-box-seam"></i> Serviços</a>
+      </div>
+      <div class="nav-spacer"></div>
+      <button class="btn-icon" id="gnNavBtn" onclick="openGlobalNoticeModal()" title="Central de Avisos"><i class="bi bi-megaphone"></i></button>
+      <button class="btn-icon" onclick="openArchiveModal()" title="Arquivados"><i class="bi bi-archive"></i></button>
+      <button class="btn-icon" onclick="openSettings()" title="Configurações"><i class="bi bi-gear"></i></button>
+      <button class="btn-icon" id="themeBtn" onclick="toggleTheme()" title="Tema"><i class="bi bi-moon-stars"></i></button>
+      <button class="btn-icon btn-logout" onclick="logoutAdmin()" title="Sair do painel"><i class="bi bi-box-arrow-right"></i></button>
+    `;
+    const bannerEl = document.getElementById('setupBanner');
+    if (bannerEl && bannerEl.nextSibling) {
+      document.body.insertBefore(navEl, bannerEl.nextSibling);
+    } else {
+      document.body.prepend(navEl);
+    }
+  }
+
+  // 4. Mobile Bottom Tabs Bar
+  if (!document.getElementById('mtabBar')) {
+    const mtabEl = document.createElement('nav');
+    mtabEl.className = 'mtab-bar';
+    mtabEl.id = 'mtabBar';
+    mtabEl.innerHTML = getMobileTabBarHtml();
+    document.body.appendChild(mtabEl);
+  }
+
+  // 5. Shared Global Modals
+  injectSharedModals();
+
+  // 6. Global Timer Bar
+  renderGlobalTimerBar();
+}
+
+function injectSharedModals() {
+  if (document.getElementById('sharedModalsContainer')) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'sharedModalsContainer';
+
+  let modalsHtml = '';
+
+  // Settings Overlay
+  if (!document.getElementById('settingsOverlay')) {
+    modalsHtml += `
+      <div class="overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings(true)">
+      <div class="mbox mmd">
+        <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-gear"></i> Configurações</h5><button class="btn-icon btn-sm" onclick="closeSettings(true)"><i class="bi bi-x-lg"></i></button></div>
+        <div class="mbody">
+          <div class="stgrp">
+            <div class="sec"><i class="bi bi-window"></i> Painel do Cliente</div>
+            <div class="fld"><label class="flbl">URL do cliente.html</label><input class="inp inp-sm" id="clientUrl" placeholder="cliente.html ou https://seusite.com/cliente.html"></div>
+          </div>
+          <div class="stgrp">
+            <div class="sec"><i class="bi bi-qr-code" style="color:var(--accent)"></i> Pagamento (PIX)</div>
+            <div class="fld"><label class="flbl">Chave PIX (CPF/CNPJ/e-mail/telefone)</label><input class="inp inp-sm" id="pixKey" placeholder="Ex: 350.605.018-41"></div>
+            <div class="row2">
+              <div class="fld"><label class="flbl">Titular</label><input class="inp inp-sm" id="pixName" placeholder="Nome do titular"></div>
+              <div class="fld"><label class="flbl">Banco / Instituição</label><input class="inp inp-sm" id="pixBank" placeholder="Ex: Nu Pagamentos"></div>
+            </div>
+          </div>
+          <div class="stgrp">
+            <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
+            <div class="fld">
+              <label class="flbl">Template de Mensagem</label>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Cliente}')" title="Primeiro nome do cliente">+ {Cliente}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Projeto}')" title="Nome do projeto">+ {Projeto}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Etapa}')" title="Etapa/Coluna">+ {Etapa}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Prazo}')" title="Prazo do projeto">+ {Prazo}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorTotal}')" title="Valor total">+ {ValorTotal}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorPago}')" title="Valor pago">+ {ValorPago}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{SaldoPendente}')" title="Saldo pendente">+ {SaldoPendente}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{TarefaAtual}')" title="Subtarefas em foco">+ {TarefaAtual}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Observacao}')" title="Observações">+ {Observacao}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkPainel}')" title="Painel do cliente">+ {LinkPainel}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkDrive}')" title="Pasta de arquivos">+ {LinkDrive}</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{DadosPix}')" title="Dados PIX">+ {DadosPix}</button>
+              </div>
+              <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
+            </div>
+          </div>
+          <div class="stgrp">
+            <div class="sec"><i class="bi bi-building"></i> Dados do Emissor (para Recibos e Orçamentos)</div>
+            <div class="fld">
+              <label class="flbl">Nome / Razão Social</label>
+              <input class="inp inp-sm" id="companyName" placeholder="Ex: Victor Lourenço Pereira Ltda">
+            </div>
+            <div class="fld">
+              <label class="flbl">CPF / CNPJ do Emissor</label>
+              <input class="inp inp-sm" id="companyDoc" placeholder="Ex: 350.605.018-41" oninput="maskDocInput(this)" onblur="checkDocValidity(this)">
+            </div>
+            <div class="fld">
+              <label class="flbl">E-mail do Emissor</label>
+              <input class="inp inp-sm" id="companyEmail" placeholder="Ex: projetos.mavic@hotmail.com">
+            </div>
+            <div class="fld">
+              <label class="flbl">Instagram do Emissor</label>
+              <input class="inp inp-sm" id="companyInsta" placeholder="Ex: @mavic.arquitetuta">
+            </div>
+          </div>
+          <div class="stgrp">
+            <div class="sec"><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Valor Hora Operacional (Lucratividade)</div>
+            <div class="fld">
+              <label class="flbl">Valor Base por Hora (R$/h)</label>
+              <input class="inp inp-sm" id="hourlyRate" type="number" min="1" placeholder="80" style="max-width:180px">
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">Utilizado para calcular o custo real e a margem de lucro nos projetos.</div>
+            </div>
+          </div>
+          <div class="stgrp">
+            <div class="sec"><i class="bi bi-shield-lock" style="color:var(--accent)"></i> Sessão & Segurança</div>
+            <div class="st-row"><span style="color:var(--text2)">Conectado como</span><strong id="stAdminEmail" style="color:var(--accent)">projetos.mavic@hotmail.com</strong></div>
+            <div class="st-row" style="margin-top: 10px; display: flex; justify-content: flex-end;">
+              <button type="button" class="btn-outline-danger" onclick="logoutAdmin()"><i class="bi bi-box-arrow-right"></i> Sair do Painel</button>
+            </div>
+          </div>
+          <div class="stgrp">
+            <div class="sec">Sistema</div>
+            <div class="st-row"><span style="color:var(--text2)">Projetos</span><strong id="stProjCnt">—</strong></div>
+            <div class="st-row"><span style="color:var(--text2)">Clientes</span><strong id="stCliCnt">—</strong></div>
+            <div class="st-row"><span style="color:var(--text2)">Banco de dados</span><strong style="color:var(--green)"><i class="bi bi-cloud-check"></i> Supabase conectado</strong></div>
+            <div class="st-row"><span style="color:var(--text2)">Versão</span><strong style="color:var(--accent)">MAVIC v3.1</strong></div>
+            <div class="st-row" style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end;">
+              <button class="btn btn-ghost btn-sm" onclick="exportBackup()"><i class="bi bi-download"></i> Exportar Backup</button>
+              <label class="btn btn-ghost btn-sm" style="margin:0; cursor:pointer">
+                <i class="bi bi-upload"></i> Importar Backup
+                <input type="file" accept=".json" onchange="importBackup(event)" style="display:none">
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="mftr"><button class="btn btn-ghost" onclick="closeSettings(true)">Cancelar</button><button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>
+      </div>
+      </div>
+    `;
+  }
+
+  // Global Notice Overlay
+  if (!document.getElementById('globalNoticeOverlay')) {
+    modalsHtml += `
+      <div class="overlay" id="globalNoticeOverlay" onclick="if(event.target===this)closeGlobalNoticeModal()">
+      <div class="mbox mxl">
+        <div class="mhdr">
+          <h5 style="color:var(--accent)"><i class="bi bi-megaphone"></i> Central de Avisos</h5>
+          <button class="btn-icon btn-sm" onclick="closeGlobalNoticeModal()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="mbody" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div style="display:flex;flex-direction:column">
+            <div class="sec" style="margin-bottom:10px">Avisos enviados</div>
+            <div id="gnList" style="display:flex;flex-direction:column;gap:6px;height:460px;overflow-y:auto;padding-right:6px"></div>
+          </div>
+          <div style="border-left:1px solid var(--border);padding-left:20px">
+            <div class="sec" style="margin-bottom:10px">Novo Aviso</div>
+            <div class="fld" style="display:flex;align-items:center;justify-content:space-between">
+              <label class="flbl" style="margin-bottom:0">Ativo ao publicar</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="gnActive" checked onchange="updateGnPreview()" style="accent-color:var(--accent);width:15px;height:15px">
+                <span id="gnStatusLabel" style="font-size:13px;font-weight:600;color:var(--green)">Ativo</span>
+              </label>
+            </div>
+            <div class="fld">
+              <label class="flbl">Título *</label>
+              <input class="inp inp-sm" id="gnTitle" oninput="updateGnPreview()" placeholder="Ex: Recesso de Fim de Ano">
+            </div>
+            <div class="fld">
+              <label class="flbl">Mensagem *</label>
+              <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')"><b>N</b></button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')"><i>I</i></button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\\n')">↵ Linha</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')">• Tópico</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\\n\\n')">¶ Parágrafo</button>
+              </div>
+              <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Use os botões acima para formatar."></textarea>
+            </div>
+            <div class="fld">
+              <label class="flbl">Destinatários</label>
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:6px">
+                  <input type="checkbox" id="gnAllClients" checked onchange="toggleGnAllClients()">
+                  <span>Todos os clientes</span>
+                </label>
+                <div id="gnClientsContainer" style="display:none;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto"></div>
+              </div>
+            </div>
+            <div id="gnPreview" style="display:none;background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:10px;padding:11px;margin-bottom:12px">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--yellow);margin-bottom:4px"><i class="bi bi-megaphone"></i> Prévia:</div>
+              <div id="gnPreviewText" style="font-size:13px;font-weight:500;color:var(--text);line-height:1.6"></div>
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="saveGlobalNotice()"><i class="bi bi-megaphone"></i> Publicar Aviso</button>
+          </div>
+        </div>
+      </div>
+      </div>
+    `;
+  }
+
+  // Archive Overlay
+  if (!document.getElementById('archiveOverlay')) {
+    modalsHtml += `
+      <div class="overlay" id="archiveOverlay" onclick="if(event.target===this)closeArchiveModal()">
+      <div class="mbox mmd">
+        <div class="mhdr"><h5><i class="bi bi-archive"></i> Projetos Arquivados</h5><button class="btn-icon btn-sm" onclick="closeArchiveModal()"><i class="bi bi-x-lg"></i></button></div>
+        <div class="mbody" id="archiveList" style="max-height:400px;overflow-y:auto"></div>
+      </div>
+      </div>
+    `;
+  }
+
+  // Time Tracker & Profitability Overlay
+  if (!document.getElementById('timeTrackerOverlay')) {
+    modalsHtml += `
+      <div class="overlay" id="timeTrackerOverlay" onclick="if(event.target===this)closeTimeTracker()">
+      <div class="mbox mlg" style="max-width:680px">
+        <div class="mhdr">
+          <h5 id="ttModalTitle"><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Apontamento de Horas</h5>
+          <button class="btn-icon btn-sm" onclick="closeTimeTracker()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="mbody">
+          <div class="tt-kpi-grid" id="ttKpis"></div>
+          
+          <div id="ttTimerControls"></div>
+
+          <!-- Formulário de Lançamento Manual -->
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:8px"><i class="bi bi-plus-circle"></i> Lançamento Manual de Horas</div>
+            <div class="tt-manual-form-grid">
+              <div class="fld" style="margin-bottom:0">
+                <label class="flbl">Data</label>
+                <input class="inp inp-sm" type="date" id="ttManualDate">
+              </div>
+              <div class="fld" style="margin-bottom:0">
+                <label class="flbl">Horas</label>
+                <input class="inp inp-sm" type="number" min="0" id="ttManualHours" placeholder="0">
+              </div>
+              <div class="fld" style="margin-bottom:0">
+                <label class="flbl">Minutos</label>
+                <input class="inp inp-sm" type="number" min="0" max="59" id="ttManualMinutes" placeholder="0">
+              </div>
+              <div class="fld tt-fld-desc" style="margin-bottom:0">
+                <label class="flbl">Descrição do que foi feito</label>
+                <input class="inp inp-sm" type="text" id="ttManualDesc" placeholder="Ex: Modelagem 3D, Reunião, Render…">
+              </div>
+              <div class="tt-fld-btn">
+                <button class="btn btn-primary btn-sm" onclick="saveManualTimeLog()" style="height:34px;white-space:nowrap;width:100%"><i class="bi bi-check2"></i> Salvar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Histórico de Apontamentos -->
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:8px"><i class="bi bi-clock-history"></i> Histórico de Sessões</div>
+          <div id="ttLogsList" style="max-height:220px;overflow-y:auto;padding-right:4px"></div>
+        </div>
+        <div class="mftr" style="display:flex;justify-content:space-between;align-items:center">
+          <button class="btn btn-excel btn-sm" onclick="exportFullFinancialExcel()"><i class="bi bi-file-earmark-excel"></i> Exportar Tudo (Excel)</button>
+          <button class="btn btn-ghost" onclick="closeTimeTracker()">Fechar</button>
+        </div>
+      </div>
+      </div>
+    `;
+  }
+
+  // Quick Select Project to Start Timer Overlay
+  if (!document.getElementById('selectProjectTimerOverlay')) {
+    modalsHtml += `
+      <div class="overlay" id="selectProjectTimerOverlay" onclick="if(event.target===this)closePromptStartTimer()">
+      <div class="mbox msm" style="max-width:440px">
+        <div class="mhdr">
+          <h5><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Iniciar Cronômetro</h5>
+          <button class="btn-icon btn-sm" onclick="closePromptStartTimer()"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="mbody">
+          <div class="fld">
+            <label class="flbl">Selecione o Projeto <span style="color:var(--red)">*</span></label>
+            <select class="inp" id="selTimerProjectId" onchange="onSelectTimerProjectChange()">
+              <option value="">Selecione um projeto…</option>
+            </select>
+          </div>
+          <div class="fld">
+            <label class="flbl">Etapa / Tarefa</label>
+            <input class="inp inp-sm" id="selTimerStage" placeholder="Ex: Modelagem 3D, Render, Revisão…">
+          </div>
+          <div class="fld" style="margin-bottom:0">
+            <label class="flbl">Descrição da Atividade (Opcional)</label>
+            <input class="inp inp-sm" id="selTimerDesc" placeholder="Ex: Ajustes na fachada, detalhamento…">
+          </div>
+        </div>
+        <div class="mftr" style="display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn btn-ghost" onclick="closePromptStartTimer()">Cancelar</button>
+          <button class="btn btn-primary" onclick="confirmStartTimerFromModal()"><i class="bi bi-play-fill"></i> Iniciar Cronômetro</button>
+        </div>
+      </div>
+      </div>
+    `;
+  }
+
+  if (modalsHtml) {
+    wrap.innerHTML = modalsHtml;
+    document.body.appendChild(wrap);
+  }
+}
+
+// ══════════════════════════════════════════
+//  SHEETJS & EXCEL EXPORT ENGINE
+// ══════════════════════════════════════════
+function loadSheetJs(callback) {
+  if (window.XLSX) {
+    if (callback) callback();
+    return;
+  }
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  s.onload = () => { if (callback) callback(); };
+  s.onerror = () => { showToast('Erro ao carregar módulo do Excel.', 'danger'); };
+  document.head.appendChild(s);
+}
+
+function exportFullFinancialExcel() {
+  loadSheetJs(() => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      const allProjs = (Array.isArray(projects) && projects.length) ? projects : JSON.parse(localStorage.getItem('mavic_projects') || '[]');
+      const allBudgets = (Array.isArray(budgets) && budgets.length) ? budgets : JSON.parse(localStorage.getItem('mavic_budgets') || '[]');
+      const allClients = (Array.isArray(clients) && clients.length) ? clients : JSON.parse(localStorage.getItem('mavic_clients') || '[]');
+
+      // 1. ABA RESUMO FINANCEIRO
+      const totalFaturado = allProjs.reduce((s, p) => s + parseFloat(p.value || 0), 0);
+      let totalRecebido = 0;
+      allProjs.forEach(p => {
+        (p.payments || []).forEach(pg => { totalRecebido += parseFloat(pg.amount || 0); });
+      });
+      const saldoPendente = Math.max(0, totalFaturado - totalRecebido);
+      
+      let totalMinutos = 0;
+      allProjs.forEach(p => {
+        (p.timeLogs || []).forEach(l => { totalMinutos += parseInt(l.minutes || 0); });
+      });
+      const totalHoras = (totalMinutos / 60).toFixed(1);
+
+      const orcTotal = allBudgets.reduce((s, b) => s + parseFloat(b.total || 0), 0);
+      const orcAprovados = allBudgets.filter(b => b.status === 'Aprovado').length;
+
+      const wsResumoData = [
+        ['MAVIC PROJETOS — RELATÓRIO FINANCEIRO GERAL'],
+        ['Gerado em:', new Date().toLocaleString('pt-BR')],
+        [''],
+        ['MÉTRICA', 'VALOR'],
+        ['Faturamento Total Contratado (R$)', totalFaturado],
+        ['Total Recebido (R$)', totalRecebido],
+        ['Saldo Pendente a Receber (R$)', saldoPendente],
+        ['Total de Projetos Cadastrados', allProjs.length],
+        ['Total de Clientes', allClients.length],
+        ['Total de Horas Trabalhadas', `${totalHoras} horas (${totalMinutos} min)`],
+        ['Total em Orçamentos Emitidos (R$)', orcTotal],
+        ['Orçamentos Aprovados', orcAprovados]
+      ];
+      const wsResumo = XLSX.utils.aoa_to_sheet(wsResumoData);
+      wsResumo['!cols'] = [{ wch: 34 }, { wch: 25 }];
+      XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo Geral');
+
+      // 2. ABA PROJETOS E CONTRATOS
+      const wsProjsData = [
+        ['ID', 'PROJETO', 'CLIENTE', 'CATEGORIA', 'ETAPA', 'VALOR CONTRATO (R$)', 'VALOR PAGO (R$)', 'SALDO PENDENTE (R$)', 'PRAZO', 'PRIORIDADE', 'HORAS TRABALHADAS (h)', 'STATUS FINANCEIRO']
+      ];
+      allProjs.forEach(p => {
+        const val = parseFloat(p.value || 0);
+        const paid = (p.payments || []).reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+        const bal = val - paid;
+        const pMin = (p.timeLogs || []).reduce((s, l) => s + parseInt(l.minutes || 0), 0);
+        const pHrs = (pMin / 60).toFixed(1);
+        let finStatus = 'Pendente';
+        if (val > 0) {
+          if (bal <= 0) finStatus = '100% Quitado';
+          else if (paid > 0) finStatus = 'Parcialmente Pago';
+        }
+        wsProjsData.push([
+          p.id,
+          p.name || 'Sem nome',
+          p.client || 'Sem cliente',
+          p.type || 'Geral',
+          p.column || '—',
+          val,
+          paid,
+          bal,
+          p.date || '—',
+          p.priority || 'Média',
+          parseFloat(pHrs),
+          finStatus
+        ]);
+      });
+      const wsProjs = XLSX.utils.aoa_to_sheet(wsProjsData);
+      wsProjs['!cols'] = [{ wch: 8 }, { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, wsProjs, 'Projetos & Contratos');
+
+      // 3. ABA RECEBIMENTOS E PARCELAS
+      const wsPaysData = [
+        ['ID PROJETO', 'PROJETO', 'CLIENTE', 'DATA PAGAMENTO', 'VALOR RECEBIDO (R$)', 'FORMA DE PAGAMENTO', 'OBSERVAÇÃO']
+      ];
+      allProjs.forEach(p => {
+        (p.payments || []).forEach(pg => {
+          wsPaysData.push([
+            p.id,
+            p.name || '—',
+            p.client || '—',
+            pg.date || '—',
+            parseFloat(pg.amount || 0),
+            pg.method || 'Pix',
+            pg.note || ''
+          ]);
+        });
+      });
+      const wsPays = XLSX.utils.aoa_to_sheet(wsPaysData);
+      wsPays['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 25 }];
+      XLSX.utils.book_append_sheet(wb, wsPays, 'Histórico Recebimentos');
+
+      // 4. ABA ORÇAMENTOS
+      const wsOrcData = [
+        ['Nº ORÇAMENTO', 'CLIENTE', 'TÍTULO / ESCOPO', 'DATA EMISSÃO', 'VALOR TOTAL (R$)', 'STATUS', 'VALIDADE (DIAS)']
+      ];
+      allBudgets.forEach(b => {
+        wsOrcData.push([
+          b.number ? `#${b.number}` : `#${b.id}`,
+          b.client || '—',
+          b.title || 'Orçamento',
+          b.date || '—',
+          parseFloat(b.total || 0),
+          b.status || 'Pendente',
+          b.validity || 15
+        ]);
+      });
+      const wsOrc = XLSX.utils.aoa_to_sheet(wsOrcData);
+      wsOrc['!cols'] = [{ wch: 14 }, { wch: 24 }, { wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, wsOrc, 'Orçamentos');
+
+      // 5. ABA APONTAMENTO DE HORAS
+      const wsTimeData = [
+        ['DATA', 'ID PROJETO', 'PROJETO', 'CLIENTE', 'ETAPA / TAREFA', 'DURAÇÃO (MIN)', 'DURAÇÃO (HORAS)', 'DESCRICAO', 'AUTOR']
+      ];
+      allProjs.forEach(p => {
+        (p.timeLogs || []).forEach(l => {
+          const m = parseInt(l.minutes || 0);
+          wsTimeData.push([
+            l.date || '—',
+            p.id,
+            p.name || '—',
+            p.client || '—',
+            l.stage || p.column || 'Geral',
+            m,
+            parseFloat((m / 60).toFixed(2)),
+            l.desc || '—',
+            l.author || 'Victor'
+          ]);
+        });
+      });
+      const wsTime = XLSX.utils.aoa_to_sheet(wsTimeData);
+      wsTime['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 24 }, { wch: 20 }, { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, wsTime, 'Apontamento de Horas');
+
+      const fileName = `MAVIC_Financeiro_${today()}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      showToast('Planilha Excel exportada com sucesso!', 'success');
+    } catch(err) {
+      console.error('Erro na exportação Excel:', err);
+      showToast('Falha ao gerar planilha Excel.', 'danger');
+    }
+  });
+}
+
+// ══════════════════════════════════════════
+//  TIME TRACKING & CRONÔMETRO ENGINE
+// ══════════════════════════════════════════
+let globalTimerInterval = null;
+
+function getActiveTimer() {
+  try {
+    const raw = localStorage.getItem('mavic_active_timer');
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) {
+    return null;
+  }
+}
+
+function startGlobalTimer(projectId, stage = '', desc = '') {
+  const allProjs = (Array.isArray(projects) && projects.length) ? projects : JSON.parse(localStorage.getItem('mavic_projects') || '[]');
+  const p = allProjs.find(x => String(x.id) === String(projectId));
+  if (!p) return showToast('Projeto não encontrado!', 'warning');
+
+  const existing = getActiveTimer();
+  if (existing && String(existing.projectId) === String(projectId) && !existing.pausedAt) {
+    return;
+  }
+
+  if (existing && String(existing.projectId) !== String(projectId)) {
+    stopGlobalTimer(true);
+  }
+
+  const timerState = {
+    projectId: p.id,
+    projectName: p.name,
+    client: p.client,
+    stage: stage || p.column || 'Execução',
+    desc: desc || '',
+    startTime: Date.now(),
+    accumulatedMs: existing && String(existing.projectId) === String(projectId) ? (existing.accumulatedMs || 0) : 0,
+    pausedAt: null
+  };
+
+  localStorage.setItem('mavic_active_timer', JSON.stringify(timerState));
+  renderGlobalTimerBar();
+  showToast(`⏱️ Cronômetro iniciado: ${p.name}`, 'info');
+
+  if (typeof renderBoard === 'function') renderBoard();
+}
+
+function pauseGlobalTimer() {
+  const timer = getActiveTimer();
+  if (!timer) return;
+
+  if (timer.pausedAt) {
+    const pausedDuration = Date.now() - timer.pausedAt;
+    timer.startTime += pausedDuration;
+    timer.pausedAt = null;
+    localStorage.setItem('mavic_active_timer', JSON.stringify(timer));
+    showToast('⏱️ Cronômetro retomado!', 'info');
+  } else {
+    timer.pausedAt = Date.now();
+    localStorage.setItem('mavic_active_timer', JSON.stringify(timer));
+    showToast('⏱️ Cronômetro pausado.', 'info');
+  }
+  renderGlobalTimerBar();
+  if (typeof renderBoard === 'function') renderBoard();
+}
+
+function stopGlobalTimer(save = true) {
+  const timer = getActiveTimer();
+  if (!timer) return;
+
+  let totalElapsedMs = timer.accumulatedMs || 0;
+  if (timer.pausedAt) {
+    totalElapsedMs += (timer.pausedAt - timer.startTime);
+  } else {
+    totalElapsedMs += (Date.now() - timer.startTime);
+  }
+
+  const minutes = Math.max(1, Math.round(totalElapsedMs / 60000));
+
+  if (save && minutes >= 1) {
+    try {
+      addProjectTimeLog(timer.projectId, {
+        date: today(),
+        minutes: minutes,
+        stage: timer.stage || 'Geral',
+        desc: timer.desc || 'Sessão de trabalho gravada via cronômetro',
+        author: 'Victor'
+      });
+      showToast(`⏱️ Gravado: ${formatMinutes(minutes)} no projeto ${timer.projectName}`, 'success');
+    } catch(err) {
+      console.error('Erro ao gravar log:', err);
+    }
+  }
+
+  localStorage.removeItem('mavic_active_timer');
+  renderGlobalTimerBar();
+  if (typeof renderBoard === 'function') renderBoard();
+}
+
+function toggleGlobalTimer(projectId) {
+  const timer = getActiveTimer();
+  if (timer && String(timer.projectId) === String(projectId)) {
+    pauseGlobalTimer();
+  } else {
+    startGlobalTimer(projectId);
+  }
+}
+
+function formatMinutes(mins) {
+  const m = parseInt(mins || 0);
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  if (h === 0) return `${remM}min`;
+  return `${h}h ${remM.toString().padStart(2, '0')}m`;
+}
+
+function formatElapsedMs(ms) {
+  const sec = Math.floor((ms / 1000) % 60);
+  const min = Math.floor((ms / (1000 * 60)) % 60);
+  const hrs = Math.floor(ms / (1000 * 60 * 60));
+  return `${hrs.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+}
+
+function renderGlobalTimerBar() {
+  updateMobileTimerIndicator();
+
+  let bar = document.getElementById('globalTimerBar');
+  const timer = getActiveTimer();
+
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'globalTimerBar';
+    bar.className = 'global-timer-bar';
+    document.body.appendChild(bar);
+  }
+
+  bar.style.display = 'flex';
+
+  if (!timer) {
+    if (globalTimerInterval) {
+      clearInterval(globalTimerInterval);
+      globalTimerInterval = null;
+    }
+    bar.classList.add('timer-idle');
+    bar.onclick = (e) => {
+      promptStartTimer();
+    };
+    bar.innerHTML = `
+      <div class="timer-live-dot" style="background:var(--text3);animation:none"></div>
+      <div class="timer-clock-display" style="color:var(--text3);font-size:14px">00:00:00</div>
+      <div class="timer-proj-title" style="color:var(--text2);cursor:pointer" title="Clique para escolher um projeto e iniciar">Iniciar Cronômetro</div>
+      <div class="timer-acts">
+        <button type="button" class="btn-timer-act" style="background:var(--accent);color:#fff;border-color:var(--accent)" onclick="promptStartTimer();event.stopPropagation()" title="Escolher projeto e iniciar cronômetro">
+          <i class="bi bi-play-fill"></i>
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  bar.classList.remove('timer-idle');
+  bar.onclick = null;
+  bar.innerHTML = `
+    <div class="timer-live-dot" style="${timer.pausedAt ? 'background:var(--yellow);animation:none' : ''}"></div>
+    <div class="timer-clock-display" id="globalTimerClock">00:00:00</div>
+    <div class="timer-proj-title" onclick="openTimeTracker('${timer.projectId}');event.stopPropagation()" style="cursor:pointer" title="Ver detalhes de ${escapeHtml(timer.projectName)}">${escapeHtml(timer.projectName)}</div>
+    <div class="timer-acts">
+      <button type="button" class="btn-timer-act" onclick="pauseGlobalTimer();event.stopPropagation()" title="${timer.pausedAt ? 'Retomar cronômetro' : 'Pausar cronômetro'}">
+        <i class="bi ${timer.pausedAt ? 'bi-play-fill' : 'bi-pause-fill'}"></i>
+      </button>
+      <button type="button" class="btn-timer-act btn-timer-stop" onclick="stopGlobalTimer(true);event.stopPropagation()" title="Parar e Salvar no Projeto">
+        <i class="bi bi-stop-fill"></i>
+      </button>
+      <button type="button" class="btn-timer-act" onclick="openTimeTracker('${timer.projectId}');event.stopPropagation()" title="Ver Apontamentos e Lucro">
+        <i class="bi bi-stopwatch"></i>
+      </button>
+    </div>
+  `;
+
+  updateGlobalTimerClock();
+
+  if (!globalTimerInterval) {
+    globalTimerInterval = setInterval(updateGlobalTimerClock, 1000);
+  }
+}
+
+function onMobileTimerClick(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const timer = getActiveTimer();
+  if (timer && timer.projectId) {
+    openTimeTracker(timer.projectId);
+  } else {
+    promptStartTimer();
+  }
+}
+
+function updateMobileTimerIndicator() {
+  const timer = getActiveTimer();
+  const icon = document.getElementById('mtabTimerIcon');
+  const dot = document.getElementById('mtabTimerDot');
+  const btn = document.getElementById('mtabTimerBtn');
+  if (!icon || !btn) return;
+
+  if (timer && !timer.pausedAt) {
+    icon.className = 'bi bi-stopwatch-fill';
+    icon.style.color = 'var(--red)';
+    if (dot) dot.style.display = 'block';
+    btn.classList.add('timer-running');
+    btn.title = `Gravando: ${timer.projectName || 'Projeto'}`;
+  } else if (timer && timer.pausedAt) {
+    icon.className = 'bi bi-pause-circle-fill';
+    icon.style.color = 'var(--yellow)';
+    if (dot) dot.style.display = 'none';
+    btn.classList.remove('timer-running');
+    btn.title = `Pausado: ${timer.projectName || 'Projeto'}`;
+  } else {
+    icon.className = 'bi bi-stopwatch';
+    icon.style.color = '';
+    if (dot) dot.style.display = 'none';
+    btn.classList.remove('timer-running');
+    btn.title = 'Iniciar Cronômetro';
+  }
+}
+
+function promptStartTimer() {
+  let overlay = document.getElementById('selectProjectTimerOverlay');
+  if (!overlay) {
+    injectSharedModals();
+    overlay = document.getElementById('selectProjectTimerOverlay');
+  }
+
+  const allProjs = (Array.isArray(projects) && projects.length) ? projects : JSON.parse(localStorage.getItem('mavic_projects') || '[]');
+  const sel = document.getElementById('selTimerProjectId');
+
+  const isFinalized = (val) => {
+    if (!val) return false;
+    const str = String(val).trim().toLowerCase();
+    return str.includes('finalizad') || str.includes('concluid') || str.includes('concluíd') || str.includes('entregue') || str.includes('arquivad');
+  };
+
+  const activeProjs = allProjs.filter(p => !p.archived && !isFinalized(p.column) && !isFinalized(p.status));
+
+  if (sel) {
+    if (activeProjs.length === 0) {
+      sel.innerHTML = `<option value="">Nenhum projeto em andamento no momento</option>`;
+    } else {
+      sel.innerHTML = `<option value="">Selecione um projeto em andamento…</option>` + activeProjs.map(p => {
+        return `<option value="${p.id}" data-stage="${escapeHtml(p.column || '')}">${escapeHtml(p.name)} (${escapeHtml(p.client || 'Sem cliente')} — ${escapeHtml(p.column || 'Geral')})</option>`;
+      }).join('');
+    }
+  }
+
+  const stageInp = document.getElementById('selTimerStage');
+  if (stageInp) stageInp.value = '';
+  const descInp = document.getElementById('selTimerDesc');
+  if (descInp) descInp.value = '';
+
+  if (overlay) overlay.classList.add('open');
+}
+
+function onSelectTimerProjectChange() {
+  const sel = document.getElementById('selTimerProjectId');
+  const stageInp = document.getElementById('selTimerStage');
+  if (!sel || !stageInp) return;
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset && opt.dataset.stage) {
+    stageInp.value = opt.dataset.stage;
+  }
+}
+
+function closePromptStartTimer() {
+  const overlay = document.getElementById('selectProjectTimerOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function confirmStartTimerFromModal() {
+  const sel = document.getElementById('selTimerProjectId');
+  const projectId = sel ? sel.value : '';
+  if (!projectId) {
+    return showToast('Por favor, selecione um projeto para iniciar o cronômetro.', 'warning');
+  }
+  const stage = document.getElementById('selTimerStage')?.value.trim() || '';
+  const desc = document.getElementById('selTimerDesc')?.value.trim() || '';
+
+  closePromptStartTimer();
+  startGlobalTimer(projectId, stage, desc);
+}
+
+function updateGlobalTimerClock() {
+  const timer = getActiveTimer();
+  if (!timer) return;
+
+  let totalMs = timer.accumulatedMs || 0;
+  if (timer.pausedAt) {
+    totalMs += (timer.pausedAt - timer.startTime);
+  } else {
+    totalMs += (Date.now() - timer.startTime);
+  }
+
+  const elapsedText = formatElapsedMs(Math.max(0, totalMs));
+
+  const clockEl = document.getElementById('globalTimerClock');
+  if (clockEl) {
+    clockEl.textContent = elapsedText;
+  }
+
+  const modalClock = document.getElementById('ttModalLiveClock');
+  if (modalClock) {
+    modalClock.textContent = `— ${elapsedText}`;
+  }
+
+  updateMobileTimerIndicator();
+}
+
+function addProjectTimeLog(projectId, { date, minutes, stage, desc, author }) {
+  const allProjs = (Array.isArray(projects) && projects.length) ? projects : JSON.parse(localStorage.getItem('mavic_projects') || '[]');
+  const p = allProjs.find(x => String(x.id) === String(projectId));
+  if (!p) return;
+  if (!Array.isArray(p.timeLogs)) p.timeLogs = [];
+
+  p.timeLogs.unshift({
+    id: Date.now(),
+    date: date || today(),
+    minutes: parseInt(minutes || 0),
+    stage: stage || p.column || 'Geral',
+    desc: desc || '',
+    author: author || 'Victor',
+    createdAt: new Date().toISOString()
+  });
+
+  projects = allProjs;
+  scheduleSync();
+  if (typeof renderBoard === 'function') renderBoard();
+}
+
+function deleteProjectTimeLog(projectId, logId) {
+  const allProjs = (Array.isArray(projects) && projects.length) ? projects : JSON.parse(localStorage.getItem('mavic_projects') || '[]');
+  const p = allProjs.find(x => String(x.id) === String(projectId));
+  if (!p || !Array.isArray(p.timeLogs)) return;
+
+  p.timeLogs = p.timeLogs.filter(l => String(l.id) !== String(logId));
+  projects = allProjs;
+  scheduleSync();
+  renderTimeTrackerModal(p.id);
+  if (typeof renderBoard === 'function') renderBoard();
+  showToast('Registro de tempo removido.', 'info');
+}
+
+// ══════════════════════════════════════════
+//  TIME TRACKER MODAL
+// ══════════════════════════════════════════
+let currentTtProjectId = null;
+
+function openTimeTracker(projectId) {
+  let overlay = document.getElementById('timeTrackerOverlay');
+  if (!overlay) {
+    injectSharedModals();
+    overlay = document.getElementById('timeTrackerOverlay');
+  }
+  currentTtProjectId = projectId;
+  renderTimeTrackerModal(projectId);
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeTimeTracker() {
+  const overlay = document.getElementById('timeTrackerOverlay');
+  if (overlay) overlay.classList.remove('open');
+  currentTtProjectId = null;
+}
+
+function renderTimeTrackerModal(projectId) {
+  try {
+    const allProjs = (Array.isArray(projects) && projects.length) ? projects : JSON.parse(localStorage.getItem('mavic_projects') || '[]');
+    const p = allProjs.find(x => String(x.id) === String(projectId || currentTtProjectId));
+    if (!p) return;
+
+    const logs = p.timeLogs || [];
+    const totalMin = logs.reduce((s, l) => s + parseInt(l.minutes || 0), 0);
+    const totalHrs = (totalMin / 60).toFixed(1);
+    const projectVal = parseFloat(p.value || 0);
+
+    const hourlyRate = parseFloat(localStorage.getItem('mavic_hourlyRate') || 80);
+    const totalCost = (totalMin / 60) * hourlyRate;
+    const profitMargin = projectVal > 0 ? (((projectVal - totalCost) / projectVal) * 100).toFixed(1) : 0;
+    const isProfit = projectVal >= totalCost;
+
+    const timer = getActiveTimer();
+    const isThisRunning = timer && String(timer.projectId) === String(p.id) && !timer.pausedAt;
+
+    const titleEl = document.getElementById('ttModalTitle');
+    if (titleEl) {
+      titleEl.innerHTML = `<i class="bi bi-stopwatch" style="color:var(--accent)"></i> Apontamento de Horas — <strong>${escapeHtml(p.name)}</strong>`;
+    }
+
+    const kpiEl = document.getElementById('ttKpis');
+    if (kpiEl) {
+      kpiEl.innerHTML = `
+        <div class="tt-kpi-card">
+          <div class="tt-kpi-lbl">Total Trabalhado</div>
+          <div class="tt-kpi-val" style="color:var(--accent)">${formatMinutes(totalMin)}</div>
+          <div style="font-size:10.5px;color:var(--text3)">${totalHrs} horas</div>
+        </div>
+        <div class="tt-kpi-card">
+          <div class="tt-kpi-lbl">Valor Contrato</div>
+          <div class="tt-kpi-val" style="color:var(--green)">${fmt(projectVal)}</div>
+          <div style="font-size:10.5px;color:var(--text3)">Cliente: ${escapeHtml(p.client || '—')}</div>
+        </div>
+        <div class="tt-kpi-card">
+          <div class="tt-kpi-lbl">Custo Real (R$ ${hourlyRate}/h)</div>
+          <div class="tt-kpi-val" style="color:var(--red)">${fmt(totalCost)}</div>
+          <div style="font-size:10.5px;color:var(--text3)">Base operacional</div>
+        </div>
+        <div class="tt-kpi-card">
+          <div class="tt-kpi-lbl">Margem de Lucro</div>
+          <div class="tt-kpi-val" style="color:${isProfit ? 'var(--green)' : 'var(--red)'}">${profitMargin}%</div>
+          <div style="font-size:10.5px;color:var(--text3)">${isProfit ? 'Lucrativo' : 'Custo excedido'}</div>
+        </div>
+      `;
+    }
+
+    // Timer Controls
+    const timerCtrlEl = document.getElementById('ttTimerControls');
+    if (timerCtrlEl) {
+      timerCtrlEl.innerHTML = `
+        <div class="tt-timer-live-box">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0">
+            <div class="timer-live-dot" style="${!isThisRunning ? 'background:var(--text3);animation:none' : (timer && timer.pausedAt ? 'background:var(--yellow);animation:none' : '')}"></div>
+            <div>
+              <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px">
+                <span>Cronômetro em Tempo Real</span>
+                ${timer && String(timer.projectId) === String(p.id) ? `<span id="ttModalLiveClock" style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--accent)"></span>` : ''}
+              </div>
+              <div style="font-size:11px;color:var(--text3)">${isThisRunning ? 'Gravando atividade agora…' : (timer && timer.pausedAt ? 'Pausado' : 'Inicie para cronometrar sua sessão')}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${isThisRunning ? `
+              <button class="btn btn-sm btn-ghost" onclick="pauseGlobalTimer();renderTimeTrackerModal('${p.id}')" title="Pausar"><i class="bi bi-pause-fill"></i> Pausar</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="stopGlobalTimer(true);renderTimeTrackerModal('${p.id}')"><i class="bi bi-stop-fill"></i> Parar e Salvar</button>
+            ` : (timer && String(timer.projectId) === String(p.id) && timer.pausedAt ? `
+              <button class="btn btn-sm btn-primary" onclick="pauseGlobalTimer();renderTimeTrackerModal('${p.id}')"><i class="bi bi-play-fill"></i> Retomar</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="stopGlobalTimer(true);renderTimeTrackerModal('${p.id}')"><i class="bi bi-stop-fill"></i> Parar e Salvar</button>
+            ` : `
+              <button class="btn btn-sm btn-primary" onclick="startGlobalTimer('${p.id}');renderTimeTrackerModal('${p.id}')"><i class="bi bi-play-fill"></i> Iniciar Cronômetro</button>
+            `)}
+          </div>
+        </div>
+      `;
+    }
+
+  // Logs List
+  const logsEl = document.getElementById('ttLogsList');
+  if (logsEl) {
+    if (logs.length === 0) {
+      logsEl.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px"><i class="bi bi-clock-history" style="font-size:24px;display:block;margin-bottom:6px"></i>Nenhum apontamento de horas registrado neste projeto.</div>`;
+    } else {
+      logsEl.innerHTML = logs.map(l => {
+        const dStr = l.date ? new Date(l.date + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+        return `
+          <div class="tt-log-item">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <span class="badge" style="font-size:11px;padding:3px 7px;background:var(--surface2);color:var(--text2);white-space:nowrap">${dStr}</span>
+              <div style="min-width:0">
+                <div style="font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(l.desc || 'Atividade')}</div>
+                <div style="font-size:11px;color:var(--text3)">Etapa: <strong>${escapeHtml(l.stage || 'Geral')}</strong> · ${escapeHtml(l.author || 'Victor')}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <strong style="font-family:'Space Grotesk',sans-serif;font-size:13px;color:var(--accent);white-space:nowrap">${formatMinutes(l.minutes)}</strong>
+              <button class="btn-icon btn-sm" style="color:var(--red)" onclick="deleteProjectTimeLog('${p.id}', '${l.id}')" title="Excluir apontamento"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  const manualDate = document.getElementById('ttManualDate');
+  if (manualDate) manualDate.value = today();
+  } catch(err) {
+    console.error('Erro ao renderizar modal de horas:', err);
+  }
+}
+
+function saveManualTimeLog() {
+  if (!currentTtProjectId) return;
+  const allProjs = (Array.isArray(projects) && projects.length) ? projects : JSON.parse(localStorage.getItem('mavic_projects') || '[]');
+  const p = allProjs.find(x => String(x.id) === String(currentTtProjectId));
+  if (!p) return;
+
+  const date = document.getElementById('ttManualDate')?.value || today();
+  const hours = parseFloat(document.getElementById('ttManualHours')?.value || 0);
+  const minutes = parseInt(document.getElementById('ttManualMinutes')?.value || 0);
+  const totalMin = Math.round((hours * 60) + minutes);
+
+  const stage = p.column || 'Geral';
+  const desc = document.getElementById('ttManualDesc')?.value.trim() || 'Trabalho realizado';
+
+  if (totalMin <= 0) {
+    return showToast('Informe ao menos 1 minuto de trabalho.', 'warning');
+  }
+
+  addProjectTimeLog(p.id, {
+    date: date,
+    minutes: totalMin,
+    stage: stage,
+    desc: desc,
+    author: 'Victor'
+  });
+
+  document.getElementById('ttManualHours').value = '';
+  document.getElementById('ttManualMinutes').value = '';
+  document.getElementById('ttManualDesc').value = '';
+
+  renderTimeTrackerModal(p.id);
+  showToast('Horas registradas com sucesso!', 'success');
+}
+
 // Ping Supabase every 30 mins to prevent database pausing
 setInterval(async()=>{
   if(!sb)return;
@@ -2299,6 +3449,9 @@ setInterval(async()=>{
 },30*60*1000);
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Inject shared layout, navbar and modals
+  injectSharedLayout();
+
   // Automatically unregister Service Worker on localhost to prevent dev cache freezes
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
     if ('serviceWorker' in navigator) {
@@ -2320,6 +3473,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bind default values to theme
   applyTheme(localStorage.getItem('mavic_theme') || 'light');
   highlightActiveTab();
+  renderGlobalTimerBar();
 
   await reloadPageData();
   document.body.classList.remove('preload');
@@ -2601,6 +3755,14 @@ document.addEventListener('keydown', (e) => {
       ov.style.display = 'none';
     });
     document.querySelectorAll('.sort-menu.open, .table-action-dropdown.open').forEach(dd => dd.classList.remove('open'));
+  }
+});
+
+// Sincronização em tempo real do cronômetro entre abas e páginas
+window.addEventListener('storage', (e) => {
+  if (e.key === 'mavic_active_timer' || e.key === 'mavic_projects') {
+    if (typeof renderGlobalTimerBar === 'function') renderGlobalTimerBar();
+    if (typeof renderBoard === 'function') renderBoard();
   }
 });
 

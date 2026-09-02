@@ -2045,10 +2045,34 @@ textarea.inp {
   padding: 16px 24px;
   border-top: 1px solid var(--border);
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   border-radius: 0 0 28px 28px;
   background: var(--surface);
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.mftr .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mftr .btn-txt,
+.mftr .btn-text {
+  display: inline;
+}
+
+.mftr-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  margin-left: auto;
 }
 
 /* Rodapé do modal de confirmação (pode ter 3+ botões) */
@@ -5282,10 +5306,52 @@ textarea.inp {
     padding-bottom: max(16px, env(safe-area-inset-bottom, 12px)) !important;
   }
 
-  /* Botões do rodapé nunca podem vazar da tela: empilham em largura total */
+  /* Botões do rodapé no mobile: SEMPRE EM UMA LINHA SÓ e APENAS ÍCONES */
   .mftr {
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    white-space: nowrap !important;
   }
+  .mftr::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .mftr .btn-txt,
+  .mftr .btn-text {
+    display: none !important;
+  }
+
+  .mftr .btn {
+    padding: 8px 12px !important;
+    min-height: 38px !important;
+    min-width: 38px !important;
+    font-size: 15px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+
+  .mftr .btn i {
+    font-size: 16px !important;
+    margin: 0 !important;
+  }
+
+  .mftr-actions {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-left: auto !important;
+  }
+
   .confirm-ftr {
     flex-direction: column !important;
     align-items: stretch !important;

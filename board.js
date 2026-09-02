@@ -2715,7 +2715,7 @@ function clearAllReviewFiles() {
   });
 }
 
-async function saveSendReview(notifyWhatsApp = false) {
+async function saveSendReview(mode = false) {
   const projId = parseInt(document.getElementById('sendReviewProjId').value);
   const p = projects.find(x => x.id === projId);
   if (!p) return;
@@ -2731,10 +2731,18 @@ async function saveSendReview(notifyWhatsApp = false) {
   renderBoard();
   scheduleSync();
 
-  showToast(`Projeto "${p.name}" atualizado em Revisão com ${p.reviewFiles.length} arquivo${p.reviewFiles.length !== 1 ? 's' : ''}!`, 'success');
-
-  if (notifyWhatsApp) {
+  if (mode === 'copy') {
+    const msg = getWhatsAppApprovalMessage(p.id, notes);
+    if (msg) {
+      copyTextToClipboard(msg, 'Mensagem copiada para a área de transferência! 📋');
+    } else {
+      showToast(`Projeto "${p.name}" atualizado em Revisão!`, 'success');
+    }
+  } else if (mode === true || mode === 'whatsapp') {
+    showToast(`Projeto "${p.name}" atualizado em Revisão com ${p.reviewFiles.length} arquivo${p.reviewFiles.length !== 1 ? 's' : ''}!`, 'success');
     openWhatsAppApprovalRequest(p.id);
+  } else {
+    showToast(`Projeto "${p.name}" atualizado em Revisão com ${p.reviewFiles.length} arquivo${p.reviewFiles.length !== 1 ? 's' : ''}!`, 'success');
   }
 }
 
@@ -2754,7 +2762,7 @@ async function cleanupProjectReviewFiles(p) {
   }
 }
 
-function getWhatsAppApprovalMessage(projId) {
+function getWhatsAppApprovalMessage(projId, customNotes) {
   const p = projects.find(x => x.id === projId);
   if (!p) return '';
   const cl = clients.find(c => (c.name || '').toLowerCase().trim() === (p.client || '').toLowerCase().trim());
@@ -2764,9 +2772,13 @@ function getWhatsAppApprovalMessage(projId) {
   }
   const clientFirstName = (cl?.name || p.client || 'Cliente').trim().split(' ')[0];
   const link = cl?.token ? buildLink(cl.name, cl.token) : '';
+  const notes = (customNotes !== undefined ? customNotes : (p.reviewNotes || '')).trim();
 
   let msg = `Olá, *${clientFirstName}*! Tudo bem?\n\n`;
   msg += `Seu projeto *${p.name}* está pronto para sua avaliação e aprovação! 🌟\n\n`;
+  if (notes) {
+    msg += `📝 *Orientações:* ${notes}\n\n`;
+  }
   if (link) {
     msg += `Acesse seu painel exclusivo para conferir e aprovar com 1 clique:\n👉 ${link}\n\n`;
   }
@@ -2784,11 +2796,19 @@ function openWhatsAppApprovalRequest(projId) {
   const p = projects.find(x => x.id === projId);
   if (!p) return;
   const cl = clients.find(c => (c.name || '').toLowerCase().trim() === (p.client || '').toLowerCase().trim());
-  if (!cl || !cl.phone) return showToast('Cliente sem WhatsApp cadastrado', 'warning');
+  const msg = getWhatsAppApprovalMessage(projId);
+
+  if (!cl || !cl.phone) {
+    if (msg) {
+      copyTextToClipboard(msg, 'Cliente sem WhatsApp cadastrado. A mensagem foi copiada para a área de transferência! 📋');
+    } else {
+      showToast('Cliente sem WhatsApp cadastrado', 'warning');
+    }
+    return;
+  }
 
   const raw = cl.phone.replace(/\D/g, '');
   const num = raw.length <= 11 ? '55' + raw : raw;
-  const msg = getWhatsAppApprovalMessage(projId);
 
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(msg).then(() => {
@@ -3011,6 +3031,14 @@ Passando para informar sobre o andamento do projeto *{Projeto}*:
 {TarefaAtual}
 {Observacao}
 {LinkPainel}
+_Equipe MAVIC Projetos_`,
+
+  review: `Olá, *{Cliente}*! Tudo bem?
+
+Seu projeto *{Projeto}* está pronto para sua avaliação e aprovação! 🌟
+{Observacao}
+{LinkPainel}
+Qualquer dúvida ou ajuste necessário, estou à disposição!
 _Equipe MAVIC Projetos_`,
 
   payment: `Olá, *{Cliente}*!

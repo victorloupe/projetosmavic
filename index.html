@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=128">
+<link rel="stylesheet" href="index.css?v=129">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="config.js"></script>
@@ -332,15 +332,15 @@
       </div>
     </div>
   </div>
-  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn btn-danger" id="btnDelProj" onclick="deleteCurrentProject()" style="display:none"><i class="bi bi-trash"></i> Excluir</button>
-      <button type="button" class="btn btn-ghost btn-sm" id="btnProjTimeTracker" onclick="openTimeTracker(parseInt(document.getElementById('projId').value))" style="display:none"><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Horas & Lucratividade</button>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:nowrap">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap">
+      <button class="btn btn-danger" id="btnDelProj" onclick="deleteCurrentProject()" style="display:none" title="Excluir"><i class="bi bi-trash"></i> <span class="btn-txt">Excluir</span></button>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnProjTimeTracker" onclick="openTimeTracker(parseInt(document.getElementById('projId').value))" style="display:none" title="Horas & Lucratividade"><i class="bi bi-stopwatch" style="color:var(--accent)"></i> <span class="btn-txt">Horas</span></button>
     </div>
-    <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
-      <button class="btn btn-ghost" id="btnArchProj" onclick="archiveCurrentProject()"><i class="bi bi-archive"></i> Arquivar</button>
-      <button class="btn btn-ghost" onclick="closeProjectModal(true)">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveProject()"><i class="bi bi-check2"></i> Salvar</button>
+    <div class="mftr-actions" style="display:flex;gap:6px;margin-left:auto;align-items:center;flex-wrap:nowrap">
+      <button class="btn btn-ghost" id="btnArchProj" onclick="archiveCurrentProject()" title="Arquivar"><i class="bi bi-archive"></i> <span class="btn-txt">Arquivar</span></button>
+      <button class="btn btn-ghost" onclick="closeProjectModal(true)" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+      <button class="btn btn-primary" onclick="saveProject()" title="Salvar"><i class="bi bi-check2"></i> <span class="btn-txt">Salvar</span></button>
     </div>
   </div>
 </div>
@@ -362,7 +362,10 @@
     </div>
     <div class="fld"><label class="flbl">Mensagem *</label><textarea class="inp" id="notifyMsg" rows="4" placeholder="Escreva o aviso que o cliente verá no painel…"></textarea></div>
   </div>
-  <div class="mftr"><button class="btn btn-ghost" onclick="closeNotifyModal()">Cancelar</button><button class="btn btn-success" onclick="sendNotification()"><i class="bi bi-send"></i> Enviar Aviso</button></div>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:nowrap">
+    <button class="btn btn-ghost" onclick="closeNotifyModal()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+    <button class="btn btn-success" onclick="sendNotification()" title="Enviar Aviso"><i class="bi bi-send"></i> <span class="btn-txt">Enviar Aviso</span></button>
+  </div>
 </div>
 </div>
 
@@ -374,9 +377,9 @@
     <div style="display:flex;flex-direction:column;gap:10px" id="qmManagerList"></div>
     <button class="btn btn-ghost btn-sm mt-3" onclick="addQuickMsgInput()"><i class="bi bi-plus-lg"></i> Nova Mensagem Rápida</button>
   </div>
-  <div class="mftr">
-    <button class="btn btn-ghost" onclick="closeManageQuickMsgsModal()">Cancelar</button>
-    <button class="btn btn-primary" onclick="saveQuickMsgs()"><i class="bi bi-check2"></i> Salvar Alterações</button>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:nowrap">
+    <button class="btn btn-ghost" onclick="closeManageQuickMsgsModal()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+    <button class="btn btn-primary" onclick="saveQuickMsgs()" title="Salvar Alterações"><i class="bi bi-check2"></i> <span class="btn-txt">Salvar Alterações</span></button>
   </div>
 </div>
 </div>
@@ -389,7 +392,10 @@
     <div style="display:flex;flex-direction:column;gap:8px" id="colManagerList"></div>
     <button class="btn btn-ghost btn-sm mt-3" onclick="addColInput()"><i class="bi bi-plus-lg"></i> Nova Coluna</button>
   </div>
-  <div class="mftr"><button class="btn btn-ghost" onclick="closeManageColumnsModal()">Cancelar</button><button class="btn btn-primary" onclick="saveColumnsConfig()">Salvar Alterações</button></div>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:nowrap">
+    <button class="btn btn-ghost" onclick="closeManageColumnsModal()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+    <button class="btn btn-primary" onclick="saveColumnsConfig()" title="Salvar Alterações"><i class="bi bi-check2"></i> <span class="btn-txt">Salvar Alterações</span></button>
+  </div>
 </div>
 </div>
 
@@ -434,6 +440,7 @@
           <select class="inp inp-sm" id="waPresetSelect" style="width:auto;font-size:11.5px;padding:3px 8px" onchange="applyWaPreset(this.value)">
             <option value="default">Template Padrão</option>
             <option value="update">Atualização de Etapa</option>
+            <option value="review">Revisão & Aprovação</option>
             <option value="payment">Resumo Financeiro</option>
             <option value="installment">Lembrete de Parcela</option>
             <option value="receipt">Comprovante de Pagamento</option>
@@ -449,10 +456,12 @@
       <textarea class="inp" id="waMsg" rows="11" style="font-size:13px;line-height:1.6;resize:vertical"></textarea>
     </div>
   </div>
-  <div class="mftr">
-    <button class="btn btn-ghost" onclick="copyWhatsAppMsg()"><i class="bi bi-clipboard"></i> Copiar</button>
-    <button class="btn btn-ghost" onclick="closeWaModal()">Cancelar</button>
-    <button class="btn" style="background:#25D366;color:#fff" onclick="sendWhatsApp()"><i class="bi bi-whatsapp"></i> Abrir no WhatsApp</button>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:nowrap">
+    <button class="btn btn-ghost" onclick="closeWaModal()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+    <div class="mftr-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap">
+      <button class="btn btn-ghost" onclick="copyWhatsAppMsg()" title="Copiar Mensagem"><i class="bi bi-clipboard"></i> <span class="btn-txt">Copiar</span></button>
+      <button class="btn" style="background:#25D366;color:#fff" onclick="sendWhatsApp()" title="Abrir no WhatsApp"><i class="bi bi-whatsapp"></i> <span class="btn-txt">Abrir no WhatsApp</span></button>
+    </div>
   </div>
 </div>
 </div>
@@ -488,11 +497,11 @@
       <div id="pfSubfoldersList" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto"></div>
     </div>
   </div>
-  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center">
-    <button type="button" class="btn btn-ghost btn-sm" id="pfBtnEditPath" onclick="editFolderFromModal()" style="font-size:12px">
-      <i class="bi bi-pencil"></i> Alterar Caminho
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:nowrap">
+    <button type="button" class="btn btn-ghost btn-sm" id="pfBtnEditPath" onclick="editFolderFromModal()" style="font-size:12px" title="Alterar Caminho">
+      <i class="bi bi-pencil"></i> <span class="btn-txt">Alterar Caminho</span>
     </button>
-    <button type="button" class="btn btn-ghost" onclick="closeProjFoldersModal()">Fechar</button>
+    <button type="button" class="btn btn-ghost" onclick="closeProjFoldersModal()" title="Fechar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Fechar</span></button>
   </div>
 </div>
 </div>
@@ -524,8 +533,8 @@
       <div id="revLogsList" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto"></div>
     </div>
   </div>
-  <div class="mftr">
-    <button class="btn btn-ghost" onclick="closeRevisionLogModal()">Fechar</button>
+  <div class="mftr" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:nowrap">
+    <button class="btn btn-ghost" onclick="closeRevisionLogModal()" title="Fechar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Fechar</span></button>
   </div>
 </div>
 </div>
@@ -593,22 +602,27 @@
       <textarea id="sendReviewNotes" class="inp" rows="2" placeholder="Ex: Renders da sala com iluminação indireta e opção de piso acetinado. Avalie e confirme a aprovação…" style="width:100%;font-size:12.5px;resize:vertical"></textarea>
     </div>
   </div>
-  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center">
-    <button type="button" class="btn btn-ghost" onclick="closeSendReviewModal()">Cancelar</button>
-    <div style="display:flex;gap:8px">
-      <button type="button" class="btn btn-ghost" onclick="saveSendReview(false)" id="btnSaveReviewOnly">
-        <i class="bi bi-check2"></i> Salvar
+  <div class="mftr send-review-ftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:nowrap">
+    <button type="button" class="btn btn-ghost" onclick="closeSendReviewModal()" title="Cancelar">
+      <i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span>
+    </button>
+    <div class="mftr-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap">
+      <button type="button" class="btn btn-ghost" onclick="saveSendReview(false)" id="btnSaveReviewOnly" title="Salvar">
+        <i class="bi bi-check2"></i> <span class="btn-txt">Salvar</span>
       </button>
-      <button type="button" class="btn btn-primary" onclick="saveSendReview(true)" id="btnSaveAndNotifyReview" style="background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700">
-        <i class="bi bi-whatsapp"></i> Salvar & Avisar no WhatsApp
+      <button type="button" class="btn btn-ghost" onclick="saveSendReview('copy')" id="btnSaveAndCopyReview" style="border:1px solid var(--border)" title="Copiar Mensagem">
+        <i class="bi bi-clipboard"></i> <span class="btn-txt">Copiar Mensagem</span>
+      </button>
+      <button type="button" class="btn btn-primary" onclick="saveSendReview(true)" id="btnSaveAndNotifyReview" style="background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700" title="Salvar & Avisar no WhatsApp">
+        <i class="bi bi-whatsapp"></i> <span class="btn-txt">Salvar & Avisar</span>
       </button>
     </div>
   </div>
 </div>
 </div>
 
-<script src="common.js?v=140"></script>
-<script src="board.js?v=140"></script>
+<script src="common.js?v=141"></script>
+<script src="board.js?v=141"></script>
 <script>
   // Board column popover selector helper
   function toggleColsMenu() {

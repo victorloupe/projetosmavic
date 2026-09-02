@@ -2662,24 +2662,34 @@ async function handleReviewFilesSelected(fileList) {
 
   if (progWrap) progWrap.style.display = 'block';
 
-  let completed = 0;
+  let successCount = 0;
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (progLbl) progLbl.innerHTML = `<span class="spin" style="width:11px;height:11px;display:inline-block"></span> Enviando "${escapeHtml(file.name)}" (${i + 1}/${files.length})...`;
     try {
       if (typeof uploadReviewFile === 'function') {
-        const reviewFile = await uploadReviewFile(file, projId);
+        const reviewFile = await uploadReviewFile(file, projId, (subPct, statusText) => {
+          if (progLbl && statusText) {
+            progLbl.innerHTML = `<span class="spin" style="width:11px;height:11px;display:inline-block"></span> ${escapeHtml(statusText)}`;
+          }
+          if (progBar && typeof subPct === 'number') {
+            const overallPct = Math.min(99, Math.round(((i + (subPct / 100)) / files.length) * 100));
+            progBar.style.width = `${overallPct}%`;
+            if (progPct) progPct.textContent = `${overallPct}%`;
+          }
+        });
         tempReviewFiles.push(reviewFile);
+        successCount++;
       } else {
         showToast('Módulo de upload não inicializado.', 'error');
         break;
       }
     } catch (err) {
       console.error('Falha no upload do arquivo:', err);
-      showToast(`Erro ao enviar "${file.name}".`, 'error');
+      const errMsg = err?.message || err?.error_description || (typeof err === 'string' ? err : 'Erro no Storage');
+      showToast(`Erro ao enviar "${file.name}": ${errMsg}`, 'error');
     }
-    completed++;
-    const pct = Math.round((completed / files.length) * 100);
+    const pct = Math.round(((i + 1) / files.length) * 100);
     if (progBar) progBar.style.width = `${pct}%`;
     if (progPct) progPct.textContent = `${pct}%`;
   }
@@ -2689,7 +2699,9 @@ async function handleReviewFilesSelected(fileList) {
   }
 
   renderSendReviewFilesList();
-  showToast(`${completed} arquivo${completed > 1 ? 's' : ''} carregado${completed > 1 ? 's' : ''} com sucesso!`, 'success');
+  if (successCount > 0) {
+    showToast(`${successCount} arquivo${successCount > 1 ? 's' : ''} carregado${successCount > 1 ? 's' : ''} com sucesso!`, 'success');
+  }
   const inp = document.getElementById('reviewFileInput');
   if (inp) inp.value = '';
 }

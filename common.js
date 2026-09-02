@@ -267,6 +267,141 @@ async function uploadToSupabaseStorage(file, folder = 'uploads') {
   return urlData?.publicUrl || '';
 }
 
+// Carrega scripts dinamicamente sob demanda
+function loadScriptAsync(src) {
+  if (document.querySelector(`script[src="${src}"]`)) return Promise.resolve(true);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve(true);
+    s.onerror = (e) => reject(new Error(`Falha ao carregar ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+// Otimiza imagens muito pesadas (>3MB ou PNGs enormes) redimensionando e comprimindo
+async function optimizeHeavyImage(file, maxDimension = 3840, quality = 0.88) {
+  if (!file) return file;
+  const isImg = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name || '');
+  if (!isImg) return file;
+
+  // Se já for menor que 3.5MB e não for PNG, não precisa recomprimir
+  if (file.size <= 3.5 * 1024 * 1024 && !file.name.toLowerCase().endsWith('.png')) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob && blob.size < file.size) {
+            const ext = file.name.toLowerCase().endsWith('.webp') ? '.webp' : '.jpeg';
+            const mime = ext === '.webp' ? 'image/webp' : 'image/jpeg';
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, ext), { type: mime }));
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Otimiza PDFs pesados (>30MB) no próprio navegador via PDF.js e jsPDF
+async function optimizeHeavyPdf(file, onProgress) {
+  if (!file || file.size <= 30 * 1024 * 1024) {
+    return file; // Menor que 30MB, envia diretamente
+  }
+
+  try {
+    if (onProgress) onProgress(10, `Otimizando PDF pesado (${(file.size / (1024*1024)).toFixed(1)} MB)...`);
+
+    // Carrega PDF.js e jsPDF sob demanda
+    if (!window.pdfjsLib) {
+      await loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    }
+    if (!window.jspdf) {
+      await loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const numPages = pdf.numPages;
+    if (numPages === 0) return file;
+
+    const { jsPDF } = window.jspdf;
+    let doc = null;
+
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      if (onProgress) {
+        onProgress(15 + Math.round((pageNum / numPages) * 70), `Otimizando PDF (página ${pageNum}/${numPages})...`);
+      }
+
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      const pageDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+      const isLandscape = viewport.width > viewport.height;
+      const orientation = isLandscape ? 'landscape' : 'portrait';
+      const format = [viewport.width, viewport.height];
+
+      if (pageNum === 1) {
+        doc = new jsPDF({ orientation, unit: 'px', format });
+        doc.addImage(pageDataUrl, 'JPEG', 0, 0, viewport.width, viewport.height);
+      } else {
+        doc.addPage(format, orientation);
+        doc.addImage(pageDataUrl, 'JPEG', 0, 0, viewport.width, viewport.height);
+      }
+    }
+
+    if (onProgress) onProgress(90, 'Finalizando compressão do PDF...');
+    const outputBlob = doc.output('blob');
+    if (outputBlob && outputBlob.size < file.size) {
+      console.log(`PDF otimizado de ${(file.size / (1024*1024)).toFixed(1)}MB para ${(outputBlob.size / (1024*1024)).toFixed(1)}MB`);
+      return new File([outputBlob], file.name, { type: 'application/pdf' });
+    }
+    return file;
+  } catch (err) {
+    console.warn('Compressão automática de PDF indisponível, enviando arquivo original:', err);
+    return file;
+  }
+}
+
 // Gera versão otimizada de alta fidelidade para visualização rápida no painel (WebP/JPEG 2048px)
 async function createOptimizedPreviewBlob(file, maxDimension = 2048, quality = 0.85) {
   if (!file || !file.type || !file.type.startsWith('image/')) return null;
@@ -319,23 +454,40 @@ async function createOptimizedPreviewBlob(file, maxDimension = 2048, quality = 0
 }
 
 // Faz upload de arquivos de revisão com Dual-Stream (original em alta resolução + preview web otimizado)
-async function uploadReviewFile(file, projId) {
+async function uploadReviewFile(file, projId, onProgress = null) {
   if (!sb || !sb.storage) {
     throw new Error('Supabase Storage não está disponível.');
   }
 
-  const cleanName = (file.name || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const rawName = file.name || 'arquivo';
+  const cleanName = rawName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
   const uid = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-  const isImage = file.type && file.type.startsWith('image/');
+  const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(rawName);
+  const isPdf = (file.type && (file.type === 'application/pdf' || file.type.includes('pdf'))) || /\.pdf$/i.test(rawName);
   const storagePaths = [];
 
-  // 1. Upload do Arquivo Original (sem perda de resolução, para download do cliente)
+  // Otimização automática se o arquivo for muito pesado
+  let fileToUpload = file;
+  if (isImage) {
+    fileToUpload = await optimizeHeavyImage(file, 3840, 0.88);
+  } else if (isPdf && file.size > 30 * 1024 * 1024) {
+    fileToUpload = await optimizeHeavyPdf(file, onProgress);
+  }
+
+  const mimeType = fileToUpload.type || (isPdf ? 'application/pdf' : isImage ? 'image/jpeg' : 'application/octet-stream');
+
+  // 1. Upload do Arquivo Original (sem perda de resolução, para download/visualização do cliente)
+  if (onProgress) onProgress(92, `Enviando "${cleanName}" (${(fileToUpload.size / (1024*1024)).toFixed(1)} MB)...`);
   const origPath = `reviews/${projId}/${uid}_orig_${cleanName}`;
-  const { error: origErr } = await sb.storage.from('mavic_files').upload(origPath, file, {
+  const { data: uploadData, error: origErr } = await sb.storage.from('mavic_files').upload(origPath, fileToUpload, {
+    contentType: mimeType,
     cacheControl: '31536000',
     upsert: true
   });
-  if (origErr) throw origErr;
+  if (origErr) {
+    console.error('Erro no upload para o Storage:', origErr);
+    throw new Error(origErr.message || origErr.error_description || 'Falha ao salvar no Storage');
+  }
   storagePaths.push(origPath);
 
   const { data: origUrlData } = sb.storage.from('mavic_files').getPublicUrl(origPath);
@@ -345,10 +497,11 @@ async function uploadReviewFile(file, projId) {
   let previewUrl = originalUrl;
   if (isImage) {
     try {
-      const previewFile = await createOptimizedPreviewBlob(file, 2048, 0.85);
+      const previewFile = await createOptimizedPreviewBlob(fileToUpload, 2048, 0.85);
       if (previewFile) {
         const prevPath = `reviews/${projId}/${uid}_prev_${cleanName.replace(/\.[^.]+$/, '.webp')}`;
         const { error: prevErr } = await sb.storage.from('mavic_files').upload(prevPath, previewFile, {
+          contentType: 'image/webp',
           cacheControl: '31536000',
           upsert: true
         });
@@ -366,8 +519,8 @@ async function uploadReviewFile(file, projId) {
   return {
     id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     name: file.name,
-    type: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'),
-    size: file.size || 0,
+    type: mimeType,
+    size: fileToUpload.size || file.size || 0,
     originalUrl,
     previewUrl,
     storagePaths,

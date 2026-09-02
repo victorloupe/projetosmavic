@@ -1,4 +1,4 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- MAVIC Projetos — Configuração de Segurança, RLS e Supabase Storage
 -- Execute este script no SQL Editor do seu painel Supabase (https://supabase.com/dashboard)
 -- ==============================================================================
@@ -37,10 +37,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mavic_store;
 -- em vez de Base64, evitando limites de memória no LocalStorage.
 -- ==============================================================================
 
--- Garante a criação do bucket público 'mavic_files'
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('mavic_files', 'mavic_files', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
+-- Garante a criação do bucket público 'mavic_files' com limite de 50MB
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('mavic_files', 'mavic_files', true, 52428800)
+ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = 52428800;
 
 -- Remove políticas antigas do Storage se existirem
 DROP POLICY IF EXISTS "Storage Leitura Publica" ON storage.objects;

@@ -216,6 +216,17 @@
             </button>
           </div>
         </div>
+
+        <!-- ARQUIVOS & RENDERS DE REVISÃO DO CLIENTE -->
+        <div class="fld" id="projEditReviewSection" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <label class="flbl" style="margin:0"><i class="bi bi-images" style="color:var(--accent)"></i> Renders & Revisão (<span id="projEditReviewCount">0</span>)</label>
+            <button type="button" class="btn btn-ghost btn-xs" id="btnManageProjReviewFiles" onclick="openSendReviewFromEditModal()" style="font-size:11px;color:var(--accent);display:inline-flex;align-items:center;gap:4px">
+              <i class="bi bi-cloud-arrow-up"></i> Gerenciar / Upload
+            </button>
+          </div>
+          <div id="projEditReviewThumbList" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;min-height:28px;align-items:center"></div>
+        </div>
       </div>
       
       <!-- COL 2 -->
@@ -519,8 +530,85 @@
 </div>
 </div>
 
-<script src="common.js?v=118"></script>
-<script src="board.js?v=119"></script>
+<!-- ══ MODAL DE ENVIO PARA REVISÃO / ARQUIVOS PARA O CLIENTE ══ -->
+<div class="overlay" id="sendReviewOverlay" onclick="if(event.target===this)closeSendReviewModal()">
+<div class="mbox mmd" style="max-width:580px">
+  <div class="mhdr">
+    <h5 style="color:var(--accent);display:flex;align-items:center;gap:8px">
+      <i class="bi bi-images"></i> <span id="sendReviewModalTitle">Enviar para Revisão do Cliente</span>
+    </h5>
+    <button class="btn-icon btn-sm" onclick="closeSendReviewModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody" style="display:flex;flex-direction:column;gap:14px">
+    <input type="hidden" id="sendReviewProjId" value="">
+    
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-weight:700;font-size:13.5px;color:var(--text)" id="sendReviewProjName">Nome do Projeto</div>
+        <div style="font-size:11.5px;color:var(--text3)"><i class="bi bi-person"></i> <span id="sendReviewClientName">Cliente</span></div>
+      </div>
+      <span class="badge" style="background:rgba(37,99,235,0.12);color:#2563eb;font-weight:700;font-size:11px">
+        <i class="bi bi-bell-fill"></i> Revisão & Aprovação
+      </span>
+    </div>
+
+    <!-- DROPZONE DE ARQUIVOS -->
+    <div class="fld" style="margin:0">
+      <label class="flbl"><i class="bi bi-cloud-arrow-up"></i> Imagens e Arquivos para Avaliação do Cliente</label>
+      <div id="reviewDropzone" class="review-dropzone" onclick="document.getElementById('reviewFileInput').click()" ondragover="handleReviewDragOver(event)" ondragleave="handleReviewDragLeave(event)" ondrop="handleReviewDrop(event)">
+        <input type="file" id="reviewFileInput" multiple accept="image/*,application/pdf" style="display:none" onchange="handleReviewFilesSelected(this.files)">
+        <i class="bi bi-cloud-arrow-up review-drop-icon"></i>
+        <div style="font-weight:600;font-size:13px;color:var(--text)">Arraste os renders e PDFs aqui</div>
+        <div style="font-size:11.5px;color:var(--text3)">ou clique para selecionar do computador (PNG, JPG, PDF)</div>
+      </div>
+    </div>
+
+    <!-- BARRA DE PROGRESSO DE UPLOAD -->
+    <div id="reviewUploadProgressWrap" style="display:none;background:var(--surface2);padding:10px 12px;border-radius:8px;border:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:600;margin-bottom:6px">
+        <span id="reviewUploadProgressLabel"><span class="spin" style="width:11px;height:11px;display:inline-block"></span> Enviando arquivos...</span>
+        <span id="reviewUploadProgressPct">0%</span>
+      </div>
+      <div style="width:100%;height:6px;background:var(--border);border-radius:999px;overflow:hidden">
+        <div id="reviewUploadProgressBar" style="width:0%;height:100%;background:var(--accent);transition:width .2s"></div>
+      </div>
+    </div>
+
+    <!-- LISTA DE ARQUIVOS ANEXADOS -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2)"><i class="bi bi-paperclip"></i> Arquivos Anexados (<span id="sendReviewFilesCount">0</span>)</div>
+        <button type="button" class="btn btn-ghost btn-xs" id="btnClearAllReviewFiles" onclick="clearAllReviewFiles()" style="font-size:11px;color:var(--red);display:none">
+          <i class="bi bi-trash"></i> Remover todos
+        </button>
+      </div>
+      <div id="sendReviewFilesList" class="send-review-files-list">
+        <!-- Renderizado dinamicamente -->
+      </div>
+    </div>
+
+    <!-- MENSAGEM / RECADO PARA O CLIENTE -->
+    <div class="fld" style="margin:0">
+      <label class="flbl"><i class="bi bi-chat-left-text"></i> Mensagem / Orientações para o Cliente (Opcional)</label>
+      <textarea id="sendReviewNotes" class="inp" rows="2" placeholder="Ex: Renders da sala com iluminação indireta e opção de piso acetinado. Avalie e confirme a aprovação…" style="width:100%;font-size:12.5px;resize:vertical"></textarea>
+    </div>
+  </div>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center">
+    <button type="button" class="btn btn-ghost" onclick="closeSendReviewModal()">Cancelar</button>
+    <div style="display:flex;gap:8px">
+      <button type="button" class="btn btn-ghost" onclick="saveSendReview(false)" id="btnSaveReviewOnly">
+        <i class="bi bi-check2"></i> Salvar
+      </button>
+      <button type="button" class="btn btn-primary" onclick="saveSendReview(true)" id="btnSaveAndNotifyReview" style="background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700">
+        <i class="bi bi-whatsapp"></i> Salvar & Avisar no WhatsApp
+      </button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script src="common.js?v=140"></script>
+<script src="board.js?v=140"></script>
 <script>
   // Board column popover selector helper
   function toggleColsMenu() {

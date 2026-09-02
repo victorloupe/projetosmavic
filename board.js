@@ -525,7 +525,15 @@ function createCardHTML(p, cardIdx=0){
     if (latestLog && latestLog.text) {
       const dLog = latestLog.timestamp ? new Date(latestLog.timestamp) : (latestLog.date ? new Date(latestLog.date + 'T12:00:00') : new Date());
       const dStr = dLog.toLocaleDateString('pt-BR') + (latestLog.timestamp ? ` às ${dLog.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : '');
-      const isClient = latestLog.author && latestLog.author.toLowerCase() !== 'mavic';
+      const hasPins = Array.isArray(latestLog.pins) && latestLog.pins.length > 0;
+      const pinsBadgeHtml = hasPins ? `
+        <div style="margin-top:4px">
+          <span class="badge" style="background:rgba(234,88,12,0.18);color:#ea580c;font-size:10px;font-weight:700;padding:2px 6px;display:inline-flex;align-items:center;gap:3px">
+            <i class="bi bi-pin-map-fill"></i> ${latestLog.pins.length} marcaç${latestLog.pins.length === 1 ? 'ão' : 'ões'} no render
+          </span>
+        </div>
+      ` : '';
+
       latestClientRevNoteHtml = `
         <div class="kcard-rev-note" style="background:${isClient ? 'rgba(234,88,12,0.08)' : 'var(--surface2)'};border:1px solid ${isClient ? 'rgba(234,88,12,0.3)' : 'var(--border)'};border-radius:8px;padding:7px 9px;margin-top:6px;font-size:11.5px;display:flex;flex-direction:column;gap:3px;cursor:pointer" onclick="openRevisionLogModal(${p.id});event.stopPropagation()" title="Clique para ver todo o histórico de alterações">
           <div style="display:flex;align-items:center;justify-content:space-between;font-weight:700;color:${isClient ? '#ea580c' : 'var(--accent)'};font-size:11px">
@@ -535,6 +543,7 @@ function createCardHTML(p, cardIdx=0){
           <div style="color:var(--text);font-size:11.5px;line-height:1.35;word-break:break-word">
             "${escapeHtml(latestLog.text)}"
           </div>
+          ${pinsBadgeHtml}
         </div>
       `;
     }
@@ -704,13 +713,31 @@ function applyColumnChange(p, newCol) {
 
   if (newCol === 'Revisão' || (newCol || '').toLowerCase().includes('revis')) {
     p.pendingClientRevision = false;
+    setTimeout(() => {
+      openSendReviewModal(p.id);
+    }, 150);
   }
 
-  if (isFromAdv && isToDev) {
+  if (isHiddenColumn(newCol) || newCol === 'Finalizado') {
+    if (Array.isArray(p.reviewFiles) && p.reviewFiles.length > 0) {
+      showConfirm(
+        `O projeto "<strong>${escapeHtml(p.name)}</strong>" foi movido para <strong>${escapeHtml(newCol)}</strong>.<br><br>Deseja <strong>apagar os ${p.reviewFiles.length} arquivo${p.reviewFiles.length !== 1 ? 's' : ''} temporário${p.reviewFiles.length !== 1 ? 's' : ''} de render</strong> do Supabase Storage para liberar espaço na nuvem?`,
+        () => {
+          cleanupProjectReviewFiles(p);
+        },
+        {
+          title: 'Liberar Espaço na Nuvem',
+          icon: 'bi bi-cloud-slash',
+          okText: 'Sim, Liberar Espaço',
+          cancelText: 'Manter por Enquanto',
+          danger: true
+        }
+      );
+    }
+    showToast(`Movido para ${newCol} — não aparece mais pro cliente`, 'warning');
+  } else if (isFromAdv && isToDev) {
     p.revisions = (parseInt(p.revisions) || 0) + 1;
     showToast(`Projeto retornou para ${newCol}: +1 alteração computada (${p.revisions}ª alteração)!`, 'warning');
-  } else if (isHiddenColumn(newCol)) {
-    showToast(`Movido para ${newCol} — não aparece mais pro cliente`, 'warning');
   } else {
     showToast(`Movido para ${newCol}`, 'info');
   }
@@ -969,8 +996,39 @@ function openProjectModal(id=null){
     if (ttBtn) ttBtn.style.display = 'none';
   }
   updateProjCoverPreview();
+  updateProjEditReviewFiles(id ? projects.find(x => x.id === parseInt(id)) : null);
   renderSubsList();renderPaymentsModal();renderProjProdsTable();
   document.getElementById('projectOverlay').classList.add('open');
+}
+
+function updateProjEditReviewFiles(p) {
+  const countEl = document.getElementById('projEditReviewCount');
+  const listEl = document.getElementById('projEditReviewThumbList');
+  const files = p && Array.isArray(p.reviewFiles) ? p.reviewFiles : [];
+  if (countEl) countEl.textContent = files.length;
+  if (listEl) {
+    if (!files.length) {
+      listEl.innerHTML = '<span style="font-size:11px;color:var(--text3)">Nenhum render anexado.</span>';
+    } else {
+      listEl.innerHTML = files.map(f => {
+        const isImg = (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+        const url = f.previewUrl || f.originalUrl || f.url;
+        if (isImg) {
+          return `<img src="${url}" title="${escapeHtml(f.name)}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--border);flex-shrink:0">`;
+        }
+        return `<div style="width:32px;height:32px;border-radius:6px;background:rgba(37,99,235,0.1);color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0" title="${escapeHtml(f.name)}"><i class="bi bi-file-earmark-pdf"></i></div>`;
+      }).join('');
+    }
+  }
+}
+
+function openSendReviewFromEditModal() {
+  const id = document.getElementById('projId').value;
+  if (!id) {
+    showToast('Salve o projeto primeiro para anexar arquivos de revisão.', 'warning');
+    return;
+  }
+  openSendReviewModal(parseInt(id));
 }
 
 function updateProjCoverPreview() {
@@ -1214,6 +1272,8 @@ function saveProject(){
     revisions:parseInt(document.getElementById('projRevision')?.value || 0) || 0,
     revisionsLimit:parseInt(document.getElementById('projRevLimit')?.value || 2),
     revisionLogs: existingProj?.revisionLogs || [],
+    reviewFiles: existingProj?.reviewFiles || [],
+    reviewNotes: existingProj?.reviewNotes || '',
     tags: (document.getElementById('projTags')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
     column:document.getElementById('projCol').value,
     date:document.getElementById('projDate').value,
@@ -1494,6 +1554,46 @@ function renderRevisionLogsList(p) {
     const dLog = lg.timestamp ? new Date(lg.timestamp) : (lg.date ? new Date(lg.date + 'T12:00:00') : new Date());
     const dStr = dLog.toLocaleDateString('pt-BR') + (lg.timestamp ? ` às ${dLog.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : '');
     
+    let pinsVisualHtml = '';
+    if (Array.isArray(lg.pins) && lg.pins.length > 0) {
+      const pinsByImg = {};
+      lg.pins.forEach(pin => {
+        const key = pin.fileUrl || pin.fileName || 'render';
+        if (!pinsByImg[key]) pinsByImg[key] = { url: pin.fileUrl, name: pin.fileName || 'Render', pins: [] };
+        pinsByImg[key].pins.push(pin);
+      });
+
+      pinsVisualHtml = Object.values(pinsByImg).map(group => {
+        const pinMarkers = group.pins.map(pin => `
+          <div id="adminPin_${pin.id}" class="admin-rev-pin-marker" style="position:absolute;left:${pin.xPct}%;top:${pin.yPct}%;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;background:#ea580c;color:#fff;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;z-index:2;transition:all .15s ease" title="Ponto #${pin.number}: ${escapeHtml(pin.comment || '')}">
+            ${pin.number}
+          </div>
+        `).join('');
+
+        const pinComments = group.pins.map(pin => `
+          <div style="font-size:11.5px;color:var(--text);display:flex;align-items:flex-start;gap:6px;background:var(--surface);padding:5px 8px;border-radius:6px;border:1px solid var(--border);cursor:pointer;transition:background .15s" onmouseenter="highlightAdminPin('${pin.id}')" onmouseleave="unhighlightAdminPin('${pin.id}')">
+            <span style="font-weight:800;color:#ea580c;flex-shrink:0">📍 #${pin.number}:</span>
+            <span style="flex:1">${escapeHtml(pin.comment || 'Sem descrição')}</span>
+          </div>
+        `).join('');
+
+        return `
+          <div style="margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:4px">
+              <i class="bi bi-pin-map-fill" style="color:#ea580c"></i> Marcações no Render: <b>${escapeHtml(group.name)}</b>
+            </div>
+            ${group.url ? `
+              <div style="position:relative;width:100%;max-height:180px;background:#111;border-radius:6px;overflow:hidden;border:1px solid var(--border);display:flex;align-items:center;justify-content:center">
+                <img src="${group.url}" style="width:100%;max-height:180px;object-fit:contain;display:block" alt="">
+                <div style="position:absolute;inset:0">${pinMarkers}</div>
+              </div>
+            ` : ''}
+            <div style="display:flex;flex-direction:column;gap:4px">${pinComments}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
     return `
       <div style="background:${isClient ? 'rgba(234,88,12,0.06)' : 'var(--surface2)'};border:1px solid ${isClient ? 'rgba(234,88,12,0.3)' : 'var(--border)'};border-radius:8px;padding:9px 12px;display:flex;flex-direction:column;gap:5px">
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text3)">
@@ -1507,6 +1607,7 @@ function renderRevisionLogsList(p) {
           </div>
         </div>
         <div style="font-size:12.5px;color:var(--text);line-height:1.45;white-space:pre-wrap;background:var(--surface);padding:6px 8px;border-radius:6px;border:1px solid var(--border)">${escapeHtml(lg.text)}</div>
+        ${pinsVisualHtml}
       </div>
     `;
   }).reverse().join('');
@@ -1545,6 +1646,16 @@ function deleteRevisionLogEntry(projId, logId) {
   scheduleSync();
   renderRevisionLogsList(p);
   showToast('Registro de alteração removido', 'info');
+}
+
+function highlightAdminPin(pinId) {
+  const el = document.getElementById(`adminPin_${pinId}`);
+  if (el) el.classList.add('pin-highlighted');
+}
+
+function unhighlightAdminPin(pinId) {
+  const el = document.getElementById(`adminPin_${pinId}`);
+  if (el) el.classList.remove('pin-highlighted');
 }
 
 function archiveCurrentProject(){
@@ -2438,72 +2549,208 @@ function sendNotification(){
   closeNotifyModal();scheduleSync();renderBoard();showToast('Aviso enviado!','success');
 }
 
+// ══════════════════════════════════════════
+//  ENVIO PARA REVISÃO & ARQUIVOS DO CLIENTE
+// ══════════════════════════════════════════
+let tempReviewFiles = [];
+
 function toggleSendToClientReview(event, projId) {
   if (event) event.stopPropagation();
+  openSendReviewModal(projId);
+}
+
+function openSendReviewModal(projId) {
   const p = projects.find(x => x.id === projId);
   if (!p) return;
 
-  const cl = clients.find(c => (c.name || '').toLowerCase().trim() === (p.client || '').toLowerCase().trim());
+  document.getElementById('sendReviewProjId').value = p.id;
+  document.getElementById('sendReviewProjName').textContent = p.name;
+  document.getElementById('sendReviewClientName').textContent = p.client || 'Sem cliente';
+  document.getElementById('sendReviewNotes').value = p.reviewNotes || '';
+  tempReviewFiles = Array.isArray(p.reviewFiles) ? JSON.parse(JSON.stringify(p.reviewFiles)) : [];
 
-  if (p.column !== 'Revisão') {
-    showConfirm(
-      `Deseja mover o projeto "<strong>${escapeHtml(p.name)}</strong>" para a coluna <strong>Revisão</strong> para que o cliente avalie e aprove no painel?`,
-      () => {
-        p.column = 'Revisão';
-        p.pendingClientRevision = false;
-        updateCardDOM(p.id);
-        renderBoard();
-        scheduleSync();
+  const progWrap = document.getElementById('reviewUploadProgressWrap');
+  if (progWrap) progWrap.style.display = 'none';
 
-        if (cl && cl.phone) {
-          showConfirm(
-            `Projeto colocado em Revisão! Deseja enviar mensagem no WhatsApp de <strong>${escapeHtml(p.client)}</strong> avisando que o projeto está pronto para aprovação?`,
-            () => {
-              openWhatsAppApprovalRequest(p.id);
-            },
-            {
-              title: 'Avisar Cliente no WhatsApp',
-              icon: 'bi bi-whatsapp',
-              okText: 'Abrir WhatsApp',
-              extraBtn: {
-                text: 'Copiar Mensagem',
-                icon: 'bi bi-clipboard',
-                className: 'btn btn-ghost',
-                onClick: () => copyWhatsAppApprovalRequest(p.id)
-              }
-            }
-          );
-        } else {
-          showToast(`Projeto "${p.name}" colocado em Revisão para aprovação do cliente!`, 'success');
-        }
-      },
-      {
-        title: 'Enviar para Aprovação do Cliente',
-        icon: 'bi bi-bell-fill',
-        okText: 'Colocar em Revisão',
-        danger: false
+  renderSendReviewFilesList();
+  document.getElementById('sendReviewOverlay').classList.add('open');
+}
+
+function closeSendReviewModal() {
+  document.getElementById('sendReviewOverlay').classList.remove('open');
+  tempReviewFiles = [];
+}
+
+function renderSendReviewFilesList() {
+  const listEl = document.getElementById('sendReviewFilesList');
+  const countEl = document.getElementById('sendReviewFilesCount');
+  const clearBtn = document.getElementById('btnClearAllReviewFiles');
+  if (!listEl) return;
+
+  const count = tempReviewFiles.length;
+  if (countEl) countEl.textContent = count;
+  if (clearBtn) clearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+
+  if (!count) {
+    listEl.innerHTML = `
+      <div style="font-size:12px;color:var(--text3);text-align:center;padding:16px 8px;background:var(--surface2);border-radius:8px;border:1px dashed var(--border)">
+        <i class="bi bi-images" style="font-size:18px;display:block;margin-bottom:4px"></i>
+        Nenhum render ou prancha anexado ainda.
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = tempReviewFiles.map((f, idx) => {
+    const isImg = (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+    const isPdf = (f.type && f.type.includes('pdf')) || /\.pdf$/i.test(f.name);
+    const thumbHtml = isImg
+      ? `<img src="${f.previewUrl || f.originalUrl}" class="review-file-thumb" onerror="this.src='';this.className='review-file-icon-box'">`
+      : `<div class="review-file-icon-box" style="${isPdf ? 'background:rgba(220,38,38,0.1);color:#dc2626' : ''}"><i class="bi ${isPdf ? 'bi-file-earmark-pdf' : 'bi-file-earmark'}"></i></div>`;
+
+    return `
+      <div class="review-file-item">
+        <div style="display:flex;align-items:center;gap:10px;overflow:hidden;flex:1">
+          ${thumbHtml}
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <div style="font-weight:600;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f.name)}</div>
+            <div style="font-size:11px;color:var(--text3)">${formatFileSize(f.size)} ${isImg ? '· Render' : isPdf ? '· Prancha PDF' : ''}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <a href="${f.originalUrl}" target="_blank" class="btn-icon btn-sm" title="Abrir arquivo original"><i class="bi bi-box-arrow-up-right"></i></a>
+          <button type="button" class="btn-icon btn-sm" onclick="removeReviewFile(${idx})" title="Remover arquivo" style="color:var(--red)"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function handleReviewDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('reviewDropzone');
+  if (dz) dz.classList.add('dragover');
+}
+
+function handleReviewDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('reviewDropzone');
+  if (dz) dz.classList.remove('dragover');
+}
+
+function handleReviewDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('reviewDropzone');
+  if (dz) dz.classList.remove('dragover');
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+    handleReviewFilesSelected(e.dataTransfer.files);
+  }
+}
+
+async function handleReviewFilesSelected(fileList) {
+  if (!fileList || !fileList.length) return;
+  const projId = parseInt(document.getElementById('sendReviewProjId').value) || Date.now();
+  const files = Array.from(fileList);
+
+  const progWrap = document.getElementById('reviewUploadProgressWrap');
+  const progBar = document.getElementById('reviewUploadProgressBar');
+  const progPct = document.getElementById('reviewUploadProgressPct');
+  const progLbl = document.getElementById('reviewUploadProgressLabel');
+
+  if (progWrap) progWrap.style.display = 'block';
+
+  let completed = 0;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (progLbl) progLbl.innerHTML = `<span class="spin" style="width:11px;height:11px;display:inline-block"></span> Enviando "${escapeHtml(file.name)}" (${i + 1}/${files.length})...`;
+    try {
+      if (typeof uploadReviewFile === 'function') {
+        const reviewFile = await uploadReviewFile(file, projId);
+        tempReviewFiles.push(reviewFile);
+      } else {
+        showToast('Módulo de upload não inicializado.', 'error');
+        break;
       }
-    );
-  } else {
-    showConfirm(
-      `O projeto "<strong>${escapeHtml(p.name)}</strong>" está aguardando a aprovação do cliente.<br><br>Deseja reenviar o link de avaliação no WhatsApp?`,
-      () => {
-        openWhatsAppApprovalRequest(p.id);
-      },
-      {
-        title: 'Aprovação do Cliente — Revisão',
-        icon: 'bi bi-bell-fill',
-        okText: 'Avisar no WhatsApp',
-        danger: false,
-        cancelText: 'Cancelar',
-        extraBtn: {
-          text: 'Copiar Mensagem',
-          icon: 'bi bi-clipboard',
-          className: 'btn btn-ghost',
-          onClick: () => copyWhatsAppApprovalRequest(p.id)
-        }
-      }
-    );
+    } catch (err) {
+      console.error('Falha no upload do arquivo:', err);
+      showToast(`Erro ao enviar "${file.name}".`, 'error');
+    }
+    completed++;
+    const pct = Math.round((completed / files.length) * 100);
+    if (progBar) progBar.style.width = `${pct}%`;
+    if (progPct) progPct.textContent = `${pct}%`;
+  }
+
+  if (progWrap) {
+    setTimeout(() => { progWrap.style.display = 'none'; }, 400);
+  }
+
+  renderSendReviewFilesList();
+  showToast(`${completed} arquivo${completed > 1 ? 's' : ''} carregado${completed > 1 ? 's' : ''} com sucesso!`, 'success');
+  const inp = document.getElementById('reviewFileInput');
+  if (inp) inp.value = '';
+}
+
+function removeReviewFile(idx) {
+  if (idx < 0 || idx >= tempReviewFiles.length) return;
+  const removed = tempReviewFiles.splice(idx, 1);
+  if (removed && removed[0] && typeof deleteReviewFilesFromStorage === 'function') {
+    deleteReviewFilesFromStorage(removed);
+  }
+  renderSendReviewFilesList();
+}
+
+function clearAllReviewFiles() {
+  if (!tempReviewFiles.length) return;
+  showConfirm('Deseja remover todos os arquivos anexados desta revisão?', () => {
+    if (typeof deleteReviewFilesFromStorage === 'function') {
+      deleteReviewFilesFromStorage(tempReviewFiles);
+    }
+    tempReviewFiles = [];
+    renderSendReviewFilesList();
+    showToast('Todos os arquivos foram removidos.', 'info');
+  });
+}
+
+async function saveSendReview(notifyWhatsApp = false) {
+  const projId = parseInt(document.getElementById('sendReviewProjId').value);
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+
+  const notes = document.getElementById('sendReviewNotes').value.trim();
+  p.column = 'Revisão';
+  p.pendingClientRevision = false;
+  p.reviewFiles = [...tempReviewFiles];
+  p.reviewNotes = notes;
+
+  closeSendReviewModal();
+  updateCardDOM(p.id);
+  renderBoard();
+  scheduleSync();
+
+  showToast(`Projeto "${p.name}" atualizado em Revisão com ${p.reviewFiles.length} arquivo${p.reviewFiles.length !== 1 ? 's' : ''}!`, 'success');
+
+  if (notifyWhatsApp) {
+    openWhatsAppApprovalRequest(p.id);
+  }
+}
+
+async function cleanupProjectReviewFiles(p) {
+  if (!p || !Array.isArray(p.reviewFiles) || !p.reviewFiles.length) return;
+  const filesToDelete = [...p.reviewFiles];
+  const count = filesToDelete.length;
+  p.reviewFiles = [];
+  p.reviewNotes = '';
+  scheduleSync();
+
+  if (typeof deleteReviewFilesFromStorage === 'function') {
+    const ok = await deleteReviewFilesFromStorage(filesToDelete);
+    if (ok) {
+      showToast(`Projeto finalizado: ${count} arquivo${count > 1 ? 's' : ''} temporário${count > 1 ? 's' : ''} de render removido${count > 1 ? 's' : ''} da nuvem para liberar espaço!`, 'info');
+    }
   }
 }
 
@@ -2736,6 +2983,10 @@ function archiveProject(id){
 
 function deleteProject(id,fromArch=false){
   showConfirm('Excluir definitivamente?', () => {
+    const target = projects.find(p => p.id === id);
+    if (target && Array.isArray(target.reviewFiles) && target.reviewFiles.length && typeof deleteReviewFilesFromStorage === 'function') {
+      deleteReviewFilesFromStorage(target.reviewFiles);
+    }
     projects=projects.filter(p=>p.id!==id);
     pinnedCards.delete(id);
     expandedFin.delete(id);

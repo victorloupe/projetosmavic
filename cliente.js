@@ -872,6 +872,92 @@ function createCardHTML(p, cardIdx=0){
   const unreadNotifs=notifications.filter(n=>n.projectName===p.name&&!dismissed.includes(n.id)&&!n.read);
   const hasBell=unreadNotifs.length>0;
 
+  // Bloco de Arquivos & Renders de Revisão
+  const revFiles = Array.isArray(p.reviewFiles) ? p.reviewFiles : [];
+  let reviewGalleryHtml = '';
+  if (revFiles.length > 0 || p.reviewNotes) {
+    const filesHtml = revFiles.map((f, fIdx) => {
+      const isImg = (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+      const isPdf = (f.type && f.type.includes('pdf')) || /\.pdf$/i.test(f.name);
+      const prevUrl = f.previewUrl || f.originalUrl || f.url || '';
+      const origUrl = f.originalUrl || f.url || prevUrl;
+      const sizeText = formatFileSize(f.size);
+
+      if (isImg) {
+        return `
+          <div class="client-review-item" onclick="openReviewLightbox(${p.id}, ${fIdx})">
+            <div class="client-review-thumb-wrap">
+              <img src="${prevUrl}" loading="lazy" class="client-review-img" alt="${escapeHtml(f.name)}" onerror="this.onerror=null;this.src='${origUrl}'">
+              <div class="client-review-overlay">
+                <span class="client-review-zoom-btn" title="Ampliar e Ver Detalhes"><i class="bi bi-arrows-fullscreen"></i></span>
+              </div>
+            </div>
+            <div class="client-review-meta">
+              <div class="client-review-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+              <div class="client-review-sub">
+                <span class="client-review-badge">RENDER</span>
+                <span>${sizeText}</span>
+                <a href="${origUrl}" download="${escapeHtml(f.name)}" target="_blank" class="client-review-dl-btn" onclick="event.stopPropagation()" title="Baixar em Alta Resolução">
+                  <i class="bi bi-download"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="client-review-item client-review-doc" onclick="${isPdf ? `openPdfPreview('${origUrl}', '${escapeHtml(f.name)}')` : `window.open('${origUrl}', '_blank')`}">
+            <div class="client-review-doc-icon ${isPdf ? 'pdf' : ''}">
+              <i class="bi ${isPdf ? 'bi-file-earmark-pdf' : 'bi-file-earmark-text'}"></i>
+            </div>
+            <div class="client-review-meta">
+              <div class="client-review-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+              <div class="client-review-sub">
+                <span class="client-review-badge ${isPdf ? 'pdf' : ''}">${isPdf ? 'PDF' : 'ARQUIVO'}</span>
+                <span>${sizeText}</span>
+                <div style="display:flex;align-items:center;gap:4px">
+                  ${isPdf ? `<button type="button" class="client-review-dl-btn" onclick="openPdfPreview('${origUrl}', '${escapeHtml(f.name)}');event.stopPropagation()" title="Visualizar PDF"><i class="bi bi-eye"></i></button>` : ''}
+                  <a href="${origUrl}" download="${escapeHtml(f.name)}" target="_blank" class="client-review-dl-btn" onclick="event.stopPropagation()" title="Baixar Arquivo">
+                    <i class="bi bi-download"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }).join('');
+
+    const notesHtml = p.reviewNotes ? `
+      <div class="client-review-notes-box">
+        <i class="bi bi-chat-quote" style="color:var(--accent);font-size:16px;flex-shrink:0;margin-top:1px"></i>
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);letter-spacing:.3px">Orientações do Escritório</div>
+          <div style="font-size:12.5px;color:var(--text);margin-top:2px;line-height:1.4">${escapeHtml(p.reviewNotes)}</div>
+        </div>
+      </div>
+    ` : '';
+
+    const downloadAllBtn = revFiles.length > 1 ? `
+      <button type="button" class="btn btn-ghost btn-xs client-dl-all-btn" onclick="downloadAllProjectFiles(${p.id});event.stopPropagation()">
+        <i class="bi bi-cloud-arrow-down"></i> Baixar Todos (${revFiles.length})
+      </button>
+    ` : '';
+
+    reviewGalleryHtml = `
+      <div class="client-review-gallery-wrap">
+        <div class="client-review-gallery-hdr">
+          <div style="font-size:12px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px">
+            <i class="bi bi-images" style="color:var(--accent)"></i> Arquivos para Avaliação <span class="badge" style="background:var(--surface2);color:var(--text2);font-size:10px">${revFiles.length}</span>
+          </div>
+          ${downloadAllBtn}
+        </div>
+        ${notesHtml}
+        ${revFiles.length > 0 ? `<div class="client-review-grid">${filesHtml}</div>` : ''}
+      </div>
+    `;
+  }
+
   // Bloco de Aprovação / Revisão pelo Cliente
   const isInReview = (p.column === 'Revisão');
   let approvalBannerHtml = '';
@@ -885,7 +971,8 @@ function createCardHTML(p, cardIdx=0){
             <div style="font-size:11.5px;color:var(--text2)">Avalie as imagens/arquivos deste projeto e confirme abaixo:</div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${reviewGalleryHtml}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
           <button type="button" class="btn btn-sm" style="flex:1;min-width:120px;background:var(--green);color:#fff;border:none;font-weight:700;padding:8px 10px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer" onclick="clientApproveProject(${p.id})">
             <i class="bi bi-check-circle-fill"></i> Aprovar Projeto
           </button>
@@ -918,7 +1005,7 @@ function createCardHTML(p, cardIdx=0){
     </div>
     <div class="kcard-exp">
       ${driveHtml}
-      ${approvalBannerHtml}
+      ${isInReview ? approvalBannerHtml : reviewGalleryHtml}
       ${timelineHtml}
       ${finHtml}
       ${subtaskTextHtml}
@@ -964,6 +1051,10 @@ function clientApproveProject(projId) {
   );
 }
 
+let currentRevPins = [];
+let currentRevRenderFiles = [];
+let currentActiveRenderIdx = 0;
+
 function clientRequestRevision(projId) {
   const p = projects.find(x => x.id === projId);
   if (!p) return;
@@ -974,8 +1065,150 @@ function clientRequestRevision(projId) {
 
   document.getElementById('revReqProjId').value = String(projId);
   document.getElementById('revReqNotes').value = '';
+  currentRevPins = [];
+
+  // Filtra imagens para marcação de pinos
+  currentRevRenderFiles = (p.reviewFiles || []).filter(f => (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(f.name));
+  const pinSection = document.getElementById('revReqPinSection');
+  
+  if (currentRevRenderFiles.length > 0) {
+    if (pinSection) pinSection.style.display = 'flex';
+    currentActiveRenderIdx = 0;
+    renderRevReqRenderSelector();
+    loadRevReqCanvasImage();
+    renderRevReqPins();
+  } else {
+    if (pinSection) pinSection.style.display = 'none';
+  }
+
   document.getElementById('revisionRequestModal').classList.remove('d-none');
   setTimeout(() => document.getElementById('revReqNotes')?.focus(), 100);
+}
+
+function renderRevReqRenderSelector() {
+  const strip = document.getElementById('revReqRendersList');
+  if (!strip) return;
+  strip.innerHTML = currentRevRenderFiles.map((f, idx) => {
+    const isActive = idx === currentActiveRenderIdx;
+    const url = f.previewUrl || f.originalUrl || f.url;
+    const pinCount = currentRevPins.filter(p => p.fileId === f.id || p.fileName === f.name).length;
+    return `
+      <button type="button" class="rev-req-render-chip ${isActive ? 'active' : ''}" onclick="selectRevReqRender(${idx})">
+        <img src="${url}" alt="">
+        <span class="chip-name">${escapeHtml(f.name)}</span>
+        ${pinCount > 0 ? `<span class="pin-badge">${pinCount}</span>` : ''}
+      </button>
+    `;
+  }).join('');
+}
+
+function selectRevReqRender(idx) {
+  if (idx < 0 || idx >= currentRevRenderFiles.length) return;
+  currentActiveRenderIdx = idx;
+  renderRevReqRenderSelector();
+  loadRevReqCanvasImage();
+  renderRevReqPins();
+}
+
+function loadRevReqCanvasImage() {
+  const f = currentRevRenderFiles[currentActiveRenderIdx];
+  const img = document.getElementById('revReqCanvasImg');
+  if (img && f) {
+    img.src = f.previewUrl || f.originalUrl || f.url;
+  }
+}
+
+function handlePinLayerClick(event) {
+  const f = currentRevRenderFiles[currentActiveRenderIdx];
+  if (!f) return;
+
+  const rect = event.currentTarget.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+
+  const xPct = Math.max(1, Math.min(99, ((event.clientX - rect.left) / rect.width) * 100));
+  const yPct = Math.max(1, Math.min(99, ((event.clientY - rect.top) / rect.height) * 100));
+
+  const newPin = {
+    id: `${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    number: currentRevPins.length + 1,
+    fileId: f.id,
+    fileName: f.name,
+    fileUrl: f.previewUrl || f.originalUrl || f.url,
+    xPct: parseFloat(xPct.toFixed(1)),
+    yPct: parseFloat(yPct.toFixed(1)),
+    comment: ''
+  };
+
+  currentRevPins.push(newPin);
+  renderRevReqRenderSelector();
+  renderRevReqPins();
+
+  // Foco no campo do novo pino
+  setTimeout(() => {
+    const input = document.getElementById(`pinInput_${newPin.id}`);
+    if (input) input.focus();
+  }, 50);
+}
+
+function renderRevReqPins() {
+  const currentFile = currentRevRenderFiles[currentActiveRenderIdx];
+  const layer = document.getElementById('revReqPinsLayer');
+  const list = document.getElementById('revReqPinsList');
+  const countBadge = document.getElementById('revReqPinCountBadge');
+
+  if (countBadge) {
+    countBadge.textContent = `${currentRevPins.length} ${currentRevPins.length === 1 ? 'marcação' : 'marcações'}`;
+  }
+
+  // Renderiza pinos no canvas da imagem ativa
+  if (layer && currentFile) {
+    const activeFilePins = currentRevPins.filter(p => p.fileId === currentFile.id || p.fileName === currentFile.name);
+    layer.innerHTML = activeFilePins.map(p => `
+      <div id="canvasPin_${p.id}" class="rev-pin-marker" style="left:${p.xPct}%;top:${p.yPct}%" title="Ponto #${p.number}" onclick="event.stopPropagation()">
+        ${p.number}
+      </div>
+    `).join('');
+  }
+
+  // Renderiza lista de anotações
+  if (list) {
+    if (!currentRevPins.length) {
+      list.innerHTML = '';
+      return;
+    }
+    list.innerHTML = currentRevPins.map((p) => `
+      <div class="rev-pin-item" onmouseenter="highlightPin('${p.id}')" onmouseleave="unhighlightPin('${p.id}')">
+        <span class="rev-pin-num-badge">📍 ${p.number}</span>
+        <div style="flex:1;overflow:hidden">
+          <div style="font-size:10.5px;color:var(--text3);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.fileName || 'Render')} (${p.xPct}%, ${p.yPct}%)</div>
+          <input type="text" id="pinInput_${p.id}" class="inp inp-sm" style="width:100%;font-size:12px;padding:4px 8px" placeholder="Descreva o que ajustar neste ponto..." value="${escapeHtml(p.comment || '')}" oninput="updatePinComment('${p.id}', this.value)">
+        </div>
+        <button type="button" class="btn-icon btn-sm" onclick="removeRevPin('${p.id}')" title="Excluir marcação" style="color:var(--red)"><i class="bi bi-trash"></i></button>
+      </div>
+    `).join('');
+  }
+}
+
+function highlightPin(pinId) {
+  const el = document.getElementById(`canvasPin_${pinId}`);
+  if (el) el.classList.add('pin-highlighted');
+}
+
+function unhighlightPin(pinId) {
+  const el = document.getElementById(`canvasPin_${pinId}`);
+  if (el) el.classList.remove('pin-highlighted');
+}
+
+function updatePinComment(pinId, text) {
+  const pin = currentRevPins.find(p => p.id === pinId);
+  if (pin) pin.comment = text;
+}
+
+function removeRevPin(pinId) {
+  currentRevPins = currentRevPins.filter(p => p.id !== pinId);
+  currentRevPins.forEach((p, i) => { p.number = i + 1; });
+  renderRevReqRenderSelector();
+  renderRevReqPins();
 }
 
 function closeRevisionRequestModal() {
@@ -997,11 +1230,18 @@ async function submitRevisionRequest() {
   const p = projects.find(x => x.id === projId);
   if (!p) return closeRevisionRequestModal();
 
-  const notes = document.getElementById('revReqNotes').value.trim();
-  if (!notes) {
-    showToast('Por favor, descreva o que precisa ser ajustado', 'warning');
+  let notes = document.getElementById('revReqNotes').value.trim();
+  const pinsWithComments = currentRevPins.filter(p => p.comment && p.comment.trim());
+
+  if (!notes && !pinsWithComments.length) {
+    showToast('Por favor, descreva os ajustes ou anote nos pontos do render', 'warning');
     document.getElementById('revReqNotes')?.focus();
     return;
+  }
+
+  // Se não houver nota geral, gera um resumo a partir dos pinos
+  if (!notes && pinsWithComments.length) {
+    notes = pinsWithComments.map(p => `• Ponto #${p.number} em "${p.fileName}": ${p.comment}`).join('\n');
   }
 
   const targetCol = getRevisionTargetColumn();
@@ -1013,20 +1253,22 @@ async function submitRevisionRequest() {
     id: Date.now(),
     timestamp: new Date().toISOString(),
     text: notes,
+    pins: currentRevPins,
     author: clientName || 'Cliente'
   });
 
   closeRevisionRequestModal();
   renderBoard();
   calcFinance();
-  showToast(`Solicitação de ajustes enviada! O projeto retornou para ${targetCol}.`, 'success');
+  showToast(`Solicitação de ajustes enviada com sucesso! O projeto retornou para ${targetCol}.`, 'success');
 
   const ok = await syncProjectChangeToServer({
     id: p.id,
     column: targetCol,
     revisions: p.revisions,
     revisionLogs: p.revisionLogs,
-    notes: notes
+    notes: notes,
+    pins: currentRevPins
   });
   if (!ok) {
     showToast('Não conseguimos confirmar a solicitação no servidor. Verifique sua conexão ou avise o escritório.', 'warning');
@@ -1374,14 +1616,317 @@ function valorPorExtenso(v) {
   return textoReais || textoCentavos || 'zero reais';
 }
 
-function copyPixKey() {
-  const kText = document.getElementById('pixKeyVal')?.textContent || pixKey;
-  if (!kText) return;
-  navigator.clipboard.writeText(kText).then(() => {
-    showToast('Chave PIX copiada!', 'success');
-  }).catch(() => {
-    showToast('Erro ao copiar chave', 'error');
-  });
+// Formata tamanho de arquivo em bytes para texto amigável (ex: 2.4 MB)
+function formatFileSize(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// ══════════════════════════════════════════
+//  LIGHTBOX IMERSIVO DE RENDERS & ARQUIVOS
+// ══════════════════════════════════════════
+let currentLightboxProjId = null;
+let currentLightboxIndex = 0;
+let lightboxZoom = 1;
+let lightboxPanX = 0;
+let lightboxPanY = 0;
+let isLightboxDragging = false;
+let lightboxDragStartX = 0;
+let lightboxDragStartY = 0;
+
+function openReviewLightbox(projId, fileIndex = 0) {
+  const p = projects.find(x => x.id === projId);
+  if (!p || !Array.isArray(p.reviewFiles) || !p.reviewFiles.length) return;
+
+  currentLightboxProjId = projId;
+  currentLightboxIndex = Math.max(0, Math.min(fileIndex, p.reviewFiles.length - 1));
+  lightboxZoom = 1;
+  lightboxPanX = 0;
+  lightboxPanY = 0;
+
+  renderLightboxCurrentFile();
+  document.getElementById('reviewLightboxModal').classList.remove('d-none');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeReviewLightbox() {
+  const modal = document.getElementById('reviewLightboxModal');
+  if (modal) modal.classList.add('d-none');
+  document.body.style.overflow = '';
+  currentLightboxProjId = null;
+}
+
+function renderLightboxCurrentFile() {
+  const p = projects.find(x => x.id === currentLightboxProjId);
+  if (!p || !p.reviewFiles || !p.reviewFiles.length) return;
+
+  const f = p.reviewFiles[currentLightboxIndex];
+  if (!f) return;
+
+  const origUrl = f.originalUrl || f.url || '';
+  const prevUrl = f.previewUrl || origUrl;
+
+  document.getElementById('lightboxFileName').textContent = f.name;
+  document.getElementById('lightboxCounter').textContent = `${currentLightboxIndex + 1} / ${p.reviewFiles.length}`;
+
+  const dlBtn = document.getElementById('lightboxDownloadBtn');
+  if (dlBtn) {
+    dlBtn.href = origUrl;
+    dlBtn.setAttribute('download', f.name);
+  }
+
+  const imgEl = document.getElementById('lightboxImg');
+  if (imgEl) {
+    imgEl.src = prevUrl || origUrl;
+    imgEl.alt = f.name;
+  }
+
+  lightboxZoomReset();
+
+  // Renderiza miniaturas no rodapé
+  const strip = document.getElementById('lightboxThumbStrip');
+  if (strip) {
+    if (p.reviewFiles.length > 1) {
+      strip.style.display = 'flex';
+      strip.innerHTML = p.reviewFiles.map((item, idx) => {
+        const itemImg = (item.type && item.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(item.name);
+        const itemUrl = item.previewUrl || item.originalUrl || item.url;
+        const isActive = idx === currentLightboxIndex;
+        if (itemImg) {
+          return `<img src="${itemUrl}" class="lightbox-thumb ${isActive ? 'active' : ''}" onclick="switchLightboxIndex(${idx})" alt="${escapeHtml(item.name)}">`;
+        }
+        return `<div class="lightbox-thumb-icon ${isActive ? 'active' : ''}" onclick="switchLightboxIndex(${idx})"><i class="bi bi-file-earmark"></i></div>`;
+      }).join('');
+    } else {
+      strip.style.display = 'none';
+      strip.innerHTML = '';
+    }
+  }
+
+  // Desabilita/habilita setas
+  const prevBtn = document.getElementById('lightboxPrevBtn');
+  const nextBtn = document.getElementById('lightboxNextBtn');
+  if (prevBtn) prevBtn.style.visibility = p.reviewFiles.length > 1 ? 'visible' : 'hidden';
+  if (nextBtn) nextBtn.style.visibility = p.reviewFiles.length > 1 ? 'visible' : 'hidden';
+}
+
+function switchLightboxIndex(idx) {
+  const p = projects.find(x => x.id === currentLightboxProjId);
+  if (!p || !p.reviewFiles) return;
+  if (idx < 0) idx = p.reviewFiles.length - 1;
+  if (idx >= p.reviewFiles.length) idx = 0;
+  currentLightboxIndex = idx;
+  renderLightboxCurrentFile();
+}
+
+function lightboxNext() {
+  switchLightboxIndex(currentLightboxIndex + 1);
+}
+
+function lightboxPrev() {
+  switchLightboxIndex(currentLightboxIndex - 1);
+}
+
+function lightboxZoomIn() {
+  lightboxZoom = Math.min(4, lightboxZoom + 0.35);
+  lightboxApplyTransform();
+}
+
+function lightboxZoomOut() {
+  lightboxZoom = Math.max(0.7, lightboxZoom - 0.35);
+  if (lightboxZoom <= 1) {
+    lightboxPanX = 0;
+    lightboxPanY = 0;
+  }
+  lightboxApplyTransform();
+}
+
+function lightboxZoomReset() {
+  lightboxZoom = 1;
+  lightboxPanX = 0;
+  lightboxPanY = 0;
+  lightboxApplyTransform();
+}
+
+function lightboxApplyTransform() {
+  const img = document.getElementById('lightboxImg');
+  const levelText = document.getElementById('lightboxZoomLevel');
+  if (levelText) levelText.textContent = `${Math.round(lightboxZoom * 100)}%`;
+  if (img) {
+    img.style.transform = `translate(${lightboxPanX}px, ${lightboxPanY}px) scale(${lightboxZoom})`;
+    img.style.cursor = lightboxZoom > 1 ? (isLightboxDragging ? 'grabbing' : 'grab') : 'default';
+  }
+}
+
+async function downloadAllProjectFiles(projId) {
+  const p = projects.find(x => x.id === projId);
+  if (!p || !Array.isArray(p.reviewFiles) || !p.reviewFiles.length) return;
+  
+  const total = p.reviewFiles.length;
+  showToast(`Preparando ${total} arquivo(s) para download...`, 'info');
+
+  if (window.JSZip) {
+    try {
+      const zip = new window.JSZip();
+      let loaded = 0;
+
+      for (let i = 0; i < total; i++) {
+        const f = p.reviewFiles[i];
+        const url = f.originalUrl || f.url;
+        if (!url) continue;
+
+        try {
+          const resp = await fetch(url, { mode: 'cors' });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const blob = await resp.blob();
+          const cleanName = (f.name || `arquivo_${i + 1}`).replace(/[/\\?%*:|"<>]/g, '_');
+          zip.file(cleanName, blob);
+        } catch (e) {
+          console.warn(`Erro ao baixar "${f.name}" para o ZIP, usando fallback direto:`, e);
+        }
+        loaded++;
+      }
+
+      showToast('Compactando arquivos em formato ZIP...', 'info');
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const cleanProjName = (p.name || 'Projeto').replace(/[/\\?%*:|"<>]/g, '_');
+      const filename = `${cleanProjName} - Renders e Arquivos.zip`;
+
+      const blobUrl = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+      showToast('🎉 Arquivo ZIP baixado com sucesso!', 'success');
+      return;
+    } catch (err) {
+      console.error('Falha ao gerar ZIP, aplicando fallback sequencial:', err);
+      showToast('Compactador indisponível, baixando arquivos individualmente...', 'info');
+    }
+  }
+
+  // Fallback se JSZip não estiver disponível
+  for (let i = 0; i < total; i++) {
+    const f = p.reviewFiles[i];
+    const url = f.originalUrl || f.url;
+    if (url) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = f.name || `arquivo_${i + 1}`;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      await new Promise(r => setTimeout(r, 400));
+    }
+  }
+  showToast('Download concluído!', 'success');
+}
+
+// Eventos de teclado do Lightbox
+document.addEventListener('keydown', (e) => {
+  const modal = document.getElementById('reviewLightboxModal');
+  if (!modal || modal.classList.contains('d-none')) return;
+
+  if (e.key === 'Escape') closeReviewLightbox();
+  else if (e.key === 'ArrowRight') lightboxNext();
+  else if (e.key === 'ArrowLeft') lightboxPrev();
+  else if (e.key === '+' || e.key === '=') lightboxZoomIn();
+  else if (e.key === '-' || e.key === '_') lightboxZoomOut();
+  else if (e.key === '0') lightboxZoomReset();
+});
+
+// Eventos de arrastar e scroll de zoom
+document.addEventListener('DOMContentLoaded', () => {
+  const viewport = document.getElementById('lightboxViewport');
+  const img = document.getElementById('lightboxImg');
+  if (viewport && img) {
+    viewport.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) lightboxZoomIn();
+      else lightboxZoomOut();
+    }, { passive: false });
+
+    img.addEventListener('mousedown', (e) => {
+      if (lightboxZoom <= 1) return;
+      isLightboxDragging = true;
+      lightboxDragStartX = e.clientX - lightboxPanX;
+      lightboxDragStartY = e.clientY - lightboxPanY;
+      lightboxApplyTransform();
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isLightboxDragging) return;
+      lightboxPanX = e.clientX - lightboxDragStartX;
+      lightboxPanY = e.clientY - lightboxDragStartY;
+      lightboxApplyTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isLightboxDragging) {
+        isLightboxDragging = false;
+        lightboxApplyTransform();
+      }
+    });
+
+    // Duplo clique para alternar zoom 100% / 200%
+    img.addEventListener('dblclick', () => {
+      if (lightboxZoom === 1) {
+        lightboxZoom = 2;
+      } else {
+        lightboxZoomReset();
+      }
+      lightboxApplyTransform();
+    });
+  }
+});
+
+function lightboxPointAdjustment() {
+  const projId = currentLightboxProjId;
+  const currentIdx = currentLightboxIndex;
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+
+  const activeFile = (p.reviewFiles || [])[currentIdx];
+  closeReviewLightbox();
+  clientRequestRevision(projId);
+
+  if (activeFile && currentRevRenderFiles.length > 0) {
+    const renderIdx = currentRevRenderFiles.findIndex(f => f.id === activeFile.id || f.name === activeFile.name);
+    if (renderIdx > -1) {
+      selectRevReqRender(renderIdx);
+    }
+  }
+}
+
+function openPdfPreview(url, fileName) {
+  const modal = document.getElementById('pdfPreviewModal');
+  const iframe = document.getElementById('pdfPreviewIframe');
+  const title = document.getElementById('pdfPreviewTitle');
+  const dloadBtn = document.getElementById('pdfPreviewDownloadBtn');
+
+  if (title) title.textContent = fileName || 'Prancha Técnica (PDF)';
+  if (dloadBtn) {
+    dloadBtn.href = url;
+    dloadBtn.download = fileName || 'prancha.pdf';
+  }
+  if (iframe) iframe.src = url;
+  if (modal) modal.classList.remove('d-none');
+}
+
+function closePdfPreview() {
+  const modal = document.getElementById('pdfPreviewModal');
+  const iframe = document.getElementById('pdfPreviewIframe');
+  if (iframe) iframe.src = '';
+  if (modal) modal.classList.add('d-none');
 }
 
 document.addEventListener('DOMContentLoaded',loadData);

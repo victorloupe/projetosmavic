@@ -267,6 +267,156 @@ async function uploadToSupabaseStorage(file, folder = 'uploads') {
   return urlData?.publicUrl || '';
 }
 
+// Gera versão otimizada de alta fidelidade para visualização rápida no painel (WebP/JPEG 2048px)
+async function createOptimizedPreviewBlob(file, maxDimension = 2048, quality = 0.85) {
+  if (!file || !file.type || !file.type.startsWith('image/')) return null;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Tenta gerar WebP para máxima compressão e qualidade, com fallback para JPEG
+        const format = 'image/webp';
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], (file.name || 'render.webp').replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }));
+          } else {
+            canvas.toBlob((jpegBlob) => {
+              if (jpegBlob) {
+                resolve(new File([jpegBlob], (file.name || 'render.jpg').replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+              } else {
+                resolve(null);
+              }
+            }, 'image/jpeg', quality);
+          }
+        }, format, quality);
+      };
+      img.onerror = () => resolve(null);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Faz upload de arquivos de revisão com Dual-Stream (original em alta resolução + preview web otimizado)
+async function uploadReviewFile(file, projId) {
+  if (!sb || !sb.storage) {
+    throw new Error('Supabase Storage não está disponível.');
+  }
+
+  const cleanName = (file.name || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const uid = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const isImage = file.type && file.type.startsWith('image/');
+  const storagePaths = [];
+
+  // 1. Upload do Arquivo Original (sem perda de resolução, para download do cliente)
+  const origPath = `reviews/${projId}/${uid}_orig_${cleanName}`;
+  const { error: origErr } = await sb.storage.from('mavic_files').upload(origPath, file, {
+    cacheControl: '31536000',
+    upsert: true
+  });
+  if (origErr) throw origErr;
+  storagePaths.push(origPath);
+
+  const { data: origUrlData } = sb.storage.from('mavic_files').getPublicUrl(origPath);
+  const originalUrl = origUrlData?.publicUrl || '';
+
+  // 2. Se for imagem, gera e envia o Preview WebP otimizado para carregamento instantâneo
+  let previewUrl = originalUrl;
+  if (isImage) {
+    try {
+      const previewFile = await createOptimizedPreviewBlob(file, 2048, 0.85);
+      if (previewFile) {
+        const prevPath = `reviews/${projId}/${uid}_prev_${cleanName.replace(/\.[^.]+$/, '.webp')}`;
+        const { error: prevErr } = await sb.storage.from('mavic_files').upload(prevPath, previewFile, {
+          cacheControl: '31536000',
+          upsert: true
+        });
+        if (!prevErr) {
+          storagePaths.push(prevPath);
+          const { data: prevUrlData } = sb.storage.from('mavic_files').getPublicUrl(prevPath);
+          if (prevUrlData?.publicUrl) previewUrl = prevUrlData.publicUrl;
+        }
+      }
+    } catch(e) {
+      console.warn('Não foi possível gerar preview otimizado, usando original:', e);
+    }
+  }
+
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    name: file.name,
+    type: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'),
+    size: file.size || 0,
+    originalUrl,
+    previewUrl,
+    storagePaths,
+    uploadedAt: new Date().toISOString()
+  };
+}
+
+// Remove arquivos de revisão do Supabase Storage para liberar espaço na nuvem
+async function deleteReviewFilesFromStorage(reviewFiles) {
+  if (!sb || !sb.storage || !Array.isArray(reviewFiles) || !reviewFiles.length) return false;
+  
+  const pathsToRemove = [];
+  reviewFiles.forEach(f => {
+    if (Array.isArray(f.storagePaths) && f.storagePaths.length) {
+      pathsToRemove.push(...f.storagePaths);
+    } else if (f.storagePath) {
+      pathsToRemove.push(f.storagePath);
+    } else if (f.originalUrl || f.url) {
+      // Extrai path relativo da URL se necessário
+      const match = (f.originalUrl || f.url || '').match(/mavic_files\/(.+)$/);
+      if (match && match[1]) pathsToRemove.push(decodeURIComponent(match[1]));
+    }
+  });
+
+  const uniquePaths = [...new Set(pathsToRemove.filter(Boolean))];
+  if (!uniquePaths.length) return true;
+
+  try {
+    const { data, error } = await sb.storage.from('mavic_files').remove(uniquePaths);
+    if (error) {
+      console.warn('Erro ao remover arquivos do Supabase Storage:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Falha na limpeza do Supabase Storage:', err);
+    return false;
+  }
+}
+
+// Formata tamanho de arquivo em bytes para texto amigável (ex: 2.4 MB)
+function formatFileSize(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
 // Uma coluna conta como "concluída" se estiver marcada com isFinal.
 // Compatibilidade: configs salvas antes desse campo existir caem no nome
 // literal "Concluído", pra não quebrar dados já sincronizados.

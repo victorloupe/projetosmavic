@@ -70,6 +70,8 @@ Deno.serve(async (req) => {
         revisions:      p.revisions,
         revisionsLimit: p.revisionsLimit,
         revisionLogs:   p.revisionLogs,
+        reviewFiles:    p.reviewFiles || [],
+        reviewNotes:    p.reviewNotes || '',
         clientApproved: p.clientApproved,
         clientApprovedAt: p.clientApprovedAt,
       }))
@@ -113,6 +115,7 @@ Deno.serve(async (req) => {
       noticeId?: number
       projectId?: number
       notes?: string
+      pins?: Array<{ id: string | number; fileId?: string; fileName?: string; fileUrl?: string; xPct: number; yPct: number; comment: string; number: number }>
     }
 
     const nome  = body.nome?.trim().toLowerCase()
@@ -176,6 +179,7 @@ Deno.serve(async (req) => {
           id: Date.now(),
           timestamp: new Date().toISOString(),
           text: body.notes || 'Ajustes solicitados pelo cliente',
+          pins: Array.isArray(body.pins) ? body.pins : [],
           author: cli.name || 'Cliente'
         })
         return {

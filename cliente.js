@@ -897,9 +897,9 @@ function createCardHTML(p, cardIdx=0){
               <div class="client-review-sub">
                 <span class="client-review-badge">RENDER</span>
                 <span>${sizeText}</span>
-                <a href="${origUrl}" download="${escapeHtml(f.name)}" target="_blank" class="client-review-dl-btn" onclick="event.stopPropagation()" title="Baixar em Alta Resolução">
+                <button type="button" class="client-review-dl-btn" onclick="downloadReviewFile(${p.id}, ${fIdx}, this);event.stopPropagation()" title="Baixar em Alta Resolução">
                   <i class="bi bi-download"></i>
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -917,9 +917,9 @@ function createCardHTML(p, cardIdx=0){
                 <span>${sizeText}</span>
                 <div style="display:flex;align-items:center;gap:4px">
                   ${isPdf ? `<button type="button" class="client-review-dl-btn" onclick="openPdfPreview('${origUrl}', '${escapeHtml(f.name)}');event.stopPropagation()" title="Visualizar PDF"><i class="bi bi-eye"></i></button>` : ''}
-                  <a href="${origUrl}" download="${escapeHtml(f.name)}" target="_blank" class="client-review-dl-btn" onclick="event.stopPropagation()" title="Baixar Arquivo">
+                  <button type="button" class="client-review-dl-btn" onclick="downloadReviewFile(${p.id}, ${fIdx}, this);event.stopPropagation()" title="Baixar Arquivo">
                     <i class="bi bi-download"></i>
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1674,8 +1674,7 @@ function renderLightboxCurrentFile() {
 
   const dlBtn = document.getElementById('lightboxDownloadBtn');
   if (dlBtn) {
-    dlBtn.href = origUrl;
-    dlBtn.setAttribute('download', f.name);
+    dlBtn.title = `Baixar "${f.name}" em Alta Resolução`;
   }
 
   const imgEl = document.getElementById('lightboxImg');
@@ -1761,6 +1760,137 @@ function lightboxApplyTransform() {
   }
 }
 
+// ══════════════════════════════════════════
+//  DOWNLOAD SEGURO DE ARQUIVOS E RENDERS
+// ══════════════════════════════════════════
+async function downloadFileFromUrl(url, filename = 'arquivo') {
+  if (!url) {
+    showToast('Link do arquivo indisponível para download', 'warning');
+    return false;
+  }
+
+  let safeFilename = (filename || 'arquivo').trim().replace(/[/\\?%*:|"<>]/g, '_');
+  // Se o nome não contiver extensão, tenta extrair da URL
+  if (!/\.[a-zA-Z0-9]{2,5}$/.test(safeFilename)) {
+    const cleanUrl = url.split('?')[0].split('#')[0];
+    const matchExt = cleanUrl.match(/\.([a-zA-Z0-9]{2,5})$/);
+    if (matchExt) safeFilename += '.' + matchExt[1];
+  }
+
+  showToast(`Iniciando download de "${safeFilename}"...`, 'info');
+
+  // 1. Tenta download via fetch + Blob (funciona para mesma origem ou Supabase com CORS público)
+  try {
+    const resp = await fetch(url, { mode: 'cors' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = blobUrl;
+    a.download = safeFilename;
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    }, 25000);
+
+    showToast(`✓ "${safeFilename}" baixado com sucesso!`, 'success');
+    return true;
+  } catch (err) {
+    console.warn('Falha no download via Blob, usando fallback direto do Storage:', err);
+  }
+
+  // 2. Fallback: Supabase Storage força Content-Disposition: attachment através do parâmetro ?download=
+  try {
+    let dlUrl = url;
+    if (dlUrl.includes('supabase.co/storage/v1/object/public/') && !dlUrl.includes('download=')) {
+      dlUrl += (dlUrl.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(safeFilename);
+    }
+
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = dlUrl;
+    a.download = safeFilename;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      document.body.removeChild(a);
+    }, 5000);
+
+    showToast(`Download de "${safeFilename}" iniciado!`, 'success');
+    return true;
+  } catch (err2) {
+    console.error('Falha geral no download:', err2);
+    // 3. Último recurso: abre em nova aba
+    window.open(url, '_blank');
+    showToast('Arquivo aberto no navegador.', 'info');
+    return false;
+  }
+}
+
+async function downloadReviewFile(projId, fileIndex, btnEl = null) {
+  const p = projects.find(x => x.id === projId);
+  if (!p || !Array.isArray(p.reviewFiles)) return;
+  const f = p.reviewFiles[fileIndex];
+  if (!f) return;
+  const url = f.originalUrl || f.url || f.previewUrl;
+  if (!url) {
+    showToast('Arquivo indisponível para download', 'warning');
+    return;
+  }
+
+  let originalHtml = '';
+  if (btnEl) {
+    originalHtml = btnEl.innerHTML;
+    btnEl.innerHTML = `<i class="bi bi-arrow-repeat spinning"></i>`;
+    btnEl.disabled = true;
+  }
+
+  try {
+    await downloadFileFromUrl(url, f.name || `arquivo_${fileIndex + 1}`);
+  } finally {
+    if (btnEl) {
+      btnEl.innerHTML = originalHtml;
+      btnEl.disabled = false;
+    }
+  }
+}
+
+async function downloadLightboxCurrentFile() {
+  const p = projects.find(x => x.id === currentLightboxProjId);
+  if (!p || !Array.isArray(p.reviewFiles)) return;
+  const f = p.reviewFiles[currentLightboxIndex];
+  if (!f) return;
+  const url = f.originalUrl || f.url || f.previewUrl;
+  if (!url) {
+    showToast('Arquivo indisponível para download', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('lightboxDownloadBtn');
+  let originalHtml = '';
+  if (btn) {
+    originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="bi bi-arrow-repeat spinning"></i> <span>Baixando...</span>`;
+  }
+
+  try {
+    await downloadFileFromUrl(url, f.name || `render_${currentLightboxIndex + 1}.jpg`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  }
+}
+
 async function downloadAllProjectFiles(projId) {
   const p = projects.find(x => x.id === projId);
   if (!p || !Array.isArray(p.reviewFiles) || !p.reviewFiles.length) return;
@@ -1775,7 +1905,7 @@ async function downloadAllProjectFiles(projId) {
 
       for (let i = 0; i < total; i++) {
         const f = p.reviewFiles[i];
-        const url = f.originalUrl || f.url;
+        const url = f.originalUrl || f.url || f.previewUrl;
         if (!url) continue;
 
         try {
@@ -1784,10 +1914,14 @@ async function downloadAllProjectFiles(projId) {
           const blob = await resp.blob();
           const cleanName = (f.name || `arquivo_${i + 1}`).replace(/[/\\?%*:|"<>]/g, '_');
           zip.file(cleanName, blob);
+          loaded++;
         } catch (e) {
-          console.warn(`Erro ao baixar "${f.name}" para o ZIP, usando fallback direto:`, e);
+          console.warn(`Erro ao baixar "${f.name}" para o ZIP:`, e);
         }
-        loaded++;
+      }
+
+      if (Object.keys(zip.files).length === 0) {
+        throw new Error('Nenhum arquivo pôde ser adicionado ao ZIP');
       }
 
       showToast('Compactando arquivos em formato ZIP...', 'info');
@@ -1812,19 +1946,13 @@ async function downloadAllProjectFiles(projId) {
     }
   }
 
-  // Fallback se JSZip não estiver disponível
+  // Fallback se JSZip não estiver disponível ou falhar
   for (let i = 0; i < total; i++) {
     const f = p.reviewFiles[i];
-    const url = f.originalUrl || f.url;
+    const url = f.originalUrl || f.url || f.previewUrl;
     if (url) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = f.name || `arquivo_${i + 1}`;
-      a.target = '_blank';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      await new Promise(r => setTimeout(r, 400));
+      await downloadFileFromUrl(url, f.name || `arquivo_${i + 1}`);
+      await new Promise(r => setTimeout(r, 600));
     }
   }
   showToast('Download concluído!', 'success');
@@ -1907,19 +2035,39 @@ function lightboxPointAdjustment() {
   }
 }
 
+let currentPdfPreviewUrl = '';
+let currentPdfPreviewName = '';
+
 function openPdfPreview(url, fileName) {
   const modal = document.getElementById('pdfPreviewModal');
   const iframe = document.getElementById('pdfPreviewIframe');
   const title = document.getElementById('pdfPreviewTitle');
-  const dloadBtn = document.getElementById('pdfPreviewDownloadBtn');
 
-  if (title) title.textContent = fileName || 'Prancha Técnica (PDF)';
-  if (dloadBtn) {
-    dloadBtn.href = url;
-    dloadBtn.download = fileName || 'prancha.pdf';
-  }
+  currentPdfPreviewUrl = url;
+  currentPdfPreviewName = fileName || 'prancha.pdf';
+
+  if (title) title.textContent = currentPdfPreviewName;
   if (iframe) iframe.src = url;
   if (modal) modal.classList.remove('d-none');
+}
+
+async function downloadCurrentPdfPreview() {
+  if (!currentPdfPreviewUrl) return;
+  const btn = document.getElementById('pdfPreviewDownloadBtn');
+  let origHtml = '';
+  if (btn) {
+    origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="bi bi-arrow-repeat spinning"></i> Baixando...`;
+  }
+  try {
+    await downloadFileFromUrl(currentPdfPreviewUrl, currentPdfPreviewName || 'prancha.pdf');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
 }
 
 function closePdfPreview() {
@@ -1927,6 +2075,8 @@ function closePdfPreview() {
   const iframe = document.getElementById('pdfPreviewIframe');
   if (iframe) iframe.src = '';
   if (modal) modal.classList.add('d-none');
+  currentPdfPreviewUrl = '';
+  currentPdfPreviewName = '';
 }
 
 document.addEventListener('DOMContentLoaded',loadData);

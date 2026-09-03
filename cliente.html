@@ -269,9 +269,9 @@
       <button type="button" class="lightbox-btn-action" onclick="lightboxPointAdjustment()" title="Apontar Ajuste neste Render">
         <i class="bi bi-pin-map-fill"></i> <span>Apontar Ajuste</span>
       </button>
-      <a id="lightboxDownloadBtn" href="#" download target="_blank" class="lightbox-btn-download" title="Baixar arquivo original em alta resolução">
+      <button type="button" id="lightboxDownloadBtn" class="lightbox-btn-download" onclick="downloadLightboxCurrentFile()" title="Baixar arquivo original em alta resolução">
         <i class="bi bi-download"></i> <span>Baixar Original</span>
-      </a>
+      </button>
       <button type="button" class="lightbox-btn-close" onclick="closeReviewLightbox()" title="Fechar (Esc)"><i class="bi bi-x-lg"></i></button>
     </div>
   </div>
@@ -304,9 +304,9 @@
         <h5 id="pdfPreviewTitle" style="margin:0;font-size:14px;font-weight:700;color:var(--text);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Prancha Técnica (PDF)</h5>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <a id="pdfPreviewDownloadBtn" href="#" download target="_blank" class="btn btn-primary btn-sm" style="background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600;font-size:12px;display:inline-flex;align-items:center;gap:4px">
+        <button type="button" id="pdfPreviewDownloadBtn" onclick="downloadCurrentPdfPreview()" class="btn btn-primary btn-sm" style="background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600;font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer">
           <i class="bi bi-download"></i> Baixar PDF
-        </a>
+        </button>
         <button class="btn-icon" onclick="closePdfPreview()"><i class="bi bi-x-lg"></i></button>
       </div>
     </div>
@@ -316,6 +316,6 @@
   </div>
 </div>
 
-<script src="cliente.js?v=145"></script>
+<script src="cliente.js?v=146"></script>
 </body>
 </html>

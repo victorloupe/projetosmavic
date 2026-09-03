@@ -1385,7 +1385,7 @@ function setSync(s){
 // ══════════════════════════════════════════
 //  THEME MANAGEMENT
 // ══════════════════════════════════════════
-function toggleTheme(){appTheme=appTheme==='light'?'dark':'light';applyTheme(appTheme);scheduleSync();}
+function toggleTheme(){if(typeof triggerHaptic==='function')triggerHaptic('light');appTheme=appTheme==='light'?'dark':'light';applyTheme(appTheme);scheduleSync();}
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);
   document.documentElement.style.colorScheme = t;
@@ -2023,44 +2023,327 @@ function fsConfirmOnlyOpen() {
 }
 
 // ══════════════════════════════════════════
-//  BARRA DE NAVEGAÇÃO INFERIOR (MOBILE)
+//  BARRA DE NAVEGAÇÃO INFERIOR & RECURSOS MOBILE
 // ══════════════════════════════════════════
-// No mobile o .nav-tabs desktop some (sem espaço), e sem isso não havia
-// como trocar de página a não ser voltando pro navegador. Substitui por
-// uma barra fixa no rodapé com o item ativo "flutuando" — nas cores do
-// sistema (var(--accent) etc.), não no arco-íris do componente original.
-const MOBILE_TABS=[
-  {href:'index.html',       icon:'bi-kanban',                    label:'Board',       match:['','index.html']},
-  {href:'dashboard.html',   icon:'bi-speedometer2',               label:'Dashboard',   match:['dashboard.html']},
-  {href:'orcamento.html',   icon:'bi-file-earmark-spreadsheet',   label:'Orçamentos',  match:['orcamento.html']},
-  {href:'pagamentos.html',  icon:'bi-credit-card',                label:'Pagamentos',  match:['pagamentos.html']},
-  {href:'relatorio.html',   icon:'bi-graph-up-arrow',             label:'Relatórios',  match:['relatorio.html']},
-  {href:'clientes.html',    icon:'bi-people',                     label:'Clientes',    match:['clientes.html']},
-  {href:'servicos.html',    icon:'bi-box-seam',                   label:'Serviços',    match:['servicos.html']},
-  {href:'javascript:void(0)', icon:'bi-stopwatch',                label:'Cronômetro',  isTimer:true},
-];
-
-function getMobileTabBarHtml(){
-  const current=location.pathname.split('/').pop();
-  return MOBILE_TABS.map(t=>{
-    if(t.isTimer){
-      return `<a class="mtab-item" id="mtabTimerBtn" href="javascript:void(0)" onclick="onMobileTimerClick(event)" title="Cronômetro" aria-label="Cronômetro">
-        <span class="mtab-bubble">
-          <i class="bi bi-stopwatch" id="mtabTimerIcon"></i>
-          <span class="mtab-timer-dot" id="mtabTimerDot" style="display:none"></span>
-        </span>
-      </a>`;
-    }
-    const active=t.match && t.match.includes(current);
-    return `<a class="mtab-item${active?' active':''}" href="${t.href}" title="${t.label}" aria-label="${t.label}">
-      <span class="mtab-bubble"><i class="bi ${t.icon}"></i></span>
-    </a>`;
-  }).join('');
+function triggerHaptic(type = 'light') {
+  if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+  try {
+    if (type === 'light') navigator.vibrate(12);
+    else if (type === 'medium') navigator.vibrate(24);
+    else if (type === 'success') navigator.vibrate([14, 45, 18]);
+    else if (type === 'warning') navigator.vibrate([25, 40, 25]);
+  } catch (e) {}
 }
+
+let _deferredPwaPrompt = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredPwaPrompt = e;
+    const card = document.getElementById('morePwaCard');
+    if (card) card.style.display = 'flex';
+  });
+  window.addEventListener('appinstalled', () => {
+    _deferredPwaPrompt = null;
+    const card = document.getElementById('morePwaCard');
+    if (card) card.style.display = 'none';
+  });
+}
+
+async function installPwaApp() {
+  triggerHaptic('medium');
+  if (_deferredPwaPrompt) {
+    _deferredPwaPrompt.prompt();
+    const { outcome } = await _deferredPwaPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast('Aplicativo MAVIC instalado com sucesso!', 'success');
+    }
+    _deferredPwaPrompt = null;
+    const card = document.getElementById('morePwaCard');
+    if (card) card.style.display = 'none';
+  } else {
+    showToast('Para instalar no iPhone/iPad: toque em Compartilhar no Safari e escolha "Adicionar à Tela de Início".', 'info', 6000);
+  }
+}
+
+function getPageSlug(pathOrHref) {
+  if (!pathOrHref) return '';
+  const clean = pathOrHref.split('?')[0].split('#')[0].split('/').filter(Boolean).pop() || '';
+  return clean.replace(/\.html$/i, '').toLowerCase();
+}
+
+function getMobileTabBarHtml() {
+  const currentSlug = getPageSlug(window.location.pathname);
+  const isHome = currentSlug === '' || currentSlug === 'index';
+  const isMorePage = ['dashboard', 'relatorio', 'servicos'].includes(currentSlug);
+
+  const timer = typeof getActiveTimer === 'function' ? getActiveTimer() : null;
+  const isTimerRunning = timer && !timer.pausedAt;
+  const isTimerPaused = timer && timer.pausedAt;
+
+  let moreDotClass = '';
+  let moreDotStyle = 'display:none';
+  if (isTimerRunning) {
+    moreDotClass = 'timer-dot-running';
+    moreDotStyle = 'display:block';
+  } else if (isTimerPaused) {
+    moreDotClass = 'timer-dot-paused';
+    moreDotStyle = 'display:block';
+  } else if (isMorePage) {
+    moreDotClass = 'more-dot-page';
+    moreDotStyle = 'display:block';
+  }
+
+  let moreLabel = 'Mais';
+  if (currentSlug === 'dashboard') moreLabel = 'Dash';
+  else if (currentSlug === 'relatorio') moreLabel = 'Relat.';
+  else if (currentSlug === 'servicos') moreLabel = 'Serviços';
+
+  return `
+    <a class="mtab-item ${isHome ? 'active' : ''}" href="index.html" onclick="triggerHaptic('light')" title="Quadro de Projetos">
+      <div class="mtab-icon-wrap"><i class="bi bi-kanban"></i></div>
+      <span class="mtab-label">Quadro</span>
+    </a>
+    <a class="mtab-item ${currentSlug === 'orcamento' ? 'active' : ''}" href="orcamento.html" onclick="triggerHaptic('light')" title="Orçamentos">
+      <div class="mtab-icon-wrap"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+      <span class="mtab-label">Orçamentos</span>
+    </a>
+    <a class="mtab-item ${currentSlug === 'pagamentos' ? 'active' : ''}" href="pagamentos.html" onclick="triggerHaptic('light')" title="Pagamentos">
+      <div class="mtab-icon-wrap"><i class="bi bi-credit-card"></i></div>
+      <span class="mtab-label">Pagamentos</span>
+    </a>
+    <a class="mtab-item ${currentSlug === 'clientes' ? 'active' : ''}" href="clientes.html" onclick="triggerHaptic('light')" title="Clientes">
+      <div class="mtab-icon-wrap"><i class="bi bi-people"></i></div>
+      <span class="mtab-label">Clientes</span>
+    </a>
+    <button type="button" class="mtab-item ${isMorePage ? 'active' : ''}" id="mtabMoreBtn" onclick="triggerHaptic('light');openMobileMoreSheet(event)" title="Mais Opções">
+      <div class="mtab-icon-wrap">
+        <i class="bi ${isMorePage ? 'bi-grid-fill' : 'bi-grid'}"></i>
+        <span class="mtab-badge-dot ${moreDotClass}" id="mtabMoreDot" style="${moreDotStyle}"></span>
+      </div>
+      <span class="mtab-label">${moreLabel}</span>
+    </button>
+  `;
+}
+
+function injectMobileMoreSheet() {
+  if (document.getElementById('mobileMoreOverlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'mobile-more-overlay';
+  overlay.id = 'mobileMoreOverlay';
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeMobileMoreSheet();
+  };
+
+  overlay.innerHTML = `
+    <div class="mobile-more-sheet" id="mobileMoreSheet">
+      <div class="more-sheet-handle-bar"><div class="more-sheet-handle"></div></div>
+      <div class="more-sheet-header">
+        <div class="more-sheet-title">
+          <img src="LOGO NOVA.png" alt="MAVIC" class="more-sheet-logo" onerror="this.style.display='none'">
+          <div>
+            <strong>MAVIC Projetos</strong>
+            <span>Menu & Atalhos</span>
+          </div>
+        </div>
+        <button type="button" class="btn-icon btn-sm" onclick="closeMobileMoreSheet()" title="Fechar"><i class="bi bi-x-lg"></i></button>
+      </div>
+
+      <!-- TIMER BANNER IN SHEET -->
+      <div class="more-sheet-timer-box" id="moreSheetTimerBox"></div>
+
+      <!-- PWA INSTALL PROMPT CARD -->
+      <div class="more-pwa-card" id="morePwaCard" onclick="installPwaApp()" style="display:none">
+        <div class="more-pwa-icon"><i class="bi bi-phone"></i></div>
+        <div class="more-pwa-info">
+          <div class="more-pwa-title">Instalar Aplicativo MAVIC</div>
+          <div class="more-pwa-desc">Adicionar à tela de início do celular</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" style="padding:4px 10px;font-size:11px;pointer-events:none">
+          <i class="bi bi-download"></i> Instalar
+        </button>
+      </div>
+
+      <!-- MAIN MODULES GRID -->
+      <div class="more-sheet-grid">
+        <a class="more-sheet-card ${getPageSlug(window.location.pathname) === 'dashboard' ? 'active' : ''}" href="dashboard.html" onclick="triggerHaptic('light')">
+          <div class="more-card-icon" style="color:#0284c7;background:rgba(2,132,199,0.12)"><i class="bi bi-speedometer2"></i></div>
+          <div class="more-card-info">
+            <div class="more-card-title">Dashboard</div>
+            <div class="more-card-desc">Faturamento e prazos</div>
+          </div>
+        </a>
+
+        <a class="more-sheet-card ${getPageSlug(window.location.pathname) === 'relatorio' ? 'active' : ''}" href="relatorio.html" onclick="triggerHaptic('light')">
+          <div class="more-card-icon" style="color:#16a34a;background:rgba(22,163,74,0.12)"><i class="bi bi-graph-up-arrow"></i></div>
+          <div class="more-card-info">
+            <div class="more-card-title">Relatórios</div>
+            <div class="more-card-desc">Gráficos e exportação</div>
+          </div>
+        </a>
+
+        <a class="more-sheet-card ${getPageSlug(window.location.pathname) === 'servicos' ? 'active' : ''}" href="servicos.html" onclick="triggerHaptic('light')">
+          <div class="more-card-icon" style="color:#9333ea;background:rgba(147,51,234,0.12)"><i class="bi bi-box-seam"></i></div>
+          <div class="more-card-info">
+            <div class="more-card-title">Serviços</div>
+            <div class="more-card-desc">Catálogo e valores</div>
+          </div>
+        </a>
+
+        <button type="button" class="more-sheet-card" onclick="triggerHaptic('light');closeMobileMoreSheet();onMobileTimerClick()">
+          <div class="more-card-icon" style="color:#ea580c;background:rgba(234,88,12,0.12)"><i class="bi bi-stopwatch"></i></div>
+          <div class="more-card-info">
+            <div class="more-card-title">Cronômetro</div>
+            <div class="more-card-desc">Apontar horas do projeto</div>
+          </div>
+        </button>
+
+        <button type="button" class="more-sheet-card" onclick="triggerHaptic('light');closeMobileMoreSheet();openGlobalNoticeModal()">
+          <div class="more-card-icon" style="color:#ca8a04;background:rgba(202,138,4,0.12)"><i class="bi bi-megaphone"></i></div>
+          <div class="more-card-info">
+            <div class="more-card-title">Avisos Globais</div>
+            <div class="more-card-desc">Mural e comunicados</div>
+          </div>
+        </button>
+
+        <button type="button" class="more-sheet-card" onclick="triggerHaptic('light');closeMobileMoreSheet();openArchiveModal()">
+          <div class="more-card-icon" style="color:#64748b;background:rgba(100,116,139,0.12)"><i class="bi bi-archive"></i></div>
+          <div class="more-card-info">
+            <div class="more-card-title">Arquivados</div>
+            <div class="more-card-desc">Projetos guardados</div>
+          </div>
+        </button>
+      </div>
+
+      <!-- FOOTER ACTIONS -->
+      <div class="more-sheet-footer">
+        <button type="button" class="more-footer-btn" onclick="triggerHaptic('light');closeMobileMoreSheet();openSettings()">
+          <i class="bi bi-gear"></i> <span>Configurar</span>
+        </button>
+        <button type="button" class="more-footer-btn" onclick="triggerHaptic('light');toggleTheme();updateMobileMoreSheetContent()">
+          <i class="bi bi-moon-stars" id="moreThemeIcon"></i> <span>Tema</span>
+        </button>
+        <button type="button" class="more-footer-btn more-btn-logout" onclick="triggerHaptic('warning');logoutAdmin()">
+          <i class="bi bi-box-arrow-right"></i> <span>Sair</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+}
+
+function updateMobileMoreSheetContent() {
+  const box = document.getElementById('moreSheetTimerBox');
+  if (box) {
+    const timer = typeof getActiveTimer === 'function' ? getActiveTimer() : null;
+    if (!timer) {
+      box.innerHTML = `
+        <div class="more-timer-bar idle" onclick="triggerHaptic('light');closeMobileMoreSheet();promptStartTimer()">
+          <div class="more-timer-left">
+            <div class="more-timer-icon-dot idle"></div>
+            <div>
+              <div class="more-timer-title">Nenhum cronômetro rodando</div>
+              <div class="more-timer-sub">Toque para iniciar apontamento</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" style="padding:4px 10px;font-size:11px" onclick="triggerHaptic('light');closeMobileMoreSheet();promptStartTimer();event.stopPropagation()">
+            <i class="bi bi-play-fill"></i> Iniciar
+          </button>
+        </div>
+      `;
+    } else {
+      const isPaused = Boolean(timer.pausedAt);
+      box.innerHTML = `
+        <div class="more-timer-bar active" onclick="triggerHaptic('light');closeMobileMoreSheet();openTimeTracker('${timer.projectId}')">
+          <div class="more-timer-left">
+            <div class="more-timer-icon-dot ${isPaused ? 'paused' : 'running'}"></div>
+            <div>
+              <div class="more-timer-title">${escapeHtml(timer.projectName || 'Projeto')}</div>
+              <div class="more-timer-sub" id="moreSheetTimerDisplay">${isPaused ? 'Pausado' : 'Em andamento…'}</div>
+            </div>
+          </div>
+          <div class="more-timer-acts" onclick="event.stopPropagation()">
+            <button type="button" class="btn-icon btn-sm" onclick="triggerHaptic('light');pauseGlobalTimer();updateMobileMoreSheetContent()" title="${isPaused ? 'Retomar' : 'Pausar'}">
+              <i class="bi ${isPaused ? 'bi-play-fill' : 'bi-pause-fill'}"></i>
+            </button>
+            <button type="button" class="btn-icon btn-sm text-danger" onclick="triggerHaptic('medium');stopGlobalTimer(true);closeMobileMoreSheet()" title="Parar e Salvar">
+              <i class="bi bi-stop-fill"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // PWA Install prompt check
+  const pwaCard = document.getElementById('morePwaCard');
+  if (pwaCard) {
+    const isStandalone = (typeof window !== 'undefined') && (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true);
+    const isMobile = Boolean(window.matchMedia && window.matchMedia('(max-width:768px)').matches);
+    if (!isStandalone && isMobile && (_deferredPwaPrompt || /iPhone|iPad|iPod/.test(navigator.userAgent))) {
+      pwaCard.style.display = 'flex';
+    } else {
+      pwaCard.style.display = 'none';
+    }
+  }
+
+  const themeIcon = document.getElementById('moreThemeIcon');
+  if (themeIcon) {
+    const curTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    themeIcon.className = curTheme === 'dark' ? 'bi bi-sun' : 'bi bi-moon-stars';
+  }
+}
+
+function openMobileMoreSheet(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  triggerHaptic('light');
+  injectMobileMoreSheet();
+  updateMobileMoreSheetContent();
+  const overlay = document.getElementById('mobileMoreOverlay');
+  if (overlay) {
+    requestAnimationFrame(() => overlay.classList.add('open'));
+  }
+}
+
+function closeMobileMoreSheet() {
+  triggerHaptic('light');
+  const overlay = document.getElementById('mobileMoreOverlay');
+  if (overlay) {
+    overlay.classList.remove('open');
+  }
+}
+
+// Oculta menu inferior quando teclado virtual estiver aberto no mobile
+(function initMobileKeyboardHandler() {
+  if (typeof window === 'undefined') return;
+  function handleFocus(e) {
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+      const bar = document.getElementById('mtabBar');
+      if (bar) bar.classList.add('keyboard-hidden');
+    }
+  }
+  function handleBlur(e) {
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+      setTimeout(() => {
+        const active = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+        if (active !== 'input' && active !== 'textarea' && active !== 'select') {
+          const bar = document.getElementById('mtabBar');
+          if (bar) bar.classList.remove('keyboard-hidden');
+        }
+      }, 120);
+    }
+  }
+  document.addEventListener('focusin', handleFocus);
+  document.addEventListener('focusout', handleBlur);
+})();
 
 (function injectMobileTabBar(){
   if(document.getElementById('mtabBar')) return;
-  if(!document.querySelector('.nav') && !document.querySelector('nav.nav')) return; // só nas páginas admin
+  if(!document.querySelector('.nav') && !document.querySelector('nav.nav')) return;
   const wrap=document.createElement('div');
   wrap.innerHTML=`<nav class="mtab-bar" id="mtabBar">${getMobileTabBarHtml()}</nav>`;
   document.body.appendChild(wrap.firstElementChild);
@@ -2587,14 +2870,16 @@ function deleteProject(id,fromArch=false){
 //  INITIALIZATION & NAV HIGHLIGHT WITH SLIDING PILL
 // ══════════════════════════════════════════
 function highlightActiveTab() {
-  const currentPath = window.location.pathname;
-  const isHome = currentPath === '/' || currentPath.endsWith('/') || currentPath.endsWith('index.html');
+  const currentSlug = getPageSlug(window.location.pathname);
+  const isHome = currentSlug === '' || currentSlug === 'index';
+  const isMorePage = ['dashboard', 'relatorio', 'servicos'].includes(currentSlug);
 
   const tabs = document.querySelectorAll('.nav-tab');
   tabs.forEach(tab => {
     const href = tab.getAttribute('href');
     if (href) {
-      const match = (href === 'index.html' && isHome) || (href !== 'index.html' && currentPath.endsWith(href));
+      const hrefSlug = getPageSlug(href);
+      const match = (hrefSlug === 'index' || hrefSlug === '') ? isHome : (hrefSlug === currentSlug);
       tab.classList.toggle('on', match);
     }
   });
@@ -2603,8 +2888,11 @@ function highlightActiveTab() {
   mtabs.forEach(tab => {
     const href = tab.getAttribute('href');
     if (href) {
-      const match = (href === 'index.html' && isHome) || (href !== 'index.html' && currentPath.endsWith(href));
+      const hrefSlug = getPageSlug(href);
+      const match = (hrefSlug === 'index' || hrefSlug === '') ? isHome : (hrefSlug === currentSlug);
       tab.classList.toggle('active', match);
+    } else if (tab.id === 'mtabMoreBtn') {
+      tab.classList.toggle('active', isMorePage);
     }
   });
 
@@ -2783,6 +3071,7 @@ function injectSharedLayout() {
     mtabEl.innerHTML = getMobileTabBarHtml();
     document.body.appendChild(mtabEl);
   }
+  injectMobileMoreSheet();
 
   // 5. Shared Global Modals
   injectSharedModals();
@@ -3424,30 +3713,54 @@ function onMobileTimerClick(e) {
 }
 
 function updateMobileTimerIndicator() {
-  const timer = getActiveTimer();
-  const icon = document.getElementById('mtabTimerIcon');
-  const dot = document.getElementById('mtabTimerDot');
-  const btn = document.getElementById('mtabTimerBtn');
-  if (!icon || !btn) return;
+  const timer = typeof getActiveTimer === 'function' ? getActiveTimer() : null;
+  const dot = document.getElementById('mtabMoreDot');
+  const currentSlug = typeof getPageSlug === 'function' ? getPageSlug(window.location.pathname) : '';
+  const isMorePage = ['dashboard', 'relatorio', 'servicos'].includes(currentSlug);
 
-  if (timer && !timer.pausedAt) {
-    icon.className = 'bi bi-stopwatch-fill';
-    icon.style.color = 'var(--red)';
-    if (dot) dot.style.display = 'block';
-    btn.classList.add('timer-running');
-    btn.title = `Gravando: ${timer.projectName || 'Projeto'}`;
-  } else if (timer && timer.pausedAt) {
-    icon.className = 'bi bi-pause-circle-fill';
-    icon.style.color = 'var(--yellow)';
-    if (dot) dot.style.display = 'none';
-    btn.classList.remove('timer-running');
-    btn.title = `Pausado: ${timer.projectName || 'Projeto'}`;
-  } else {
-    icon.className = 'bi bi-stopwatch';
-    icon.style.color = '';
-    if (dot) dot.style.display = 'none';
-    btn.classList.remove('timer-running');
-    btn.title = 'Iniciar Cronômetro';
+  if (dot) {
+    if (timer && !timer.pausedAt) {
+      dot.className = 'mtab-badge-dot timer-dot-running';
+      dot.style.display = 'block';
+    } else if (timer && timer.pausedAt) {
+      dot.className = 'mtab-badge-dot timer-dot-paused';
+      dot.style.display = 'block';
+    } else if (isMorePage) {
+      dot.className = 'mtab-badge-dot more-dot-page';
+      dot.style.display = 'block';
+    } else {
+      dot.style.display = 'none';
+    }
+  }
+
+  // Compatibilidade com elementos legados caso existam
+  const legacyIcon = document.getElementById('mtabTimerIcon');
+  const legacyDot = document.getElementById('mtabTimerDot');
+  const legacyBtn = document.getElementById('mtabTimerBtn');
+  if (legacyIcon && legacyBtn) {
+    if (timer && !timer.pausedAt) {
+      legacyIcon.className = 'bi bi-stopwatch-fill';
+      legacyIcon.style.color = 'var(--red)';
+      if (legacyDot) legacyDot.style.display = 'block';
+      legacyBtn.classList.add('timer-running');
+    } else if (timer && timer.pausedAt) {
+      legacyIcon.className = 'bi bi-pause-circle-fill';
+      legacyIcon.style.color = 'var(--yellow)';
+      if (legacyDot) legacyDot.style.display = 'none';
+      legacyBtn.classList.remove('timer-running');
+    } else {
+      legacyIcon.className = 'bi bi-stopwatch';
+      legacyIcon.style.color = '';
+      if (legacyDot) legacyDot.style.display = 'none';
+      legacyBtn.classList.remove('timer-running');
+    }
+  }
+
+  // Atualiza tempo no bottom sheet se aberto
+  const disp = document.getElementById('moreSheetTimerDisplay');
+  if (disp && timer) {
+    const elapsed = timer.pausedAt ? (timer.pausedAt - timer.startTime - (timer.totalPausedMs || 0)) : (Date.now() - timer.startTime - (timer.totalPausedMs || 0));
+    disp.textContent = formatMsToClock(Math.max(0, elapsed));
   }
 }
 

@@ -591,6 +591,28 @@ function createCardHTML(p, cardIdx=0){
   const activeTimer = (typeof getActiveTimer === 'function') ? getActiveTimer() : null;
   const isRunningOnThis = activeTimer && activeTimer.projectId === p.id && !activeTimer.pausedAt;
 
+  const allVisCols = appColumns.filter(c => visibleColumns.includes(c.id));
+  const curColIdx = allVisCols.findIndex(c => c.id === p.column);
+  const curColObj = curColIdx > -1 ? allVisCols[curColIdx] : null;
+  const nextColObj = (curColIdx > -1 && curColIdx < allVisCols.length - 1) ? allVisCols[curColIdx + 1] : null;
+
+  const mobileStageBarHtml = `
+    <div class="kcard-mobile-stage-bar">
+      <div class="kcard-stage-info">
+        <i class="bi ${curColObj?.icon || DEFAULT_COL_ICON}" style="color:${curColObj?.color || DEFAULT_COL_COLOR}"></i>
+        <span>${escapeHtml(p.column || 'Geral')}</span>
+      </div>
+      ${nextColObj ? `
+        <button type="button" class="btn-quick-next-col" onclick="quickMoveNext(event, ${p.id})" title="Avançar para ${escapeHtml(nextColObj.id)}">
+          <span>Avançar para <strong>${escapeHtml(nextColObj.id)}</strong></span>
+          <i class="bi bi-arrow-right"></i>
+        </button>
+      ` : `
+        <span class="badge-stage-final"><i class="bi bi-check2-circle"></i> Etapa Final</span>
+      `}
+    </div>
+  `;
+
   return `<div class="kcard ${dlClass} ${pinnedCards.has(p.id)?'pinned':''}" data-id="${p.id}" draggable="true" onclick="togglePin(event,${p.id})" style="--type-color:${typeColor(p.type)}">
     ${subs.length?`<div class="kcard-prog-bar"><div class="kcard-prog-fill" style="width:${subPct}%;background:${progColor}"></div></div>`:''}
     ${p.image?`<img src="${p.image}" class="kcard-cover" onerror="this.style.display='none'">`:''}
@@ -629,6 +651,7 @@ function createCardHTML(p, cardIdx=0){
         ${revCount > 0 ? `<span class="badge b-rev" style="margin:0 auto" title="Rodada de alteração ${revCount}">Rev ${revCount}</span>` : ''}
         ${!isFinalColumn(p.column)?`<span class="badge ${pMap[p.priority]||'b-baixa'}" style="margin-left:auto">${pIcon[p.priority]||'🟢'} ${p.priority}</span>`:''}
       </div>
+      ${mobileStageBarHtml}
     </div>
     <div class="kcard-exp">
       ${dl?`<div style="font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px" class="${dateCls}"><i class="bi bi-calendar3"></i>${dl.toLocaleDateString('pt-BR')} ${dateBadge}</div>`:''}
@@ -2244,6 +2267,7 @@ function quickPayFromCard(projId, instId) {
       updateCardDOM(p.id);
       scheduleSync();
       if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof triggerHaptic === 'function') triggerHaptic('success');
       showToast(`Recebimento de ${fmt(payAmount)} confirmado!`, 'success');
     },
     {
@@ -2965,12 +2989,24 @@ function saveColumnsConfig(){
 
 
 
+function quickMoveNext(e, id) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (typeof triggerHaptic === 'function') triggerHaptic('medium');
+  moveNext(id);
+}
+
 function moveNext(id){
   const p=projects.find(x=>x.id===id);if(!p)return;
   const cols=appColumns.filter(c=>visibleColumns.includes(c.id));
   const idx=cols.findIndex(c=>c.id===p.column);
   if(idx===-1||idx===cols.length-1)return showToast('Já na última etapa','info');
-  applyColumnChange(p, cols[idx+1].id);
+  const targetCol = cols[idx+1].id;
+  applyColumnChange(p, targetCol);
+  if (typeof triggerHaptic === 'function') triggerHaptic('medium');
+  showToast(`Avançado para "${targetCol}"`, 'success');
   renderBoard();scheduleSync();
 }
 
@@ -2985,6 +3021,7 @@ function toggleSub(pId,sId){
   if(s){
     s.done=!s.done;
     if(s.done) s.current=false;
+    if (typeof triggerHaptic === 'function') triggerHaptic('success');
     updateCardDOM(pId);
     scheduleSync();
   }

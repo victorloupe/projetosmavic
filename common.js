@@ -1402,23 +1402,44 @@ function applyTheme(t){
 // ══════════════════════════════════════════
 //  TOAST & GENERAL HELPERS
 // ══════════════════════════════════════════
-function showToast(msg,type='success'){
+function showToast(msg,type='success',action=null){
   const wrap=document.getElementById('toastWrap');
   if(!wrap) return;
   const ic={success:'bi-check-circle',warning:'bi-exclamation-circle',error:'bi-x-circle',info:'bi-info-circle'};
   const cl={success:'var(--green)',warning:'var(--yellow)',error:'var(--red)',info:'var(--blue)'};
-  const t=document.createElement('div');t.className='toast';
+  const duration = action ? 4500 : 2800;
+  const t=document.createElement('div');
+  t.className='toast' + (action ? ' has-action' : '');
   t.style.cursor = 'pointer';
   t.style.position = 'relative';
   t.style.overflow = 'hidden';
+
+  const actionHtml = (action && action.text)
+    ? `<button type="button" class="toast-action-btn">${escapeHtml(action.text)}</button>`
+    : '';
+
   t.innerHTML=`<i class="bi ${ic[type]||ic.success}" style="color:${cl[type]||cl.success}"></i>
-               <span>${msg}</span>
-               <div class="toast-progress" style="position:absolute;bottom:0;left:0;height:3px;background:${cl[type]||cl.success};width:100%;transition:width 2.8s linear;"></div>`;
+               <span style="flex:1">${msg}</span>
+               ${actionHtml}
+               <div class="toast-progress" style="position:absolute;bottom:0;left:0;height:3px;background:${cl[type]||cl.success};width:100%;transition:width ${duration/1000}s linear;"></div>`;
   
   let timer = setTimeout(()=>{
     t.classList.remove('show');
     setTimeout(()=>t.remove(),400);
-  }, 2800);
+  }, duration);
+
+  if (action && typeof action.onClick === 'function') {
+    const actBtn = t.querySelector('.toast-action-btn');
+    if (actBtn) {
+      actBtn.onclick = (e) => {
+        e.stopPropagation();
+        clearTimeout(timer);
+        t.classList.remove('show');
+        setTimeout(() => t.remove(), 400);
+        action.onClick();
+      };
+    }
+  }
 
   t.onclick=()=>{
     clearTimeout(timer);
@@ -1439,13 +1460,13 @@ function showToast(msg,type='success'){
   t.onmouseleave=()=>{
     const prog = t.querySelector('.toast-progress');
     if (prog) {
-      prog.style.transition = 'width 2.8s linear';
+      prog.style.transition = `width ${duration/1000}s linear`;
       prog.style.width = '0%';
     }
     timer = setTimeout(()=>{
       t.classList.remove('show');
       setTimeout(()=>t.remove(),400);
-    }, 2800);
+    }, duration);
   };
 
   wrap.appendChild(t);

@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=131">
+<link rel="stylesheet" href="index.css?v=148">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 </head>
@@ -540,6 +540,38 @@
 </div>
 </div>
 
+<!-- ══ MODAL DE RETORNO DE ETAPA / MOTIVO DA ALTERAÇÃO ══ -->
+<div class="overlay" id="stageReturnModalOverlay" onclick="if(event.target===this)cancelStageReturnModal()">
+<div class="mbox msm" style="max-width:480px">
+  <div class="mhdr">
+    <h5 style="color:var(--accent);display:flex;align-items:center;gap:8px">
+      <i class="bi bi-arrow-repeat"></i> <span id="stageReturnModalTitle">Registrar Alteração</span>
+    </h5>
+    <button class="btn-icon btn-sm" onclick="cancelStageReturnModal()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="mbody" style="display:flex;flex-direction:column;gap:12px">
+    <div id="stageReturnModalInfo" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--text);display:flex;flex-direction:column;gap:4px"></div>
+
+    <div class="fld">
+      <label class="flbl" style="display:flex;align-items:center;gap:6px">
+        <i class="bi bi-pencil-square" style="color:var(--accent)"></i> O que precisa ser alterado neste projeto?
+      </label>
+      <textarea class="inp" id="stageReturnNotes" rows="3" placeholder="Ex: Cliente pediu troca da textura de madeira e ajuste nas luminárias da sala…" style="resize:vertical;font-size:13px;line-height:1.45;padding:8px 10px"></textarea>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">
+        Esta anotação aparecerá no card do projeto e ficará registrada no histórico.
+      </div>
+    </div>
+  </div>
+  <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+    <button type="button" class="btn btn-ghost btn-sm" onclick="cancelStageReturnModal()"><i class="bi bi-x-lg"></i> Cancelar</button>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="confirmStageReturnModal(true)" title="Retornar sem anotação">Pular Anotação</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="confirmStageReturnModal(false)"><i class="bi bi-check2"></i> Salvar Alteração</button>
+    </div>
+  </div>
+</div>
+</div>
+
 <!-- ══ MODAL DE ENVIO PARA REVISÃO / ARQUIVOS PARA O CLIENTE ══ -->
 <div class="overlay" id="sendReviewOverlay" onclick="if(event.target===this)closeSendReviewModal()">
 <div class="mbox mmd" style="max-width:580px">
@@ -622,8 +654,8 @@
 </div>
 </div>
 
-<script src="common.js?v=145"></script>
-<script src="board.js?v=145"></script>
+<script src="common.js?v=149"></script>
+<script src="board.js?v=149"></script>
 <script>
   // Board column popover selector helper
   function toggleColsMenu() {

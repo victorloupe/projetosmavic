@@ -1800,30 +1800,29 @@ async function renderPdfToContainer(url, container, spinnerEl, iframeFallback, o
     const numPages = doc.numPages;
     if (typeof onPageCount === 'function') onPageCount(numPages);
 
-    const containerWidth = Math.min(window.innerWidth - 32, (container.clientWidth || 700) - 24);
+    const containerWidth = Math.min(window.innerWidth - 24, (container.clientWidth || 700) - 20);
     const firstPage = await doc.getPage(1);
     const unscaled = firstPage.getViewport({ scale: 1.0 });
-    const fitScale = Math.min(2.5, Math.max(0.25, containerWidth / unscaled.width));
+    const fitScale = Math.min(2.5, Math.max(0.04, containerWidth / unscaled.width));
     const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
-    const estHeight = Math.round(unscaled.height * fitScale);
 
-    // Cria wrappers com skeleton para todas as páginas
+    // Cria wrappers com skeleton para todas as páginas (sem fundo branco artificial)
     for (let p = 1; p <= numPages; p++) {
       const pageWrap = document.createElement('div');
       pageWrap.className = 'pdf-page-wrapper';
       pageWrap.id = `common-page-wrap-${p}`;
       pageWrap.dataset.pageNumber = p;
-      pageWrap.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,0.35);border-radius:4px;overflow:hidden;background:#fff;max-width:100%;min-height:${estHeight}px;width:100%`;
+      pageWrap.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:20px;width:100%;max-width:100%;background:transparent';
 
       const skeleton = document.createElement('div');
       skeleton.className = 'pdf-page-skeleton';
-      skeleton.style.cssText = `width:100%;min-height:${estHeight}px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:#1e1e1e;gap:6px`;
+      skeleton.style.cssText = 'width:100%;max-width:100%;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px dashed rgba(255,255,255,0.1);gap:6px';
       skeleton.innerHTML = `<span class="spin" style="width:20px;height:20px;border-width:2px;display:inline-block"></span><span style="font-size:11px;color:#aaa">Página ${p} de ${numPages}</span>`;
       pageWrap.appendChild(skeleton);
 
       const numTag = document.createElement('div');
       numTag.className = 'pdf-page-num-tag';
-      numTag.style.cssText = 'font-size:10px;color:var(--text3);padding:4px 8px;text-align:center;background:rgba(0,0,0,0.04);width:100%';
+      numTag.style.cssText = 'font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);padding:3px 12px;border-radius:20px;background:rgba(255,255,255,0.08);margin-top:8px;display:inline-block;letter-spacing:0.3px';
       numTag.textContent = `Página ${p} de ${numPages}`;
       pageWrap.appendChild(numTag);
 
@@ -1912,9 +1911,16 @@ async function renderCommonSinglePage(pageNum, pageWrap, doc, scale, dpr) {
     canvas.style.maxWidth = '100%';
     canvas.style.height = 'auto';
     canvas.style.display = 'block';
+    canvas.style.borderRadius = '4px';
+    canvas.style.boxShadow = '0 6px 24px rgba(0,0,0,0.55)';
+    canvas.style.background = '#ffffff';
 
     const skeleton = pageWrap.querySelector('.pdf-page-skeleton');
     if (skeleton) skeleton.remove();
+
+    pageWrap.style.minHeight = '0';
+    pageWrap.style.background = 'transparent';
+    pageWrap.style.boxShadow = 'none';
 
     const renderTask = page.render({
       canvasContext: ctx,
@@ -1946,24 +1952,24 @@ async function renderCommonSinglePage(pageNum, pageWrap, doc, scale, dpr) {
   wrap.innerHTML = `
     <div class="overlay" id="pdfPreviewOverlay" style="z-index:1250;padding:12px;background:rgba(12,11,10,0.68)" onclick="if(event.target===this)closePdfPreview()">
       <div class="mbox" id="pdfPreviewBox" style="max-width:1150px;width:96vw;height:90vh;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,0.45);border:1px solid var(--border)" onclick="event.stopPropagation()">
-        <div class="mhdr" style="padding:12px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface);flex-shrink:0;gap:12px">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-            <div style="width:34px;height:34px;border-radius:8px;background:rgba(220,38,38,0.12);color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">
+        <div class="mhdr" style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface);flex-shrink:0;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;overflow:hidden">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(220,38,38,0.12);color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">
               <i class="bi bi-file-earmark-pdf-fill"></i>
             </div>
             <div style="min-width:0;overflow:hidden">
-              <h5 id="pdfPreviewTitle" style="margin:0;font-size:13.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Visualizador de PDF</h5>
-              <span id="pdfPreviewSubtitle" style="font-size:11px;color:var(--text3);display:block">Prancha / Documento MAVIC</span>
+              <h5 id="pdfPreviewTitle" style="margin:0;font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Visualizador de PDF</h5>
+              <span id="pdfPreviewSubtitle" style="font-size:10.5px;color:var(--text3);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Prancha / Documento MAVIC</span>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <button type="button" id="pdfPreviewDownloadBtn" onclick="downloadCurrentPdfPreview()" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px" title="Baixar PDF">
-              <i class="bi bi-download"></i> <span>Baixar</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <button type="button" id="pdfPreviewDownloadBtn" onclick="downloadCurrentPdfPreview()" class="btn-icon" style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text);background:var(--surface2)" title="Baixar PDF">
+              <i class="bi bi-download" style="font-size:15px"></i>
             </button>
-            <a id="pdfPreviewExternalBtn" href="#" target="_blank" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;text-decoration:none" title="Abrir em aba separada">
-              <i class="bi bi-box-arrow-up-right"></i> <span>Aba Externa</span>
+            <a id="pdfPreviewExternalBtn" href="#" target="_blank" class="btn-icon" style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text);background:var(--surface2);text-decoration:none" title="Abrir em aba separada">
+              <i class="bi bi-box-arrow-up-right" style="font-size:14px"></i>
             </a>
-            <button type="button" class="btn-icon btn-sm" onclick="closePdfPreview()" title="Fechar (Esc)" style="width:32px;height:32px"><i class="bi bi-x-lg"></i></button>
+            <button type="button" class="btn-icon" onclick="closePdfPreview()" title="Fechar (Esc)" style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text);background:var(--surface2)"><i class="bi bi-x-lg" style="font-size:15px"></i></button>
           </div>
         </div>
         <div class="mbody" style="flex:1;padding:0;background:#1e1e1e;display:flex;position:relative;overflow:hidden">
@@ -2110,7 +2116,7 @@ async function downloadCurrentPdfPreview() {
   if (btn) {
     origHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<span class="spin" style="width:12px;height:12px;display:inline-block"></span> Baixando...`;
+    btn.innerHTML = `<span class="spin" style="width:14px;height:14px;border-width:2px;display:inline-block"></span>`;
   }
   try {
     await downloadFileFromUrl(currentPdfPreviewUrl, currentPdfPreviewName || 'documento.pdf');

@@ -2038,6 +2038,8 @@ function lightboxPointAdjustment() {
 let currentPdfPreviewUrl = '';
 let currentPdfPreviewName = '';
 let clientPdfDoc = null;
+let baseFitScale = 1.0;
+let zoomMultiplier = 1.0;
 let clientPdfScale = 1.0;
 let clientPdfObserver = null;
 let activePdfRenderTasks = {};
@@ -2155,32 +2157,31 @@ async function renderClientPdfViewer(url) {
     if (spinnerSubtext) spinnerSubtext.textContent = 'Preparando página 1 em alta definição';
 
     // Determina a largura disponível para ajustar à tela do celular ou desktop
-    const containerWidth = Math.min(window.innerWidth - 32, (container?.clientWidth || 700) - 24);
+    const containerWidth = Math.min(window.innerWidth - 24, (container?.clientWidth || 700) - 20);
     const firstPage = await clientPdfDoc.getPage(1);
     const unscaledViewport = firstPage.getViewport({ scale: 1.0 });
-    const fitScale = Math.min(2.5, Math.max(0.25, (containerWidth / unscaledViewport.width)));
-    clientPdfScale = fitScale;
+    baseFitScale = Math.min(2.5, Math.max(0.04, (containerWidth / unscaledViewport.width)));
+    zoomMultiplier = 1.0;
+    clientPdfScale = baseFitScale * zoomMultiplier;
     updateClientPdfZoomText();
 
-    const estHeight = Math.round(unscaledViewport.height * fitScale);
-
-    // Cria placeholders leves para todas as páginas com antecedência
+    // Cria placeholders leves e limpos para todas as páginas (sem fundo branco artificial)
     for (let p = 1; p <= numPages; p++) {
       const pageWrap = document.createElement('div');
       pageWrap.className = 'pdf-page-wrapper';
       pageWrap.id = `client-page-wrap-${p}`;
       pageWrap.dataset.pageNumber = p;
-      pageWrap.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,0.35);border-radius:4px;overflow:hidden;background:#fff;max-width:100%;min-height:${estHeight}px;width:100%`;
+      pageWrap.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:20px;width:100%;max-width:100%;background:transparent';
 
       const skeleton = document.createElement('div');
       skeleton.className = 'pdf-page-skeleton';
-      skeleton.style.cssText = `width:100%;min-height:${estHeight}px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:#1e1e1e;gap:6px`;
+      skeleton.style.cssText = 'width:100%;max-width:100%;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px dashed rgba(255,255,255,0.1);gap:6px';
       skeleton.innerHTML = `<span class="spin" style="width:20px;height:20px;border-width:2px;display:inline-block"></span><span style="font-size:11px;color:#aaa">Página ${p} de ${numPages}</span>`;
       pageWrap.appendChild(skeleton);
 
       const numTag = document.createElement('div');
       numTag.className = 'pdf-page-num-tag';
-      numTag.style.cssText = 'font-size:10px;color:var(--text3);padding:4px 8px;text-align:center;background:rgba(0,0,0,0.04);width:100%';
+      numTag.style.cssText = 'font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);padding:3px 12px;border-radius:20px;background:rgba(255,255,255,0.08);margin-top:8px;display:inline-block;letter-spacing:0.3px';
       numTag.textContent = `Página ${p} de ${numPages}`;
       pageWrap.appendChild(numTag);
 
@@ -2267,13 +2268,27 @@ async function renderClientSinglePage(pageNum, pageWrap) {
     const ctx = canvas.getContext('2d');
     canvas.height = Math.floor(viewport.height);
     canvas.width = Math.floor(viewport.width);
-    canvas.style.width = Math.round(viewport.width / dpr) + 'px';
-    canvas.style.maxWidth = '100%';
+    
+    const displayWidth = Math.round(viewport.width / dpr);
+    canvas.style.width = displayWidth + 'px';
+    if (zoomMultiplier <= 1.05) {
+      canvas.style.maxWidth = '100%';
+    } else {
+      canvas.style.maxWidth = 'none';
+    }
     canvas.style.height = 'auto';
     canvas.style.display = 'block';
+    canvas.style.borderRadius = '4px';
+    canvas.style.boxShadow = '0 6px 24px rgba(0,0,0,0.55)';
+    canvas.style.background = '#ffffff';
 
     const skeleton = pageWrap.querySelector('.pdf-page-skeleton');
     if (skeleton) skeleton.remove();
+
+    // Elimina qualquer espaço ou fundo artificial do invólucro
+    pageWrap.style.minHeight = '0';
+    pageWrap.style.background = 'transparent';
+    pageWrap.style.boxShadow = 'none';
 
     const renderTask = page.render({
       canvasContext: ctx,
@@ -2300,7 +2315,8 @@ async function renderClientSinglePage(pageNum, pageWrap) {
 
 function changePdfZoom(delta) {
   if (!clientPdfDoc) return;
-  clientPdfScale = Math.min(3.0, Math.max(0.25, clientPdfScale + delta));
+  zoomMultiplier = Math.min(3.5, Math.max(0.5, zoomMultiplier + delta));
+  clientPdfScale = baseFitScale * zoomMultiplier;
   updateClientPdfZoomText();
   applyZoomToAllPages();
 }
@@ -2308,10 +2324,12 @@ function changePdfZoom(delta) {
 function resetPdfZoom() {
   if (!clientPdfDoc) return;
   const container = document.getElementById('pdfPagesScrollContainer');
-  const containerWidth = Math.min(window.innerWidth - 32, (container?.clientWidth || 700) - 24);
+  const containerWidth = Math.min(window.innerWidth - 24, (container?.clientWidth || 700) - 20);
   clientPdfDoc.getPage(1).then(p => {
     const unscaled = p.getViewport({ scale: 1.0 });
-    clientPdfScale = Math.min(2.5, Math.max(0.25, (containerWidth / unscaled.width)));
+    baseFitScale = Math.min(2.5, Math.max(0.04, (containerWidth / unscaled.width)));
+    zoomMultiplier = 1.0;
+    clientPdfScale = baseFitScale * zoomMultiplier;
     updateClientPdfZoomText();
     applyZoomToAllPages();
   });
@@ -2330,8 +2348,16 @@ function applyZoomToAllPages() {
   const wrappers = container.querySelectorAll('.pdf-page-wrapper');
   wrappers.forEach(wrap => {
     wrap.dataset.rendered = '';
+    const canvas = wrap.querySelector('canvas');
+    if (canvas) {
+      if (zoomMultiplier <= 1.05) {
+        canvas.style.maxWidth = '100%';
+      } else {
+        canvas.style.maxWidth = 'none';
+      }
+    }
     const rect = wrap.getBoundingClientRect();
-    const isVisible = (rect.top < window.innerHeight && rect.bottom > 0);
+    const isVisible = (rect.top < window.innerHeight + 250 && rect.bottom > -250);
     if (isVisible) {
       wrap.dataset.rendered = 'rendering';
       const pNum = parseInt(wrap.dataset.pageNumber, 10);
@@ -2342,7 +2368,7 @@ function applyZoomToAllPages() {
 
 function updateClientPdfZoomText() {
   const el = document.getElementById('pdfZoomLevelText');
-  if (el) el.textContent = `${Math.round(clientPdfScale * 100)}%`;
+  if (el) el.textContent = `${Math.round(zoomMultiplier * 100)}%`;
 }
 
 async function downloadCurrentPdfPreview() {
@@ -2352,7 +2378,7 @@ async function downloadCurrentPdfPreview() {
   if (btn) {
     origHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<i class="bi bi-arrow-repeat spinning"></i> Baixando...`;
+    btn.innerHTML = `<span class="spin" style="width:14px;height:14px;border-width:2px;display:inline-block"></span>`;
   }
   try {
     await downloadFileFromUrl(currentPdfPreviewUrl, currentPdfPreviewName || 'prancha.pdf');
@@ -2387,6 +2413,7 @@ function closePdfPreview() {
   clientPdfDoc = null;
   currentPdfPreviewUrl = '';
   currentPdfPreviewName = '';
+  zoomMultiplier = 1.0;
 }
 
 document.addEventListener('DOMContentLoaded',loadData);

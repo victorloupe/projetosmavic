@@ -34,7 +34,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="index.css?v=149">
+<link rel="stylesheet" href="index.css?v=150">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 </head>
@@ -645,19 +645,19 @@
         </div>
       </div>
 
-      <div class="mftr send-review-ftr" style="padding:12px 18px; border-top:1px solid var(--border); background:var(--surface); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-shrink:0">
-        <button type="button" class="btn btn-ghost" onclick="closeSendReviewModal()" title="Cancelar">
+      <div class="mftr send-review-ftr" style="padding:10px 14px; border-top:1px solid var(--border); background:var(--surface); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-shrink:0">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeSendReviewModal()" title="Cancelar" style="font-size:12px;padding:6px 10px;border-radius:8px">
           <i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span>
         </button>
         <div class="mftr-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap">
-          <button type="button" class="btn btn-ghost" onclick="saveSendReview(false)" id="btnSaveReviewOnly" title="Salvar">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="saveSendReview(false)" id="btnSaveReviewOnly" title="Salvar no painel sem notificar" style="font-size:12px;padding:6px 10px;border-radius:8px">
             <i class="bi bi-check2"></i> <span class="btn-txt">Salvar</span>
           </button>
-          <button type="button" class="btn btn-ghost" onclick="saveSendReview('copy')" id="btnSaveAndCopyReview" style="border:1px solid var(--border)" title="Copiar Mensagem">
-            <i class="bi bi-clipboard"></i> <span class="btn-txt">Copiar Mensagem</span>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="saveSendReview('copy')" id="btnSaveAndCopyReview" style="border:1px solid var(--border);font-size:12px;padding:6px 10px;border-radius:8px" title="Salvar e Copiar Link/Mensagem">
+            <i class="bi bi-clipboard"></i> <span class="btn-txt">Copiar</span>
           </button>
-          <button type="button" class="btn btn-primary" onclick="saveSendReview(true)" id="btnSaveAndNotifyReview" style="background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700" title="Salvar & Avisar no WhatsApp">
-            <i class="bi bi-whatsapp"></i> <span class="btn-txt">Salvar & Avisar</span>
+          <button type="button" class="btn btn-primary btn-sm" onclick="saveSendReview(true)" id="btnSaveAndNotifyReview" style="background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700;font-size:12px;padding:6px 12px;border-radius:8px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap" title="Salvar & Avisar no WhatsApp">
+            <i class="bi bi-whatsapp"></i> <span class="btn-txt">Avisar Cliente</span>
           </button>
         </div>
       </div>
@@ -665,15 +665,15 @@
 
     <!-- COLUNA 2: PAINEL DE PRÉ-VISUALIZAÇÃO DIRETO NO MODAL -->
     <div id="sendReviewPreviewCol" style="display:none; flex:1.35; min-width:360px; background:#222; border-left:1px solid var(--border); flex-direction:column; overflow:hidden">
-      <div style="padding:10px 14px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-shrink:0">
-        <div style="display:flex; align-items:center; gap:8px; overflow:hidden; flex:1; min-width:0; margin-right:8px">
+      <div style="padding:10px 14px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; gap:8px">
+        <div style="display:flex; align-items:center; gap:8px; overflow:hidden; flex:1; min-width:0">
           <i id="sendReviewInlineIcon" class="bi bi-file-earmark-pdf-fill" style="color:#dc2626; font-size:16px; flex-shrink:0"></i>
           <span id="sendReviewInlineName" style="font-size:12.5px; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">Prancha.pdf</span>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-shrink:0">
-          <button type="button" id="btnDownloadInlinePreview" class="btn btn-ghost btn-xs" style="font-size:11px; padding:4px 8px" title="Baixar arquivo"><i class="bi bi-download"></i> <span class="d-none-mobile">Baixar</span></button>
-          <a id="btnExternalInlinePreview" href="#" target="_blank" class="btn btn-ghost btn-xs" style="font-size:11px; padding:4px 8px; text-decoration:none" title="Abrir em tela cheia / nova aba"><i class="bi bi-box-arrow-up-right"></i> <span class="d-none-mobile">Nova Aba</span></a>
-          <button type="button" class="btn-icon btn-xs" onclick="closeSendReviewInlinePreview()" title="Recolher visualizador"><i class="bi bi-chevron-right"></i></button>
+          <button type="button" id="btnDownloadInlinePreview" class="btn-icon btn-sm" style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--text)" title="Baixar arquivo"><i class="bi bi-download"></i></button>
+          <a id="btnExternalInlinePreview" href="#" target="_blank" class="btn-icon btn-sm" style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--text);text-decoration:none" title="Abrir em tela cheia / nova aba"><i class="bi bi-box-arrow-up-right"></i></a>
+          <button type="button" class="btn-icon btn-sm" onclick="closeSendReviewInlinePreview()" title="Recolher visualizador" style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--text)"><i class="bi bi-chevron-right"></i></button>
         </div>
       </div>
       <div style="flex:1; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#1e1e1e">

@@ -6391,13 +6391,30 @@ textarea.inp {
 
 @media (min-width: 861px) {
   #sendReviewBox.has-inline-preview {
-    max-width: 1080px !important;
-    height: 88vh !important;
+    max-width: 1180px !important;
+    width: 94vw !important;
+    height: 90vh !important;
   }
   #sendReviewFormCol {
-    max-width: 460px !important;
+    max-width: 480px !important;
+    min-width: 360px !important;
     border-right: 1px solid var(--border) !important;
   }
+}
+
+.pdf-page-wrapper {
+  flex-shrink: 0 !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  margin-bottom: 24px !important;
+  background: transparent !important;
+}
+
+.pdf-page-wrapper canvas {
+  flex-shrink: 0 !important;
+  display: block !important;
 }
 
 

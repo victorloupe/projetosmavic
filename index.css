@@ -6364,3 +6364,40 @@ textarea.inp {
   transition: all .15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* Modal de Revisão: Split View & Pré-visualização Integrada */
+.review-file-item.active {
+  border-color: var(--accent) !important;
+  background: var(--surface) !important;
+  box-shadow: 0 0 0 1.5px var(--accent) !important;
+}
+
+@media (max-width: 860px) {
+  #sendReviewSplitWrap {
+    flex-direction: column !important;
+  }
+  #sendReviewBox.has-inline-preview {
+    max-width: 96vw !important;
+    height: 92vh !important;
+  }
+  #sendReviewFormCol {
+    max-height: 48vh !important;
+  }
+  #sendReviewPreviewCol {
+    min-height: 320px !important;
+    border-left: none !important;
+    border-top: 1px solid var(--border) !important;
+  }
+}
+
+@media (min-width: 861px) {
+  #sendReviewBox.has-inline-preview {
+    max-width: 1080px !important;
+    height: 88vh !important;
+  }
+  #sendReviewFormCol {
+    max-width: 460px !important;
+    border-right: 1px solid var(--border) !important;
+  }
+}
+
+

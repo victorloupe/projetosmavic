@@ -2785,6 +2785,7 @@ function sendNotification(){
 //  ENVIO PARA REVISÃO & ARQUIVOS DO CLIENTE
 // ══════════════════════════════════════════
 let tempReviewFiles = [];
+let currentSendReviewPreviewIdx = null;
 
 function toggleSendToClientReview(event, projId) {
   if (event) event.stopPropagation();
@@ -2804,13 +2805,117 @@ function openSendReviewModal(projId) {
   const progWrap = document.getElementById('reviewUploadProgressWrap');
   if (progWrap) progWrap.style.display = 'none';
 
+  closeSendReviewInlinePreview();
   renderSendReviewFilesList();
+  
+  if (tempReviewFiles.length > 0 && window.innerWidth >= 860) {
+    openSendReviewInlinePreview(0);
+  }
+
   document.getElementById('sendReviewOverlay').classList.add('open');
 }
 
 function closeSendReviewModal() {
   document.getElementById('sendReviewOverlay').classList.remove('open');
+  closeSendReviewInlinePreview();
   tempReviewFiles = [];
+}
+
+function openSendReviewInlinePreview(idx) {
+  if (idx < 0 || idx >= tempReviewFiles.length) return;
+  const f = tempReviewFiles[idx];
+  if (!f) return;
+
+  currentSendReviewPreviewIdx = idx;
+  const isImg = (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+  const isPdf = (f.type && f.type.includes('pdf')) || /\.pdf$/i.test(f.name);
+  const fileUrl = f.originalUrl || f.url || f.previewUrl || '';
+
+  const box = document.getElementById('sendReviewBox');
+  const previewCol = document.getElementById('sendReviewPreviewCol');
+  const nameEl = document.getElementById('sendReviewInlineName');
+  const iconEl = document.getElementById('sendReviewInlineIcon');
+  const iframe = document.getElementById('sendReviewInlineIframe');
+  const imgWrap = document.getElementById('sendReviewInlineImgWrap');
+  const imgEl = document.getElementById('sendReviewInlineImg');
+  const spinner = document.getElementById('sendReviewInlineSpinner');
+  const dlBtn = document.getElementById('btnDownloadInlinePreview');
+  const extBtn = document.getElementById('btnExternalInlinePreview');
+  const toggleBtn = document.getElementById('btnToggleReviewPreviewPane');
+
+  if (box) box.classList.add('has-inline-preview');
+  if (previewCol) previewCol.style.display = 'flex';
+  if (toggleBtn) toggleBtn.style.display = 'inline-flex';
+
+  if (nameEl) nameEl.textContent = f.name || 'Arquivo';
+  if (iconEl) {
+    iconEl.className = isPdf ? 'bi bi-file-earmark-pdf-fill' : isImg ? 'bi bi-image' : 'bi bi-file-earmark';
+    iconEl.style.color = isPdf ? '#dc2626' : isImg ? 'var(--accent)' : 'var(--text2)';
+  }
+
+  if (dlBtn) dlBtn.onclick = () => downloadFileFromUrl(fileUrl, f.name);
+  if (extBtn) extBtn.href = fileUrl;
+
+  if (spinner) spinner.style.display = 'flex';
+
+  if (isPdf) {
+    if (imgWrap) imgWrap.style.display = 'none';
+    if (iframe) {
+      let targetSrc = fileUrl;
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      if (isAndroid && fileUrl.startsWith('http')) {
+        targetSrc = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+      }
+      iframe.src = targetSrc;
+      iframe.style.display = 'block';
+    }
+  } else if (isImg) {
+    if (iframe) {
+      iframe.src = 'about:blank';
+      iframe.style.display = 'none';
+    }
+    if (imgEl) imgEl.src = fileUrl;
+    if (imgWrap) imgWrap.style.display = 'flex';
+  } else {
+    if (imgWrap) imgWrap.style.display = 'none';
+    if (iframe) {
+      iframe.src = fileUrl;
+      iframe.style.display = 'block';
+    }
+  }
+
+  renderSendReviewFilesList();
+}
+
+function closeSendReviewInlinePreview() {
+  currentSendReviewPreviewIdx = null;
+  const box = document.getElementById('sendReviewBox');
+  const previewCol = document.getElementById('sendReviewPreviewCol');
+  const iframe = document.getElementById('sendReviewInlineIframe');
+  const imgWrap = document.getElementById('sendReviewInlineImgWrap');
+  const imgEl = document.getElementById('sendReviewInlineImg');
+  const toggleBtn = document.getElementById('btnToggleReviewPreviewPane');
+
+  if (iframe) {
+    iframe.src = 'about:blank';
+    iframe.style.display = 'none';
+  }
+  if (imgEl) imgEl.src = '';
+  if (imgWrap) imgWrap.style.display = 'none';
+  if (previewCol) previewCol.style.display = 'none';
+  if (box) box.classList.remove('has-inline-preview');
+  if (toggleBtn) toggleBtn.style.display = 'none';
+
+  renderSendReviewFilesList();
+}
+
+function toggleSendReviewInlinePreview() {
+  const previewCol = document.getElementById('sendReviewPreviewCol');
+  if (previewCol && previewCol.style.display === 'flex') {
+    closeSendReviewInlinePreview();
+  } else if (tempReviewFiles.length > 0) {
+    openSendReviewInlinePreview(0);
+  }
 }
 
 function renderSendReviewFilesList() {
@@ -2837,25 +2942,25 @@ function renderSendReviewFilesList() {
     const isImg = (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
     const isPdf = (f.type && f.type.includes('pdf')) || /\.pdf$/i.test(f.name);
     const fileUrl = f.originalUrl || f.url || f.previewUrl || '';
+    const isActive = (currentSendReviewPreviewIdx === idx);
     const thumbHtml = isImg
       ? `<img src="${f.previewUrl || f.originalUrl}" class="review-file-thumb" onerror="this.src='';this.className='review-file-icon-box'">`
       : `<div class="review-file-icon-box" style="${isPdf ? 'background:rgba(220,38,38,0.1);color:#dc2626' : ''}"><i class="bi ${isPdf ? 'bi-file-earmark-pdf' : 'bi-file-earmark'}"></i></div>`;
 
-    const openPreviewCall = isPdf
-      ? `openPdfPreview('${fileUrl}', '${escapeHtml(f.name)}');`
-      : `window.open('${fileUrl}', '_blank');`;
-
     return `
-      <div class="review-file-item">
-        <div style="display:flex;align-items:center;gap:10px;overflow:hidden;flex:1;cursor:pointer" onclick="${openPreviewCall}" title="Clique para visualizar ${isPdf ? 'no app' : 'o render'}">
+      <div class="review-file-item ${isActive ? 'active' : ''}">
+        <div style="display:flex;align-items:center;gap:10px;overflow:hidden;flex:1;cursor:pointer" onclick="openSendReviewInlinePreview(${idx})" title="Clique para visualizar este arquivo diretamente no modal">
           ${thumbHtml}
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            <div style="font-weight:600;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f.name)}</div>
+            <div style="font-weight:600;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              ${escapeHtml(f.name)}
+              ${isActive ? '<span class="badge" style="font-size:9px;background:var(--accent);color:#fff;margin-left:4px;padding:1px 5px;vertical-align:middle">Visualizando</span>' : ''}
+            </div>
             <div style="font-size:11px;color:var(--text3)">${formatFileSize(f.size)} ${isImg ? '· Render' : isPdf ? '· Prancha PDF' : ''}</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:4px">
-          <button type="button" class="btn-icon btn-sm" onclick="${openPreviewCall}" title="Visualizar ${isPdf ? 'PDF no aplicativo' : 'render'}" style="color:var(--accent)"><i class="bi ${isPdf ? 'bi-eye' : 'bi-box-arrow-up-right'}"></i></button>
+          <button type="button" class="btn-icon btn-sm" onclick="openSendReviewInlinePreview(${idx})" title="Visualizar no Modal" style="color:${isActive ? 'var(--accent)' : 'var(--text2)'}"><i class="bi bi-eye"></i></button>
           <button type="button" class="btn-icon btn-sm" onclick="downloadFileFromUrl('${fileUrl}', '${escapeHtml(f.name)}')" title="Baixar arquivo"><i class="bi bi-download"></i></button>
           <button type="button" class="btn-icon btn-sm" onclick="removeReviewFile(${idx})" title="Remover arquivo" style="color:var(--red)"><i class="bi bi-trash"></i></button>
         </div>
@@ -2942,6 +3047,10 @@ async function handleReviewFilesSelected(fileList) {
   renderSendReviewFilesList();
   if (successCount > 0) {
     showToast(`${successCount} arquivo${successCount > 1 ? 's' : ''} carregado${successCount > 1 ? 's' : ''} com sucesso!`, 'success');
+    // Abre automaticamente a visualização direta no modal para o último arquivo enviado
+    if (tempReviewFiles.length > 0) {
+      openSendReviewInlinePreview(tempReviewFiles.length - 1);
+    }
   }
   const inp = document.getElementById('reviewFileInput');
   if (inp) inp.value = '';
@@ -2953,7 +3062,16 @@ function removeReviewFile(idx) {
   if (removed && removed[0] && typeof deleteReviewFilesFromStorage === 'function') {
     deleteReviewFilesFromStorage(removed);
   }
-  renderSendReviewFilesList();
+  if (!tempReviewFiles.length) {
+    closeSendReviewInlinePreview();
+  } else if (currentSendReviewPreviewIdx === idx) {
+    openSendReviewInlinePreview(Math.max(0, idx - 1));
+  } else if (currentSendReviewPreviewIdx !== null && currentSendReviewPreviewIdx > idx) {
+    currentSendReviewPreviewIdx--;
+    renderSendReviewFilesList();
+  } else {
+    renderSendReviewFilesList();
+  }
 }
 
 function clearAllReviewFiles() {
@@ -2963,6 +3081,7 @@ function clearAllReviewFiles() {
       deleteReviewFilesFromStorage(tempReviewFiles);
     }
     tempReviewFiles = [];
+    closeSendReviewInlinePreview();
     renderSendReviewFilesList();
     showToast('Todos os arquivos foram removidos.', 'info');
   });

@@ -1729,6 +1729,92 @@ document.addEventListener('keydown',(e)=>{
 let currentPdfPreviewUrl = '';
 let currentPdfPreviewName = '';
 
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src*="pdf.min.js"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.pdfjsLib));
+      existing.addEventListener('error', () => reject(new Error('Erro ao carregar PDF.js')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.async = true;
+    script.onload = () => {
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        resolve(window.pdfjsLib);
+      } else {
+        reject(new Error('PDF.js não disponível'));
+      }
+    };
+    script.onerror = () => reject(new Error('Falha ao carregar motor de visualização de PDF'));
+    document.head.appendChild(script);
+  });
+}
+
+async function renderPdfToContainer(url, container, spinnerEl, iframeFallback, onPageCount = null) {
+  if (!url || !container) return;
+  container.innerHTML = '';
+  if (spinnerEl) spinnerEl.style.display = 'flex';
+  if (iframeFallback) iframeFallback.style.display = 'none';
+  container.style.display = 'flex';
+
+  try {
+    const pdfjs = await loadPdfJs();
+    const loadingTask = pdfjs.getDocument({
+      url: url,
+      cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+      cMapPacked: true
+    });
+
+    const doc = await loadingTask.promise;
+    const numPages = doc.numPages;
+    if (typeof onPageCount === 'function') onPageCount(numPages);
+
+    const containerWidth = Math.min(window.innerWidth - 32, (container.clientWidth || 700) - 24);
+    const firstPage = await doc.getPage(1);
+    const unscaled = firstPage.getViewport({ scale: 1.0 });
+    const fitScale = Math.min(2.5, Math.max(0.4, containerWidth / unscaled.width));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await doc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: fitScale * dpr });
+
+      const pageWrap = document.createElement('div');
+      pageWrap.className = 'pdf-page-wrapper';
+      pageWrap.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,0.35);border-radius:4px;overflow:hidden;background:#fff;max-width:100%';
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      canvas.style.cssText = `width:${Math.round(viewport.width / dpr)}px;max-width:100%;height:auto;display:block`;
+
+      pageWrap.appendChild(canvas);
+
+      const numTag = document.createElement('div');
+      numTag.style.cssText = 'font-size:10px;color:var(--text3);padding:3px 6px;text-align:center;background:rgba(0,0,0,0.04);width:100%';
+      numTag.textContent = `Página ${pageNum} de ${numPages}`;
+      pageWrap.appendChild(numTag);
+
+      container.appendChild(pageWrap);
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+    }
+
+    if (spinnerEl) spinnerEl.style.display = 'none';
+  } catch (err) {
+    console.warn('Falha no renderizador PDF.js, aplicando fallback:', err);
+    if (spinnerEl) spinnerEl.style.display = 'none';
+    if (iframeFallback) {
+      iframeFallback.src = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`;
+      iframeFallback.style.display = 'block';
+    }
+  }
+}
+
 (function injectPdfPreviewModal() {
   if (document.getElementById('pdfPreviewOverlay') || document.getElementById('pdfPreviewModal')) return;
 
@@ -1756,12 +1842,13 @@ let currentPdfPreviewName = '';
             <button type="button" class="btn-icon btn-sm" onclick="closePdfPreview()" title="Fechar (Esc)" style="width:32px;height:32px"><i class="bi bi-x-lg"></i></button>
           </div>
         </div>
-        <div class="mbody" style="flex:1;padding:0;background:#242424;display:flex;position:relative;overflow:hidden">
+        <div class="mbody" style="flex:1;padding:0;background:#1e1e1e;display:flex;position:relative;overflow:hidden">
           <div id="pdfPreviewSpinner" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);color:var(--text2);gap:12px;z-index:2">
             <span class="spin" style="width:28px;height:28px;border-width:3px;display:inline-block"></span>
-            <span style="font-size:12.5px;font-weight:500">Abrindo PDF no aplicativo...</span>
+            <span style="font-size:12.5px;font-weight:500">Abrindo páginas do PDF...</span>
           </div>
-          <iframe id="pdfPreviewIframe" src="" style="width:100%;height:100%;border:none;display:block;background:#242424" onload="hidePdfPreviewSpinner()"></iframe>
+          <div id="pdfPreviewPagesContainer" style="width:100%;height:100%;display:flex;flex-direction:column;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:14px 10px;align-items:center;gap:14px;background:#1e1e1e"></div>
+          <iframe id="pdfPreviewIframe" src="" style="display:none;width:100%;height:100%;border:none;background:#242424"></iframe>
         </div>
       </div>
     </div>
@@ -1788,14 +1875,14 @@ function openPdfPreview(url, fileName) {
   if (!overlay) {
     const existingModal = document.getElementById('pdfPreviewModal');
     if (existingModal) {
-      // cliente.html usa pdfPreviewModal
-      const iframe = document.getElementById('pdfPreviewIframe');
-      const title = document.getElementById('pdfPreviewTitle');
       currentPdfPreviewUrl = url;
       currentPdfPreviewName = fileName || 'prancha.pdf';
+      const title = document.getElementById('pdfPreviewTitle');
       if (title) title.textContent = currentPdfPreviewName;
-      if (iframe) iframe.src = url;
       existingModal.classList.remove('d-none');
+      if (typeof renderClientPdfViewer === 'function') {
+        renderClientPdfViewer(url);
+      }
       return;
     }
   }
@@ -1805,6 +1892,7 @@ function openPdfPreview(url, fileName) {
 
   const titleEl = document.getElementById('pdfPreviewTitle');
   const subEl = document.getElementById('pdfPreviewSubtitle');
+  const pagesContainer = document.getElementById('pdfPreviewPagesContainer');
   const iframe = document.getElementById('pdfPreviewIframe');
   const externalBtn = document.getElementById('pdfPreviewExternalBtn');
   const spinner = document.getElementById('pdfPreviewSpinner');
@@ -1812,22 +1900,14 @@ function openPdfPreview(url, fileName) {
   if (titleEl) titleEl.textContent = currentPdfPreviewName;
   if (subEl) subEl.textContent = 'Prancha Técnica / Documento MAVIC';
   if (externalBtn) externalBtn.href = url;
-  if (spinner) spinner.style.display = 'flex';
-
-  // No Android mobile, Google Docs Viewer garante renderização inline sem download forçado
-  let targetSrc = url;
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  if (isAndroid && url.startsWith('http')) {
-    targetSrc = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
-  }
-
-  if (iframe) {
-    iframe.src = targetSrc;
-  }
 
   if (overlay) {
     overlay.classList.add('open');
   }
+
+  renderPdfToContainer(url, pagesContainer, spinner, iframe, (numPages) => {
+    if (subEl) subEl.textContent = `Prancha MAVIC · ${numPages} página${numPages > 1 ? 's' : ''}`;
+  });
 
   // Atalho de tecla Esc para fechar
   const escHandler = (e) => {
@@ -1842,8 +1922,10 @@ function openPdfPreview(url, fileName) {
 function closePdfPreview() {
   const overlay = document.getElementById('pdfPreviewOverlay');
   const existingModal = document.getElementById('pdfPreviewModal');
+  const pagesContainer = document.getElementById('pdfPreviewPagesContainer');
   const iframe = document.getElementById('pdfPreviewIframe');
 
+  if (pagesContainer) pagesContainer.innerHTML = '';
   if (iframe) iframe.src = 'about:blank';
   if (overlay) overlay.classList.remove('open');
   if (existingModal) existingModal.classList.add('d-none');

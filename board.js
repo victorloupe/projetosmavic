@@ -2858,9 +2858,18 @@ function openSendReviewInlinePreview(idx) {
 
   if (spinner) spinner.style.display = 'flex';
 
+  const pdfContainer = document.getElementById('sendReviewInlinePdfContainer');
+
   if (isPdf) {
     if (imgWrap) imgWrap.style.display = 'none';
-    if (iframe) {
+    if (typeof renderPdfToContainer === 'function' && pdfContainer) {
+      if (iframe) {
+        iframe.src = 'about:blank';
+        iframe.style.display = 'none';
+      }
+      renderPdfToContainer(fileUrl, pdfContainer, spinner, iframe);
+    } else if (iframe) {
+      if (pdfContainer) pdfContainer.style.display = 'none';
       let targetSrc = fileUrl;
       const isAndroid = /Android/i.test(navigator.userAgent);
       if (isAndroid && fileUrl.startsWith('http')) {
@@ -2870,6 +2879,10 @@ function openSendReviewInlinePreview(idx) {
       iframe.style.display = 'block';
     }
   } else if (isImg) {
+    if (pdfContainer) {
+      pdfContainer.innerHTML = '';
+      pdfContainer.style.display = 'none';
+    }
     if (iframe) {
       iframe.src = 'about:blank';
       iframe.style.display = 'none';
@@ -2877,6 +2890,10 @@ function openSendReviewInlinePreview(idx) {
     if (imgEl) imgEl.src = fileUrl;
     if (imgWrap) imgWrap.style.display = 'flex';
   } else {
+    if (pdfContainer) {
+      pdfContainer.innerHTML = '';
+      pdfContainer.style.display = 'none';
+    }
     if (imgWrap) imgWrap.style.display = 'none';
     if (iframe) {
       iframe.src = fileUrl;
@@ -2891,11 +2908,16 @@ function closeSendReviewInlinePreview() {
   currentSendReviewPreviewIdx = null;
   const box = document.getElementById('sendReviewBox');
   const previewCol = document.getElementById('sendReviewPreviewCol');
+  const pdfContainer = document.getElementById('sendReviewInlinePdfContainer');
   const iframe = document.getElementById('sendReviewInlineIframe');
   const imgWrap = document.getElementById('sendReviewInlineImgWrap');
   const imgEl = document.getElementById('sendReviewInlineImg');
   const toggleBtn = document.getElementById('btnToggleReviewPreviewPane');
 
+  if (pdfContainer) {
+    pdfContainer.innerHTML = '';
+    pdfContainer.style.display = 'none';
+  }
   if (iframe) {
     iframe.src = 'about:blank';
     iframe.style.display = 'none';

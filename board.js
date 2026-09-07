@@ -1245,9 +1245,9 @@ function updateProjEditReviewFiles(p) {
         const isImg = (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
         const url = f.previewUrl || f.originalUrl || f.url;
         if (isImg) {
-          return `<img src="${url}" title="${escapeHtml(f.name)}" style="width:32px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--border);flex-shrink:0">`;
+          return `<img src="${url}" title="${escapeHtml(f.name)} (Clique para abrir)" onclick="window.open('${url}','_blank')" style="width:32px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--border);flex-shrink:0;cursor:pointer">`;
         }
-        return `<div style="width:32px;height:32px;border-radius:6px;background:rgba(37,99,235,0.1);color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0" title="${escapeHtml(f.name)}"><i class="bi bi-file-earmark-pdf"></i></div>`;
+        return `<div onclick="openPdfPreview('${url}', '${escapeHtml(f.name)}')" style="width:32px;height:32px;border-radius:6px;background:rgba(37,99,235,0.1);color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;cursor:pointer" title="${escapeHtml(f.name)} (Clique para visualizar no app)"><i class="bi bi-file-earmark-pdf"></i></div>`;
       }).join('');
     }
   }
@@ -2836,13 +2836,18 @@ function renderSendReviewFilesList() {
   listEl.innerHTML = tempReviewFiles.map((f, idx) => {
     const isImg = (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
     const isPdf = (f.type && f.type.includes('pdf')) || /\.pdf$/i.test(f.name);
+    const fileUrl = f.originalUrl || f.url || f.previewUrl || '';
     const thumbHtml = isImg
       ? `<img src="${f.previewUrl || f.originalUrl}" class="review-file-thumb" onerror="this.src='';this.className='review-file-icon-box'">`
       : `<div class="review-file-icon-box" style="${isPdf ? 'background:rgba(220,38,38,0.1);color:#dc2626' : ''}"><i class="bi ${isPdf ? 'bi-file-earmark-pdf' : 'bi-file-earmark'}"></i></div>`;
 
+    const openPreviewCall = isPdf
+      ? `openPdfPreview('${fileUrl}', '${escapeHtml(f.name)}');`
+      : `window.open('${fileUrl}', '_blank');`;
+
     return `
       <div class="review-file-item">
-        <div style="display:flex;align-items:center;gap:10px;overflow:hidden;flex:1">
+        <div style="display:flex;align-items:center;gap:10px;overflow:hidden;flex:1;cursor:pointer" onclick="${openPreviewCall}" title="Clique para visualizar ${isPdf ? 'no app' : 'o render'}">
           ${thumbHtml}
           <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             <div style="font-weight:600;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f.name)}</div>
@@ -2850,7 +2855,8 @@ function renderSendReviewFilesList() {
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:4px">
-          <a href="${f.originalUrl}" target="_blank" class="btn-icon btn-sm" title="Abrir arquivo original"><i class="bi bi-box-arrow-up-right"></i></a>
+          <button type="button" class="btn-icon btn-sm" onclick="${openPreviewCall}" title="Visualizar ${isPdf ? 'PDF no aplicativo' : 'render'}" style="color:var(--accent)"><i class="bi ${isPdf ? 'bi-eye' : 'bi-box-arrow-up-right'}"></i></button>
+          <button type="button" class="btn-icon btn-sm" onclick="downloadFileFromUrl('${fileUrl}', '${escapeHtml(f.name)}')" title="Baixar arquivo"><i class="bi bi-download"></i></button>
           <button type="button" class="btn-icon btn-sm" onclick="removeReviewFile(${idx})" title="Remover arquivo" style="color:var(--red)"><i class="bi bi-trash"></i></button>
         </div>
       </div>
@@ -2917,8 +2923,11 @@ async function handleReviewFilesSelected(fileList) {
         break;
       }
     } catch (err) {
-      console.error('Falha no upload do arquivo:', err);
-      const errMsg = err?.message || err?.error_description || (typeof err === 'string' ? err : 'Erro no Storage');
+      let errMsg = err?.message || err?.error_description || (typeof err === 'string' ? err : 'Erro no Storage');
+      const lower = String(errMsg).toLowerCase();
+      if (lower.includes('row-level security') || lower.includes('violates') || lower.includes('accessdenied')) {
+        errMsg = 'Permissão negada no Supabase (RLS). Execute o script SQL no painel para liberar o bucket "mavic_files".';
+      }
       showToast(`Erro ao enviar "${file.name}": ${errMsg}`, 'error');
     }
     const pct = Math.round(((i + 1) / files.length) * 100);

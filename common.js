@@ -260,6 +260,10 @@ async function uploadToSupabaseStorage(file, folder = 'uploads') {
 
   if (error) {
     console.error('Supabase Storage upload error:', error);
+    const errText = (error.message || error.error_description || '').toLowerCase();
+    if (errText.includes('row-level security') || errText.includes('violates') || errText.includes('accessdenied')) {
+      throw new Error('Permissão negada no Supabase Storage (RLS). Execute o script SQL no Supabase para liberar o bucket "mavic_files".');
+    }
     throw error;
   }
 
@@ -486,6 +490,10 @@ async function uploadReviewFile(file, projId, onProgress = null) {
   });
   if (origErr) {
     console.error('Erro no upload para o Storage:', origErr);
+    const errText = (origErr.message || origErr.error_description || '').toLowerCase();
+    if (errText.includes('row-level security') || errText.includes('violates') || errText.includes('accessdenied')) {
+      throw new Error('Permissão negada no Supabase Storage (RLS). Execute o script SQL no Supabase para liberar o bucket "mavic_files".');
+    }
     throw new Error(origErr.message || origErr.error_description || 'Falha ao salvar no Storage');
   }
   storagePaths.push(origPath);
@@ -1714,6 +1722,199 @@ document.addEventListener('keydown',(e)=>{
     }
   }
 });
+
+// ══════════════════════════════════════════
+//  VISUALIZADOR UNIVERSAL DE PDF IN-APP
+// ══════════════════════════════════════════
+let currentPdfPreviewUrl = '';
+let currentPdfPreviewName = '';
+
+(function injectPdfPreviewModal() {
+  if (document.getElementById('pdfPreviewOverlay') || document.getElementById('pdfPreviewModal')) return;
+
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="overlay" id="pdfPreviewOverlay" style="z-index:1250;padding:12px;background:rgba(12,11,10,0.68)" onclick="if(event.target===this)closePdfPreview()">
+      <div class="mbox" id="pdfPreviewBox" style="max-width:1150px;width:96vw;height:90vh;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,0.45);border:1px solid var(--border)" onclick="event.stopPropagation()">
+        <div class="mhdr" style="padding:12px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface);flex-shrink:0;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+            <div style="width:34px;height:34px;border-radius:8px;background:rgba(220,38,38,0.12);color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">
+              <i class="bi bi-file-earmark-pdf-fill"></i>
+            </div>
+            <div style="min-width:0;overflow:hidden">
+              <h5 id="pdfPreviewTitle" style="margin:0;font-size:13.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Visualizador de PDF</h5>
+              <span id="pdfPreviewSubtitle" style="font-size:11px;color:var(--text3);display:block">Prancha / Documento MAVIC</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <button type="button" id="pdfPreviewDownloadBtn" onclick="downloadCurrentPdfPreview()" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px" title="Baixar PDF">
+              <i class="bi bi-download"></i> <span>Baixar</span>
+            </button>
+            <a id="pdfPreviewExternalBtn" href="#" target="_blank" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;text-decoration:none" title="Abrir em aba separada">
+              <i class="bi bi-box-arrow-up-right"></i> <span>Aba Externa</span>
+            </a>
+            <button type="button" class="btn-icon btn-sm" onclick="closePdfPreview()" title="Fechar (Esc)" style="width:32px;height:32px"><i class="bi bi-x-lg"></i></button>
+          </div>
+        </div>
+        <div class="mbody" style="flex:1;padding:0;background:#242424;display:flex;position:relative;overflow:hidden">
+          <div id="pdfPreviewSpinner" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);color:var(--text2);gap:12px;z-index:2">
+            <span class="spin" style="width:28px;height:28px;border-width:3px;display:inline-block"></span>
+            <span style="font-size:12.5px;font-weight:500">Abrindo PDF no aplicativo...</span>
+          </div>
+          <iframe id="pdfPreviewIframe" src="" style="width:100%;height:100%;border:none;display:block;background:#242424" onload="hidePdfPreviewSpinner()"></iframe>
+        </div>
+      </div>
+    </div>
+  `;
+  if (document.body) {
+    document.body.appendChild(wrap.firstElementChild);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.appendChild(wrap.firstElementChild);
+    });
+  }
+})();
+
+function hidePdfPreviewSpinner() {
+  const sp = document.getElementById('pdfPreviewSpinner');
+  if (sp) sp.style.display = 'none';
+}
+
+function openPdfPreview(url, fileName) {
+  if (!url) return;
+
+  // Garante que o modal foi injetado
+  let overlay = document.getElementById('pdfPreviewOverlay');
+  if (!overlay) {
+    const existingModal = document.getElementById('pdfPreviewModal');
+    if (existingModal) {
+      // cliente.html usa pdfPreviewModal
+      const iframe = document.getElementById('pdfPreviewIframe');
+      const title = document.getElementById('pdfPreviewTitle');
+      currentPdfPreviewUrl = url;
+      currentPdfPreviewName = fileName || 'prancha.pdf';
+      if (title) title.textContent = currentPdfPreviewName;
+      if (iframe) iframe.src = url;
+      existingModal.classList.remove('d-none');
+      return;
+    }
+  }
+
+  currentPdfPreviewUrl = url;
+  currentPdfPreviewName = fileName || 'documento.pdf';
+
+  const titleEl = document.getElementById('pdfPreviewTitle');
+  const subEl = document.getElementById('pdfPreviewSubtitle');
+  const iframe = document.getElementById('pdfPreviewIframe');
+  const externalBtn = document.getElementById('pdfPreviewExternalBtn');
+  const spinner = document.getElementById('pdfPreviewSpinner');
+
+  if (titleEl) titleEl.textContent = currentPdfPreviewName;
+  if (subEl) subEl.textContent = 'Prancha Técnica / Documento MAVIC';
+  if (externalBtn) externalBtn.href = url;
+  if (spinner) spinner.style.display = 'flex';
+
+  // No Android mobile, Google Docs Viewer garante renderização inline sem download forçado
+  let targetSrc = url;
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (isAndroid && url.startsWith('http')) {
+    targetSrc = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+  }
+
+  if (iframe) {
+    iframe.src = targetSrc;
+  }
+
+  if (overlay) {
+    overlay.classList.add('open');
+  }
+
+  // Atalho de tecla Esc para fechar
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closePdfPreview();
+      window.removeEventListener('keydown', escHandler);
+    }
+  };
+  window.addEventListener('keydown', escHandler);
+}
+
+function closePdfPreview() {
+  const overlay = document.getElementById('pdfPreviewOverlay');
+  const existingModal = document.getElementById('pdfPreviewModal');
+  const iframe = document.getElementById('pdfPreviewIframe');
+
+  if (iframe) iframe.src = 'about:blank';
+  if (overlay) overlay.classList.remove('open');
+  if (existingModal) existingModal.classList.add('d-none');
+
+  currentPdfPreviewUrl = '';
+  currentPdfPreviewName = '';
+}
+
+async function downloadFileFromUrl(url, filename = 'arquivo') {
+  if (!url) {
+    showToast('Link do arquivo indisponível para download', 'warning');
+    return false;
+  }
+
+  let safeFilename = (filename || 'arquivo').trim().replace(/[/\\?%*:|"<>]/g, '_');
+  if (!/\.[a-zA-Z0-9]{2,5}$/.test(safeFilename)) {
+    const cleanUrl = url.split('?')[0].split('#')[0];
+    const matchExt = cleanUrl.match(/\.([a-zA-Z0-9]{2,5})$/);
+    if (matchExt) safeFilename += '.' + matchExt[1];
+  }
+
+  showToast(`Baixando "${safeFilename}"...`, 'info');
+
+  try {
+    const resp = await fetch(url, { mode: 'cors' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = blobUrl;
+    a.download = safeFilename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    }, 1000);
+    return true;
+  } catch (err) {
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = safeFilename;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 500);
+    return true;
+  }
+}
+
+async function downloadCurrentPdfPreview() {
+  if (!currentPdfPreviewUrl) return;
+  const btn = document.getElementById('pdfPreviewDownloadBtn');
+  let origHtml = '';
+  if (btn) {
+    origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spin" style="width:12px;height:12px;display:inline-block"></span> Baixando...`;
+  }
+  try {
+    await downloadFileFromUrl(currentPdfPreviewUrl, currentPdfPreviewName || 'documento.pdf');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    }
+  }
+}
 
 // ══════════════════════════════════════════
 //  GERENCIAR TIPOS DE PROJETO

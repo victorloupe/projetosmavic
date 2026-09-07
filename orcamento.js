@@ -2798,8 +2798,18 @@ function viewOrcAttachment(id) {
     docName.textContent = att.name;
     docSize.textContent = att.size || '';
     docOpenBtn.href = fileSrc;
-    if (fileSrc && fileSrc.startsWith('http')) {
-      docOpenBtn.target = '_blank';
+    const isPdfDoc = (att.type && att.type.includes('pdf')) || /\.pdf$/i.test(att.name);
+    if (isPdfDoc && typeof openPdfPreview === 'function') {
+      docOpenBtn.onclick = (e) => {
+        e.preventDefault();
+        openPdfPreview(fileSrc, att.name);
+      };
+      docOpenBtn.removeAttribute('target');
+    } else {
+      docOpenBtn.onclick = null;
+      if (fileSrc && fileSrc.startsWith('http')) {
+        docOpenBtn.target = '_blank';
+      }
     }
   }
   

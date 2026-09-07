@@ -1754,12 +1754,39 @@ function loadPdfJs() {
   });
 }
 
+let commonPdfObserver = null;
+let commonPdfRenderTasks = {};
+
 async function renderPdfToContainer(url, container, spinnerEl, iframeFallback, onPageCount = null) {
   if (!url || !container) return;
+
+  // Cancela tarefas ativas anteriores
+  Object.values(commonPdfRenderTasks).forEach(t => {
+    try { t.cancel(); } catch(e) {}
+  });
+  commonPdfRenderTasks = {};
+
+  if (commonPdfObserver) {
+    try { commonPdfObserver.disconnect(); } catch(e) {}
+    commonPdfObserver = null;
+  }
+
   container.innerHTML = '';
   if (spinnerEl) spinnerEl.style.display = 'flex';
   if (iframeFallback) iframeFallback.style.display = 'none';
   container.style.display = 'flex';
+
+  let loadedFirst = false;
+  const timeoutId = setTimeout(() => {
+    if (!loadedFirst) {
+      console.warn('Timeout na renderização rápida do PDF, aplicando fallback.');
+      if (spinnerEl) spinnerEl.style.display = 'none';
+      if (iframeFallback) {
+        iframeFallback.src = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+        iframeFallback.style.display = 'block';
+      }
+    }
+  }, 14000);
 
   try {
     const pdfjs = await loadPdfJs();
@@ -1776,42 +1803,139 @@ async function renderPdfToContainer(url, container, spinnerEl, iframeFallback, o
     const containerWidth = Math.min(window.innerWidth - 32, (container.clientWidth || 700) - 24);
     const firstPage = await doc.getPage(1);
     const unscaled = firstPage.getViewport({ scale: 1.0 });
-    const fitScale = Math.min(2.5, Math.max(0.4, containerWidth / unscaled.width));
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const fitScale = Math.min(2.5, Math.max(0.25, containerWidth / unscaled.width));
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+    const estHeight = Math.round(unscaled.height * fitScale);
 
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      const page = await doc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: fitScale * dpr });
-
+    // Cria wrappers com skeleton para todas as páginas
+    for (let p = 1; p <= numPages; p++) {
       const pageWrap = document.createElement('div');
       pageWrap.className = 'pdf-page-wrapper';
-      pageWrap.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,0.35);border-radius:4px;overflow:hidden;background:#fff;max-width:100%';
+      pageWrap.id = `common-page-wrap-${p}`;
+      pageWrap.dataset.pageNumber = p;
+      pageWrap.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,0.35);border-radius:4px;overflow:hidden;background:#fff;max-width:100%;min-height:${estHeight}px;width:100%`;
 
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      canvas.style.cssText = `width:${Math.round(viewport.width / dpr)}px;max-width:100%;height:auto;display:block`;
-
-      pageWrap.appendChild(canvas);
+      const skeleton = document.createElement('div');
+      skeleton.className = 'pdf-page-skeleton';
+      skeleton.style.cssText = `width:100%;min-height:${estHeight}px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:#1e1e1e;gap:6px`;
+      skeleton.innerHTML = `<span class="spin" style="width:20px;height:20px;border-width:2px;display:inline-block"></span><span style="font-size:11px;color:#aaa">Página ${p} de ${numPages}</span>`;
+      pageWrap.appendChild(skeleton);
 
       const numTag = document.createElement('div');
-      numTag.style.cssText = 'font-size:10px;color:var(--text3);padding:3px 6px;text-align:center;background:rgba(0,0,0,0.04);width:100%';
-      numTag.textContent = `Página ${pageNum} de ${numPages}`;
+      numTag.className = 'pdf-page-num-tag';
+      numTag.style.cssText = 'font-size:10px;color:var(--text3);padding:4px 8px;text-align:center;background:rgba(0,0,0,0.04);width:100%';
+      numTag.textContent = `Página ${p} de ${numPages}`;
       pageWrap.appendChild(numTag);
 
       container.appendChild(pageWrap);
-      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
     }
 
+    // Observer para lazy render das demais páginas
+    if ('IntersectionObserver' in window) {
+      commonPdfObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const pNum = parseInt(entry.target.dataset.pageNumber, 10);
+            if (pNum && !entry.target.dataset.rendered) {
+              entry.target.dataset.rendered = 'rendering';
+              renderCommonSinglePage(pNum, entry.target, doc, fitScale, dpr);
+            }
+          }
+        });
+      }, {
+        root: container,
+        rootMargin: '350px 0px',
+        threshold: 0.01
+      });
+
+      container.querySelectorAll('.pdf-page-wrapper').forEach(el => commonPdfObserver.observe(el));
+    }
+
+    // Renderiza a Página 1 IMEDIATAMENTE
+    const page1Wrap = document.getElementById('common-page-wrap-1');
+    if (page1Wrap) {
+      page1Wrap.dataset.rendered = 'rendering';
+      await renderCommonSinglePage(1, page1Wrap, doc, fitScale, dpr);
+    }
+
+    loadedFirst = true;
+    clearTimeout(timeoutId);
     if (spinnerEl) spinnerEl.style.display = 'none';
+
+    if (!('IntersectionObserver' in window)) {
+      for (let p = 2; p <= numPages; p++) {
+        const wrap = document.getElementById(`common-page-wrap-${p}`);
+        if (wrap && !wrap.dataset.rendered) {
+          wrap.dataset.rendered = 'rendering';
+          await renderCommonSinglePage(p, wrap, doc, fitScale, dpr);
+        }
+      }
+    }
   } catch (err) {
+    clearTimeout(timeoutId);
     console.warn('Falha no renderizador PDF.js, aplicando fallback:', err);
     if (spinnerEl) spinnerEl.style.display = 'none';
     if (iframeFallback) {
-      iframeFallback.src = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`;
+      iframeFallback.src = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
       iframeFallback.style.display = 'block';
     }
+  }
+}
+
+async function renderCommonSinglePage(pageNum, pageWrap, doc, scale, dpr) {
+  if (!doc || !pageWrap) return;
+
+  if (commonPdfRenderTasks[pageNum]) {
+    try { commonPdfRenderTasks[pageNum].cancel(); } catch(e) {}
+    delete commonPdfRenderTasks[pageNum];
+  }
+
+  try {
+    const page = await doc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: scale * dpr });
+
+    let canvas = pageWrap.querySelector('canvas');
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      const numTag = pageWrap.querySelector('.pdf-page-num-tag');
+      if (numTag) {
+        pageWrap.insertBefore(canvas, numTag);
+      } else {
+        pageWrap.appendChild(canvas);
+      }
+    }
+
+    const ctx = canvas.getContext('2d');
+    canvas.height = Math.floor(viewport.height);
+    canvas.width = Math.floor(viewport.width);
+    canvas.style.width = Math.round(viewport.width / dpr) + 'px';
+    canvas.style.maxWidth = '100%';
+    canvas.style.height = 'auto';
+    canvas.style.display = 'block';
+
+    const skeleton = pageWrap.querySelector('.pdf-page-skeleton');
+    if (skeleton) skeleton.remove();
+
+    const renderTask = page.render({
+      canvasContext: ctx,
+      viewport: viewport
+    });
+    commonPdfRenderTasks[pageNum] = renderTask;
+
+    await renderTask.promise;
+    pageWrap.dataset.rendered = 'true';
+  } catch (err) {
+    if (err && (err.name === 'RenderingCancelledException' || err.message?.includes('cancelled'))) {
+      return;
+    }
+    console.warn(`Erro renderizando página ${pageNum}:`, err);
+    pageWrap.dataset.rendered = 'error';
+    const skeleton = pageWrap.querySelector('.pdf-page-skeleton');
+    if (skeleton) {
+      skeleton.innerHTML = `<span style="color:#ef4444;font-size:11px"><i class="bi bi-exclamation-triangle"></i> Falha ao desenhar página ${pageNum}</span>`;
+    }
+  } finally {
+    delete commonPdfRenderTasks[pageNum];
   }
 }
 

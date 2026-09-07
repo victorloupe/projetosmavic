@@ -304,6 +304,9 @@
         <h5 id="pdfPreviewTitle" style="margin:0;font-size:14px;font-weight:700;color:var(--text);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Prancha Técnica (PDF)</h5>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
+        <a id="pdfPreviewExternalBtn" href="#" target="_blank" class="btn btn-ghost btn-sm" style="font-size:12px;display:inline-flex;align-items:center;gap:4px;text-decoration:none" title="Abrir prancha em aba externa">
+          <i class="bi bi-box-arrow-up-right"></i> <span class="d-none-mobile">Nova Aba</span>
+        </a>
         <button type="button" id="pdfPreviewDownloadBtn" onclick="downloadCurrentPdfPreview()" class="btn btn-primary btn-sm" style="background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600;font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer">
           <i class="bi bi-download"></i> Baixar PDF
         </button>
@@ -322,15 +325,28 @@
         </div>
       </div>
 
-      <!-- Loading Spinner -->
-      <div id="pdfViewerLoading" style="position:absolute;inset:40px 0 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);color:var(--text2);gap:10px;z-index:4">
+      <!-- Loading Spinner com barra de progresso -->
+      <div id="pdfViewerLoading" style="position:absolute;inset:40px 0 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);color:var(--text2);gap:10px;z-index:4;transition:opacity 0.25s">
         <span class="spin" style="width:28px;height:28px;border-width:3px;display:inline-block"></span>
-        <span style="font-size:13px;font-weight:600">Abrindo páginas do PDF...</span>
-        <span style="font-size:11px;color:var(--text3)">Renderizando em alta definição</span>
+        <span id="pdfViewerLoadingText" style="font-size:13px;font-weight:600">Abrindo páginas do PDF...</span>
+        <span id="pdfViewerLoadingSubtext" style="font-size:11px;color:var(--text3)">Renderizando em alta definição</span>
       </div>
 
       <!-- Container de rolagem das páginas renderizadas -->
       <div id="pdfPagesScrollContainer" style="flex:1;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:14px;background:#1e1e1e">
+      </div>
+
+      <!-- Fallback container se falhar ou timeout -->
+      <div id="pdfViewerFallback" style="display:none;position:absolute;inset:40px 0 0 0;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);padding:24px;text-align:center;gap:14px;z-index:3">
+        <i class="bi bi-file-earmark-pdf" style="font-size:42px;color:#dc2626"></i>
+        <div>
+          <h5 style="margin:0 0 6px 0;font-size:15px;font-weight:700">Arquivo Pesado / Prévia Otimizada</h5>
+          <p style="margin:0;font-size:12px;color:var(--text3);max-width:340px">Este arquivo de prancha é grande para visualização no celular. Você pode abrir via Google Docs ou baixar diretamente.</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+          <a id="pdfFallbackGoogleBtn" href="#" target="_blank" class="btn btn-primary btn-sm" style="font-size:12px;display:inline-flex;align-items:center;gap:6px"><i class="bi bi-box-arrow-up-right"></i> Abrir com Google</a>
+          <button type="button" onclick="downloadCurrentPdfPreview()" class="btn btn-ghost btn-sm" style="font-size:12px;display:inline-flex;align-items:center;gap:6px"><i class="bi bi-download"></i> Baixar Arquivo</button>
+        </div>
       </div>
 
       <!-- Iframe de fallback -->
@@ -339,6 +355,6 @@
   </div>
 </div>
 
-<script src="cliente.js?v=148"></script>
+<script src="cliente.js?v=149"></script>
 </body>
 </html>

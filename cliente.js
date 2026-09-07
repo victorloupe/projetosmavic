@@ -2039,6 +2039,8 @@ let currentPdfPreviewUrl = '';
 let currentPdfPreviewName = '';
 let clientPdfDoc = null;
 let clientPdfScale = 1.0;
+let clientPdfObserver = null;
+let activePdfRenderTasks = {};
 
 function loadPdfJs() {
   if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
@@ -2068,25 +2070,68 @@ function loadPdfJs() {
 function openPdfPreview(url, fileName) {
   const modal = document.getElementById('pdfPreviewModal');
   const title = document.getElementById('pdfPreviewTitle');
+  const extBtn = document.getElementById('pdfPreviewExternalBtn');
 
   currentPdfPreviewUrl = url;
   currentPdfPreviewName = fileName || 'prancha.pdf';
 
   if (title) title.textContent = currentPdfPreviewName;
+  if (extBtn) extBtn.href = url;
   if (modal) modal.classList.remove('d-none');
 
   renderClientPdfViewer(url);
 }
 
+function showPdfFallback(url) {
+  const spinner = document.getElementById('pdfViewerLoading');
+  const fallback = document.getElementById('pdfViewerFallback');
+  const googleBtn = document.getElementById('pdfFallbackGoogleBtn');
+  if (spinner) spinner.style.display = 'none';
+  if (fallback) {
+    fallback.style.display = 'flex';
+    if (googleBtn) {
+      googleBtn.href = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+    }
+  }
+}
+
 async function renderClientPdfViewer(url) {
   const container = document.getElementById('pdfPagesScrollContainer');
   const spinner = document.getElementById('pdfViewerLoading');
+  const spinnerText = document.getElementById('pdfViewerLoadingText');
+  const spinnerSubtext = document.getElementById('pdfViewerLoadingSubtext');
+  const fallback = document.getElementById('pdfViewerFallback');
   const pageCountEl = document.getElementById('pdfViewerPageCount');
   const iframe = document.getElementById('pdfPreviewIframe');
 
+  // Cancela tarefas ativas anteriores
+  Object.values(activePdfRenderTasks).forEach(t => {
+    try { t.cancel(); } catch(e) {}
+  });
+  activePdfRenderTasks = {};
+
+  if (clientPdfObserver) {
+    try { clientPdfObserver.disconnect(); } catch(e) {}
+    clientPdfObserver = null;
+  }
+
   if (container) container.innerHTML = '';
-  if (spinner) spinner.style.display = 'flex';
+  if (fallback) fallback.style.display = 'none';
   if (iframe) iframe.style.display = 'none';
+  if (spinner) {
+    spinner.style.opacity = '1';
+    spinner.style.display = 'flex';
+  }
+  if (spinnerText) spinnerText.textContent = 'Carregando prancha PDF...';
+  if (spinnerSubtext) spinnerSubtext.textContent = 'Aguarde alguns instantes';
+
+  let loadedFirstPage = false;
+  const timeoutId = setTimeout(() => {
+    if (!loadedFirstPage) {
+      console.warn('PDF muito pesado para renderizar na memória do celular, aplicando fallback.');
+      showPdfFallback(url);
+    }
+  }, 14000);
 
   try {
     const pdfjs = await loadPdfJs();
@@ -2095,72 +2140,169 @@ async function renderClientPdfViewer(url) {
       cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
       cMapPacked: true
     });
-    
+
+    loadingTask.onProgress = (progress) => {
+      if (progress.total > 0 && spinnerSubtext) {
+        const pct = Math.round((progress.loaded / progress.total) * 100);
+        spinnerSubtext.textContent = `Baixando prancha... ${pct}%`;
+      }
+    };
+
     clientPdfDoc = await loadingTask.promise;
     const numPages = clientPdfDoc.numPages;
     if (pageCountEl) pageCountEl.textContent = `${numPages} página${numPages > 1 ? 's' : ''}`;
+    if (spinnerText) spinnerText.textContent = 'Renderizando prancha...';
+    if (spinnerSubtext) spinnerSubtext.textContent = 'Preparando página 1 em alta definição';
 
     // Determina a largura disponível para ajustar à tela do celular ou desktop
     const containerWidth = Math.min(window.innerWidth - 32, (container?.clientWidth || 700) - 24);
     const firstPage = await clientPdfDoc.getPage(1);
     const unscaledViewport = firstPage.getViewport({ scale: 1.0 });
-    const fitScale = Math.min(2.5, Math.max(0.4, (containerWidth / unscaledViewport.width)));
+    const fitScale = Math.min(2.5, Math.max(0.25, (containerWidth / unscaledViewport.width)));
     clientPdfScale = fitScale;
     updateClientPdfZoomText();
 
-    await renderClientPdfPages();
-    if (spinner) spinner.style.display = 'none';
-  } catch (err) {
-    console.warn('Falha no renderizador PDF.js, aplicando fallback:', err);
-    if (spinner) spinner.style.display = 'none';
-    if (iframe) {
-      iframe.src = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`;
-      iframe.style.display = 'block';
+    const estHeight = Math.round(unscaledViewport.height * fitScale);
+
+    // Cria placeholders leves para todas as páginas com antecedência
+    for (let p = 1; p <= numPages; p++) {
+      const pageWrap = document.createElement('div');
+      pageWrap.className = 'pdf-page-wrapper';
+      pageWrap.id = `client-page-wrap-${p}`;
+      pageWrap.dataset.pageNumber = p;
+      pageWrap.style.cssText = `position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,0.35);border-radius:4px;overflow:hidden;background:#fff;max-width:100%;min-height:${estHeight}px;width:100%`;
+
+      const skeleton = document.createElement('div');
+      skeleton.className = 'pdf-page-skeleton';
+      skeleton.style.cssText = `width:100%;min-height:${estHeight}px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:#1e1e1e;gap:6px`;
+      skeleton.innerHTML = `<span class="spin" style="width:20px;height:20px;border-width:2px;display:inline-block"></span><span style="font-size:11px;color:#aaa">Página ${p} de ${numPages}</span>`;
+      pageWrap.appendChild(skeleton);
+
+      const numTag = document.createElement('div');
+      numTag.className = 'pdf-page-num-tag';
+      numTag.style.cssText = 'font-size:10px;color:var(--text3);padding:4px 8px;text-align:center;background:rgba(0,0,0,0.04);width:100%';
+      numTag.textContent = `Página ${p} de ${numPages}`;
+      pageWrap.appendChild(numTag);
+
+      container.appendChild(pageWrap);
     }
+
+    // Configura IntersectionObserver para renderizar páginas conforme o usuário rola
+    if ('IntersectionObserver' in window) {
+      clientPdfObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const pNum = parseInt(entry.target.dataset.pageNumber, 10);
+            if (pNum && !entry.target.dataset.rendered) {
+              entry.target.dataset.rendered = 'rendering';
+              renderClientSinglePage(pNum, entry.target);
+            }
+          }
+        });
+      }, {
+        root: container,
+        rootMargin: '350px 0px',
+        threshold: 0.01
+      });
+
+      container.querySelectorAll('.pdf-page-wrapper').forEach(el => clientPdfObserver.observe(el));
+    }
+
+    // Renderiza a Página 1 IMEDIATAMENTE
+    const page1Wrap = document.getElementById('client-page-wrap-1');
+    if (page1Wrap) {
+      page1Wrap.dataset.rendered = 'rendering';
+      await renderClientSinglePage(1, page1Wrap);
+    }
+
+    // Marca sucesso e ESCONDE O SPINNER IMEDIATAMENTE
+    loadedFirstPage = true;
+    clearTimeout(timeoutId);
+    if (spinner) {
+      spinner.style.opacity = '0';
+      setTimeout(() => { if (spinner) spinner.style.display = 'none'; }, 200);
+    }
+
+    // Se não suportar IntersectionObserver, renderiza em background sem travar
+    if (!('IntersectionObserver' in window)) {
+      for (let p = 2; p <= numPages; p++) {
+        const wrap = document.getElementById(`client-page-wrap-${p}`);
+        if (wrap && !wrap.dataset.rendered) {
+          wrap.dataset.rendered = 'rendering';
+          await renderClientSinglePage(p, wrap);
+        }
+      }
+    }
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.warn('Falha no renderizador PDF.js, aplicando fallback:', err);
+    showPdfFallback(url);
   }
 }
 
-async function renderClientPdfPages() {
-  if (!clientPdfDoc) return;
-  const container = document.getElementById('pdfPagesScrollContainer');
-  if (!container) return;
-  container.innerHTML = '';
+async function renderClientSinglePage(pageNum, pageWrap) {
+  if (!clientPdfDoc || !pageWrap) return;
 
-  const numPages = clientPdfDoc.numPages;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (activePdfRenderTasks[pageNum]) {
+    try { activePdfRenderTasks[pageNum].cancel(); } catch(e) {}
+    delete activePdfRenderTasks[pageNum];
+  }
 
-  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+  try {
     const page = await clientPdfDoc.getPage(pageNum);
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
     const viewport = page.getViewport({ scale: clientPdfScale * dpr });
 
-    const pageWrap = document.createElement('div');
-    pageWrap.className = 'pdf-page-wrapper';
-    pageWrap.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:14px;box-shadow:0 6px 20px rgba(0,0,0,0.35);border-radius:4px;overflow:hidden;background:#fff;max-width:100%';
+    let canvas = pageWrap.querySelector('canvas');
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      const numTag = pageWrap.querySelector('.pdf-page-num-tag');
+      if (numTag) {
+        pageWrap.insertBefore(canvas, numTag);
+      } else {
+        pageWrap.appendChild(canvas);
+      }
+    }
 
-    const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    canvas.style.cssText = `width:${Math.round(viewport.width / dpr)}px;max-width:100%;height:auto;display:block`;
+    canvas.height = Math.floor(viewport.height);
+    canvas.width = Math.floor(viewport.width);
+    canvas.style.width = Math.round(viewport.width / dpr) + 'px';
+    canvas.style.maxWidth = '100%';
+    canvas.style.height = 'auto';
+    canvas.style.display = 'block';
 
-    pageWrap.appendChild(canvas);
+    const skeleton = pageWrap.querySelector('.pdf-page-skeleton');
+    if (skeleton) skeleton.remove();
 
-    const numTag = document.createElement('div');
-    numTag.style.cssText = 'font-size:10px;color:var(--text3);padding:4px 8px;text-align:center;background:rgba(0,0,0,0.04);width:100%';
-    numTag.textContent = `Página ${pageNum} de ${numPages}`;
-    pageWrap.appendChild(numTag);
+    const renderTask = page.render({
+      canvasContext: ctx,
+      viewport: viewport
+    });
+    activePdfRenderTasks[pageNum] = renderTask;
 
-    container.appendChild(pageWrap);
-
-    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+    await renderTask.promise;
+    pageWrap.dataset.rendered = 'true';
+  } catch (err) {
+    if (err && (err.name === 'RenderingCancelledException' || err.message?.includes('cancelled'))) {
+      return;
+    }
+    console.warn(`Erro ao renderizar prancha página ${pageNum}:`, err);
+    pageWrap.dataset.rendered = 'error';
+    const skeleton = pageWrap.querySelector('.pdf-page-skeleton');
+    if (skeleton) {
+      skeleton.innerHTML = `<span style="color:#ef4444;font-size:11px"><i class="bi bi-exclamation-triangle"></i> Falha ao desenhar página ${pageNum}</span>`;
+    }
+  } finally {
+    delete activePdfRenderTasks[pageNum];
   }
 }
 
 function changePdfZoom(delta) {
   if (!clientPdfDoc) return;
-  clientPdfScale = Math.min(3.0, Math.max(0.4, clientPdfScale + delta));
+  clientPdfScale = Math.min(3.0, Math.max(0.25, clientPdfScale + delta));
   updateClientPdfZoomText();
-  renderClientPdfPages();
+  applyZoomToAllPages();
 }
 
 function resetPdfZoom() {
@@ -2169,9 +2311,32 @@ function resetPdfZoom() {
   const containerWidth = Math.min(window.innerWidth - 32, (container?.clientWidth || 700) - 24);
   clientPdfDoc.getPage(1).then(p => {
     const unscaled = p.getViewport({ scale: 1.0 });
-    clientPdfScale = Math.min(2.5, Math.max(0.4, (containerWidth / unscaled.width)));
+    clientPdfScale = Math.min(2.5, Math.max(0.25, (containerWidth / unscaled.width)));
     updateClientPdfZoomText();
-    renderClientPdfPages();
+    applyZoomToAllPages();
+  });
+}
+
+function applyZoomToAllPages() {
+  if (!clientPdfDoc) return;
+  const container = document.getElementById('pdfPagesScrollContainer');
+  if (!container) return;
+
+  Object.values(activePdfRenderTasks).forEach(t => {
+    try { t.cancel(); } catch(e) {}
+  });
+  activePdfRenderTasks = {};
+
+  const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+  wrappers.forEach(wrap => {
+    wrap.dataset.rendered = '';
+    const rect = wrap.getBoundingClientRect();
+    const isVisible = (rect.top < window.innerHeight && rect.bottom > 0);
+    if (isVisible) {
+      wrap.dataset.rendered = 'rendering';
+      const pNum = parseInt(wrap.dataset.pageNumber, 10);
+      renderClientSinglePage(pNum, wrap);
+    }
   });
 }
 
@@ -2203,7 +2368,20 @@ function closePdfPreview() {
   const modal = document.getElementById('pdfPreviewModal');
   const iframe = document.getElementById('pdfPreviewIframe');
   const container = document.getElementById('pdfPagesScrollContainer');
+  const fallback = document.getElementById('pdfViewerFallback');
+
+  Object.values(activePdfRenderTasks).forEach(t => {
+    try { t.cancel(); } catch(e) {}
+  });
+  activePdfRenderTasks = {};
+
+  if (clientPdfObserver) {
+    try { clientPdfObserver.disconnect(); } catch(e) {}
+    clientPdfObserver = null;
+  }
+
   if (container) container.innerHTML = '';
+  if (fallback) fallback.style.display = 'none';
   if (iframe) iframe.src = 'about:blank';
   if (modal) modal.classList.add('d-none');
   clientPdfDoc = null;

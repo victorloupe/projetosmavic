@@ -2171,17 +2171,19 @@ async function renderClientPdfViewer(url) {
       pageWrap.className = 'pdf-page-wrapper';
       pageWrap.id = `client-page-wrap-${p}`;
       pageWrap.dataset.pageNumber = p;
-      pageWrap.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:20px;width:100%;max-width:100%;background:transparent';
+      pageWrap.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;margin-bottom:24px;width:100%;max-width:100%;background:transparent;flex-shrink:0;flex-grow:0';
 
       const skeleton = document.createElement('div');
       skeleton.className = 'pdf-page-skeleton';
-      skeleton.style.cssText = 'width:100%;max-width:100%;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px dashed rgba(255,255,255,0.1);gap:6px';
+      const ar = (unscaledViewport.width / unscaledViewport.height) || 1.41;
+      const estH = Math.round(containerWidth / ar);
+      skeleton.style.cssText = `width:100%;max-width:${containerWidth}px;aspect-ratio:${ar};min-height:${estH}px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px dashed rgba(255,255,255,0.1);gap:6px;flex-shrink:0`;
       skeleton.innerHTML = `<span class="spin" style="width:20px;height:20px;border-width:2px;display:inline-block"></span><span style="font-size:11px;color:#aaa">Página ${p} de ${numPages}</span>`;
       pageWrap.appendChild(skeleton);
 
       const numTag = document.createElement('div');
       numTag.className = 'pdf-page-num-tag';
-      numTag.style.cssText = 'font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);padding:3px 12px;border-radius:20px;background:rgba(255,255,255,0.08);margin-top:8px;display:inline-block;letter-spacing:0.3px';
+      numTag.style.cssText = 'font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);padding:3px 12px;border-radius:20px;background:rgba(255,255,255,0.08);margin-top:8px;display:inline-block;letter-spacing:0.3px;flex-shrink:0';
       numTag.textContent = `Página ${p} de ${numPages}`;
       pageWrap.appendChild(numTag);
 
@@ -2270,23 +2272,32 @@ async function renderClientSinglePage(pageNum, pageWrap) {
     canvas.width = Math.floor(viewport.width);
     
     const displayWidth = Math.round(viewport.width / dpr);
-    canvas.style.width = displayWidth + 'px';
-    if (zoomMultiplier <= 1.05) {
-      canvas.style.maxWidth = '100%';
-    } else {
-      canvas.style.maxWidth = 'none';
-    }
-    canvas.style.height = 'auto';
+    const displayHeight = Math.round(viewport.height / dpr);
+    const ar = (viewport.width / viewport.height) || 1.41;
+
     canvas.style.display = 'block';
-    canvas.style.borderRadius = '4px';
+    canvas.style.flexShrink = '0';
+    canvas.style.borderRadius = '6px';
     canvas.style.boxShadow = '0 6px 24px rgba(0,0,0,0.55)';
     canvas.style.background = '#ffffff';
+
+    if (zoomMultiplier <= 1.05) {
+      canvas.style.width = '100%';
+      canvas.style.maxWidth = displayWidth + 'px';
+      canvas.style.height = 'auto';
+      canvas.style.aspectRatio = `${ar}`;
+    } else {
+      canvas.style.width = displayWidth + 'px';
+      canvas.style.maxWidth = 'none';
+      canvas.style.height = displayHeight + 'px';
+    }
 
     const skeleton = pageWrap.querySelector('.pdf-page-skeleton');
     if (skeleton) skeleton.remove();
 
     // Elimina qualquer espaço ou fundo artificial do invólucro
-    pageWrap.style.minHeight = '0';
+    pageWrap.style.flexShrink = '0';
+    pageWrap.style.minHeight = 'auto';
     pageWrap.style.background = 'transparent';
     pageWrap.style.boxShadow = 'none';
 

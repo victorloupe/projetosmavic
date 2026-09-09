@@ -42,8 +42,8 @@
   <div class="dash-header-wrap" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px">
     <h4 style="font-weight:700;color:var(--accent);margin:0">Pagamentos & Recebimentos</h4>
     <div style="display:flex;align-items:center;gap:8px">
-      <button class="btn btn-excel btn-sm" onclick="exportFullFinancialExcel()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
-      <button class="btn btn-primary btn-sm" onclick="openAddPaymentDirectModal()" style="white-space:nowrap"><i class="bi bi-plus-lg"></i> Novo Pagamento</button>
+      <button class="btn btn-excel btn-sm" onclick="exportFullFinancialExcel()" title="Exportar Excel" aria-label="Exportar Excel"><i class="bi bi-file-earmark-excel"></i> <span class="d-none-mobile">Exportar Excel</span></button>
+      <button class="btn btn-primary btn-sm" onclick="openAddPaymentDirectModal()" style="white-space:nowrap" title="Novo Pagamento" aria-label="Novo Pagamento"><i class="bi bi-plus-lg"></i> <span class="d-none-mobile">Novo Pagamento</span></button>
     </div>
   </div>
   
@@ -255,8 +255,8 @@
     </div>
   </div>
   <div class="mftr">
-    <button class="btn btn-ghost" onclick="closeDarBaixaModal()">Cancelar</button>
-    <button class="btn btn-primary" onclick="confirmDarBaixa()" style="background:var(--green);border-color:var(--green)"><i class="bi bi-check2"></i> Confirmar Recebimento</button>
+    <button class="btn btn-ghost" onclick="closeDarBaixaModal()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+    <button class="btn btn-primary" onclick="confirmDarBaixa()" style="background:var(--green);border-color:var(--green)" title="Confirmar Recebimento"><i class="bi bi-check2"></i> <span class="btn-txt">Confirmar Recebimento</span></button>
   </div>
 </div>
 </div>
@@ -280,9 +280,9 @@
   </div>
   
   <div class="mftr" style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px">
-    <button class="btn btn-ghost" onclick="closeProjectFinanceModal()">Fechar</button>
+    <button class="btn btn-ghost" onclick="closeProjectFinanceModal()" title="Fechar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Fechar</span></button>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-primary" onclick="closeProjectFinanceModal()" style="background:var(--accent);border-color:var(--accent)"><i class="bi bi-check2"></i> Salvar e Concluir</button>
+      <button class="btn btn-primary" onclick="closeProjectFinanceModal()" style="background:var(--accent);border-color:var(--accent)" title="Salvar e Concluir"><i class="bi bi-check2"></i> <span class="btn-txt">Salvar e Concluir</span></button>
     </div>
   </div>
 </div>
@@ -347,8 +347,8 @@
     </div>
   </div>
   <div class="mftr">
-    <button class="btn btn-ghost" onclick="closeAddPaymentDirectModal()">Cancelar</button>
-    <button class="btn btn-primary" onclick="saveDirectPayment()"><i class="bi bi-check2"></i> Confirmar Recebimento</button>
+    <button class="btn btn-ghost" onclick="closeAddPaymentDirectModal()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+    <button class="btn btn-primary" onclick="saveDirectPayment()" title="Confirmar Recebimento"><i class="bi bi-check2"></i> <span class="btn-txt">Confirmar Recebimento</span></button>
   </div>
 </div>
 </div>

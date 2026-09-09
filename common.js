@@ -3618,8 +3618,7 @@ function injectSharedModals() {
               </label>
             </div>
           </div>
-        </div>
-        <div class="mftr"><button class="btn btn-ghost" onclick="closeSettings(true)">Cancelar</button><button class="btn btn-primary" onclick="saveSettings()">Salvar</button></div>
+        <div class="mftr" style="display:flex;justify-content:flex-end;gap:8px"><button class="btn btn-ghost" onclick="closeSettings(true)" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button><button class="btn btn-primary" onclick="saveSettings()" title="Salvar"><i class="bi bi-check2"></i> <span class="btn-txt">Salvar</span></button></div>
       </div>
       </div>
     `;
@@ -3742,8 +3741,8 @@ function injectSharedModals() {
           <div id="ttLogsList" style="max-height:220px;overflow-y:auto;padding-right:4px"></div>
         </div>
         <div class="mftr" style="display:flex;justify-content:space-between;align-items:center">
-          <button class="btn btn-excel btn-sm" onclick="exportFullFinancialExcel()"><i class="bi bi-file-earmark-excel"></i> Exportar Tudo (Excel)</button>
-          <button class="btn btn-ghost" onclick="closeTimeTracker()">Fechar</button>
+          <button class="btn btn-excel btn-sm" onclick="exportFullFinancialExcel()" title="Exportar Tudo (Excel)"><i class="bi bi-file-earmark-excel"></i> <span class="btn-txt">Exportar Tudo (Excel)</span></button>
+          <button class="btn btn-ghost" onclick="closeTimeTracker()" title="Fechar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Fechar</span></button>
         </div>
       </div>
       </div>
@@ -3776,8 +3775,8 @@ function injectSharedModals() {
           </div>
         </div>
         <div class="mftr" style="display:flex;justify-content:flex-end;gap:8px">
-          <button class="btn btn-ghost" onclick="closePromptStartTimer()">Cancelar</button>
-          <button class="btn btn-primary" onclick="confirmStartTimerFromModal()"><i class="bi bi-play-fill"></i> Iniciar Cronômetro</button>
+          <button class="btn btn-ghost" onclick="closePromptStartTimer()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+          <button class="btn btn-primary" onclick="confirmStartTimerFromModal()" title="Iniciar Cronômetro"><i class="bi bi-play-fill"></i> <span class="btn-txt">Iniciar Cronômetro</span></button>
         </div>
       </div>
       </div>

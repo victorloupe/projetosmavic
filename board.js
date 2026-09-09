@@ -1194,14 +1194,24 @@ function openProjectModal(id=null){
     tempInstallments=[...(p.installments||[])];
     tempPaymentCondition=p.paymentCondition||'';
     tempSelectedFolders=p.selectedFolders ? [...p.selectedFolders] : null;
-    document.getElementById('btnDelProj').style.display='block';
+    document.getElementById('btnDelProj').style.display='inline-flex';
     const ttBtn = document.getElementById('btnProjTimeTracker');
     if (ttBtn) {
       const pMins = (p.timeLogs || []).reduce((s, l) => s + parseInt(l.minutes || 0), 0);
+      const hasTime = pMins > 0;
       ttBtn.style.display = 'inline-flex';
-      ttBtn.innerHTML = `<i class="bi bi-stopwatch" style="color:var(--accent)"></i> Horas (${formatMinutes(pMins)}) & Lucro`;
+      ttBtn.innerHTML = `<i class="bi bi-stopwatch" style="color:var(--accent)"></i>${hasTime ? '<span class="tt-dot" title="Horas apontadas"></span>' : ''} <span class="btn-txt">Horas (${formatMinutes(pMins)}) & Lucro</span>`;
+      ttBtn.title = `Horas (${formatMinutes(pMins)}) & Lucro`;
+      ttBtn.setAttribute('aria-label', `Horas (${formatMinutes(pMins)}) e Lucro`);
     }
-    document.getElementById('btnArchProj').textContent=p.archived?'Desarquivar':'Arquivar';
+    const archBtn = document.getElementById('btnArchProj');
+    if (archBtn) {
+      archBtn.style.display = 'inline-flex';
+      const isArch = !!p.archived;
+      archBtn.innerHTML = `<i class="bi bi-${isArch ? 'arrow-up-right-square' : 'archive'}"></i> <span class="btn-txt">${isArch ? 'Desarquivar' : 'Arquivar'}</span>`;
+      archBtn.title = isArch ? 'Desarquivar Projeto' : 'Arquivar Projeto';
+      archBtn.setAttribute('aria-label', isArch ? 'Desarquivar Projeto' : 'Arquivar Projeto');
+    }
     
     handleClientChange(true);
   }else{
@@ -1225,6 +1235,12 @@ function openProjectModal(id=null){
     document.getElementById('btnDelProj').style.display='none';
     const ttBtn = document.getElementById('btnProjTimeTracker');
     if (ttBtn) ttBtn.style.display = 'none';
+    const archBtn = document.getElementById('btnArchProj');
+    if (archBtn) {
+      archBtn.style.display = 'none';
+      archBtn.innerHTML = `<i class="bi bi-archive"></i> <span class="btn-txt">Arquivar</span>`;
+      archBtn.title = 'Arquivar Projeto';
+    }
   }
   updateProjCoverPreview();
   updateProjEditReviewFiles(id ? projects.find(x => x.id === parseInt(id)) : null);

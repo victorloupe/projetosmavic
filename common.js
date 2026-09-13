@@ -1252,7 +1252,7 @@ function updateNavAlertBadges() {
   });
 }
 
-const CURRENT_SYNC_EPOCH = '20260913_v3';
+const CURRENT_SYNC_EPOCH = '20260913_v4';
 
 function alignAppColumns(cols) {
   let list = Array.isArray(cols) && cols.length ? cols.map(c => ({...c})) : INIT_COLS.map(c => ({...c}));

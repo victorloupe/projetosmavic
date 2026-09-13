@@ -95,7 +95,7 @@
         {
           "id": 1780435450001,
           "done": true,
-          "text": "Arrumar arm�rio - Ar Condicionado"
+          "text": "Arrumar armário - Ar Condicionado"
         },
         {
           "id": 1780435458197,
@@ -257,7 +257,7 @@
       "value": 1500,
       "client": "Isabella Vieira",
       "column": "Finalizado",
-      "product": "Fachada Comercial, Recep��o, Salas de Atendimentos, Lavabo, Wc e Copinha",
+      "product": "Fachada Comercial, Recepção, Salas de Atendimentos, Lavabo, Wc e Copinha",
       "archived": false,
       "payments": [
         {
@@ -275,7 +275,7 @@
         },
         {
           "id": 1784719259489,
-          "name": "Recep��o",
+          "name": "Recepção",
           "price": 300
         },
         {
@@ -299,7 +299,7 @@
         {
           "id": 1784719308292,
           "done": true,
-          "text": "Recep��o",
+          "text": "Recepção",
           "current": false
         },
         {
@@ -335,7 +335,7 @@
       ],
       "createdAt": 1784719356877,
       "driveLink": "https://drive.google.com/drive/folders/1vl8-rQ-SiU292t3aqWci3vNnF4xxRDNo?usp=drive_link",
-      "localPath": "D:\\SERVI�OS\\_PROJETOS VICTOR\\_Isabella Martins\\PROJETOS\\LETICIA GIL",
+      "localPath": "D:\\SERVIÇOS\\_PROJETOS VICTOR\\_Isabella Martins\\PROJETOS\\LETICIA GIL",
       "installments": [],
       "originBudgetId": null,
       "selectedFolders": [
@@ -349,7 +349,7 @@
     {
       "id": 1785355489866,
       "date": "",
-      "name": "Rotat�ria Ic�m",
+      "name": "Rotatória Icém",
       "note": "",
       "paid": 400,
       "type": "Urbanismo",
@@ -404,13 +404,13 @@
       "value": 800,
       "client": "Livia Mega",
       "column": "Alteração",
-      "product": "Projeto 3D (Maquete e Render) (x1), Marca��o de Novos Pontos (El�trica e Hidrossanit�rio) (x1)",
+      "product": "Projeto 3D (Maquete e Render) (x1), Marcação de Novos Pontos (Elétrica e Hidrossanitário) (x1)",
       "archived": false,
       "payments": [
         {
           "id": 1787347960597,
           "date": "2026-08-21",
-          "desc": "Quita��o Integral",
+          "desc": "Quitação Integral",
           "amount": 800,
           "method": "Pix"
         }
@@ -424,7 +424,7 @@
         },
         {
           "id": 1787340426149,
-          "name": "Marca��o de Novos Pontos (El�trica e Hidrossanit�rio) (x1)",
+          "name": "Marcação de Novos Pontos (Elétrica e Hidrossanitário) (x1)",
           "price": 350
         }
       ],
@@ -438,7 +438,7 @@
         {
           "id": 1787340426150,
           "done": true,
-          "text": "Marca��o de Novos Pontos (El�trica e Hidrossanit�rio)",
+          "text": "Marcação de Novos Pontos (Elétrica e Hidrossanitário)",
           "current": false
         },
         {
@@ -450,11 +450,11 @@
       ],
       "createdAt": 1787340426148,
       "driveLink": "https://drive.google.com/drive/folders/1aaSshndWVdVHAEk7RZ466PxwWcvwt85q?usp=sharing",
-      "localPath": "D:\\SERVI�OS\\PROJETOS MAVIC\\LIVIA MEGA",
+      "localPath": "D:\\SERVIÇOS\\PROJETOS MAVIC\\LIVIA MEGA",
       "installments": [
         {
           "id": 1788093441041,
-          "desc": "Pagamento Integral � Vista",
+          "desc": "Pagamento Integral à Vista",
           "amount": 800,
           "method": "Pix",
           "number": 1,
@@ -500,7 +500,7 @@
       "product": "Fachada Comercial",
       "archived": false,
       "payments": [],
-      "priority": "M�dia",
+      "priority": "Média",
       "products": [
         {
           "id": 1787690125008,
@@ -518,11 +518,11 @@
       ],
       "createdAt": 1787690125008,
       "driveLink": "https://drive.google.com/drive/folders/1xWHhSCBN7CF_Eho7y1O-o0LQcLqdeStw?usp=drive_link",
-      "localPath": "D:\\SERVI�OS\\_PROJETOS VICTOR\\_Isabella Martins\\PROJETOS\\CLINICA THAFAREL",
+      "localPath": "D:\\SERVIÇOS\\_PROJETOS VICTOR\\_Isabella Martins\\PROJETOS\\CLINICA THAFAREL",
       "installments": [
         {
           "id": 1787690107647,
-          "desc": "Pagamento Integral � Vista",
+          "desc": "Pagamento Integral à Vista",
           "amount": 450,
           "method": null,
           "number": 1,
@@ -580,7 +580,7 @@
         },
         {
           "id": 1779490875485,
-          "name": "Altera��o Simples",
+          "name": "Alteração Simples",
           "price": 150
         },
         {
@@ -595,23 +595,23 @@
         },
         {
           "id": 1779490944026,
-          "name": "�rea de Lazer (Piscina/Gourmet)",
+          "name": "Área de Lazer (Piscina/Gourmet)",
           "price": 350
         },
         {
           "id": 1779490959140,
-          "name": "�rea de Lazer (Piscina/Gourmet) + Fachada Simples",
+          "name": "Área de Lazer (Piscina/Gourmet) + Fachada Simples",
           "price": 500
         },
         {
           "id": 1779490967367,
-          "name": "�rea de Lazer (Piscina/Gourmet) + Fachada Elaborada",
+          "name": "Área de Lazer (Piscina/Gourmet) + Fachada Elaborada",
           "price": 550
         },
         {
           "id": 1786734253545,
           "desc": "",
-          "name": "Recep��o",
+          "name": "Recepção",
           "price": 300
         },
         {
@@ -662,7 +662,7 @@
         {
           "id": 1786368536903,
           "desc": "",
-          "name": "Galp�o",
+          "name": "Galpão",
           "price": 250
         },
         {
@@ -703,7 +703,7 @@
         },
         {
           "id": 1787336923248,
-          "desc": "Pontos de El�trica  e Pontos Hidrossanat�rio",
+          "desc": "Pontos de Elétrica e Pontos Hidrossanitário",
           "name": "Projeto Executivo",
           "price": 250
         }
@@ -725,7 +725,7 @@
         {
           "id": 1786734253545,
           "qty": 1,
-          "desc": "Recep��o",
+          "desc": "Recepção",
           "note": "",
           "price": 300
         },
@@ -890,7 +890,7 @@
     {
       "id": 1779490875485,
       "desc": "",
-      "name": "Altera��o Simples",
+      "name": "Alteração Simples",
       "price": 150,
       "category": "Geral",
       "clientIds": [
@@ -926,7 +926,7 @@
     {
       "id": 1779490944026,
       "desc": "",
-      "name": "�rea de Lazer (Piscina/Gourmet)",
+      "name": "Área de Lazer (Piscina/Gourmet)",
       "price": 350,
       "category": "Geral",
       "clientIds": [
@@ -938,7 +938,7 @@
     {
       "id": 1779490959140,
       "desc": "",
-      "name": "�rea de Lazer (Piscina/Gourmet) + Fachada Simples",
+      "name": "Área de Lazer (Piscina/Gourmet) + Fachada Simples",
       "price": 500,
       "category": "Geral",
       "clientIds": [
@@ -950,7 +950,7 @@
     {
       "id": 1779490967367,
       "desc": "",
-      "name": "�rea de Lazer (Piscina/Gourmet) + Fachada Elaborada",
+      "name": "Área de Lazer (Piscina/Gourmet) + Fachada Elaborada",
       "price": 550,
       "category": "Geral",
       "clientIds": [
@@ -1034,7 +1034,7 @@
     {
       "id": 1786368536903,
       "desc": "",
-      "name": "Galp�o",
+      "name": "Galpão",
       "price": 250,
       "category": "Geral",
       "clientIds": [
@@ -1070,7 +1070,7 @@
     {
       "id": 1786734253545,
       "desc": "",
-      "name": "Recep��o",
+      "name": "Recepção",
       "price": 300,
       "category": "Geral",
       "clientIds": [
@@ -1117,8 +1117,8 @@
     },
     {
       "id": 1787071207449,
-      "desc": "Dormit�rio",
-      "name": "Dormit�rio",
+      "desc": "Dormitório",
+      "name": "Dormitório",
       "price": 150,
       "category": "Geral",
       "clientIds": [
@@ -1154,7 +1154,7 @@
     {
       "id": 1787336923248,
       "desc": "Cozinha + Wc e Lavanderia",
-      "name": "Marca��o de Novos Pontos (El�trica e Hidrossanit�rio)",
+      "name": "Marcação de Novos Pontos (Elétrica e Hidrossanitário)",
       "price": 300,
       "category": "Geral",
       "clientIds": [
@@ -1178,7 +1178,7 @@
     {
       "id": 1787340426149,
       "desc": "",
-      "name": "Marca��o de Novos Pontos (El�trica e Hidrossanit�rio) (x1)",
+      "name": "Marcação de Novos Pontos (Elétrica e Hidrossanitário) (x1)",
       "price": 350,
       "category": "Geral",
       "clientIds": [

@@ -1251,20 +1251,20 @@ function updateNavAlertBadges() {
   });
 }
 
+const CURRENT_SYNC_EPOCH = '20260913_v2';
+
 async function loadData(){
+  // SyncGuard: se o dispositivo possuir cache ou sync pendente anterior a esta versão, descarta para forçar download limpo da nuvem
+  const localEpoch = localStorage.getItem('mavic_sync_epoch');
+  if (localEpoch !== CURRENT_SYNC_EPOCH) {
+    localStorage.removeItem('mavic_pending_sync');
+    sessionStorage.removeItem('mavic_last_local_save');
+    localStorage.setItem('mavic_sync_epoch', CURRENT_SYNC_EPOCH);
+    console.log('[SyncGuard] Cache/sync resetado para nova versão:', CURRENT_SYNC_EPOCH);
+  }
+
   let hasSb=false;
   try{hasSb=initSupabase();}catch(e){console.warn('initSupabase falhou',e);hasSb=false;}
-  
-  // Offline-first: if local storage has pending changes, load them and sync to cloud
-  const pendingSync = localStorage.getItem('mavic_pending_sync') === 'true';
-  if (pendingSync) {
-    loadLocal();
-    if (hasSb) {
-      syncCloud(); // trigger cloud sync in background
-      setupSupabaseRealtime();
-    }
-    return;
-  }
   
   if(!hasSb){loadLocal();return;}
   try{
@@ -1370,6 +1370,10 @@ function scheduleSync(){
 
 async function syncCloud(){
   if(!sb){setSync('off');return;}
+  if(!Array.isArray(projects) || projects.length === 0){
+    console.warn('[SyncGuard] syncCloud abortado: lista de projetos vazia para evitar perda de dados.');
+    return;
+  }
   setSync('sync');
   try{
     const { error } = await sb.from('mavic_store').upsert([

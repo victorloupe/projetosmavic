@@ -403,7 +403,7 @@
       "image": "",
       "value": 800,
       "client": "Livia Mega",
-      "column": "Desenvolvimento",
+      "column": "Alteração",
       "product": "Projeto 3D (Maquete e Render) (x1), Marca��o de Novos Pontos (El�trica e Hidrossanit�rio) (x1)",
       "archived": false,
       "payments": [
@@ -1236,16 +1236,16 @@
         "hideClient": false
       },
       {
-        "id": "Revisão",
-        "icon": "bi-search",
-        "color": "#2563eb",
+        "id": "Alteração",
+        "icon": "bi-arrow-repeat",
+        "color": "#d97706",
         "isFinal": false,
         "hideClient": false
       },
       {
-        "id": "Obra",
-        "icon": "bi-hammer",
-        "color": "#d97706",
+        "id": "Revisão",
+        "icon": "bi-search",
+        "color": "#2563eb",
         "isFinal": false,
         "hideClient": false
       },
@@ -1267,8 +1267,8 @@
     "visibleColumns": [
       "Briefing",
       "Desenvolvimento",
+      "Alteração",
       "Revisão",
-      "Obra",
       "Concluído",
       "Finalizado"
     ],

@@ -876,7 +876,7 @@ function applyColumnChange(p, newCol, suppressToast = false, skipPrompt = false,
   const newIdx = findColIdx(newCol);
 
   const fromAdvStages = ['revisão', 'revisao', 'obra', 'concluído', 'concluido', 'finalizado', 'entregue'];
-  const toDevStages = ['desenvolvimento', 'briefing', 'modelagem', 'estudo'];
+  const toDevStages = ['desenvolvimento', 'briefing', 'modelagem', 'estudo', 'alteração', 'alteracao'];
   const isFromAdv = fromAdvStages.some(s => (oldCol || '').toLowerCase().includes(s));
   const isToDev = toDevStages.some(s => (newCol || '').toLowerCase().includes(s));
 

@@ -1,9 +1,46 @@
 // URL da Edge Function — ajuste se o projeto Supabase mudar
 const EDGE_FN = 'https://ygwrpwkkriaeqaeuuxan.supabase.co/functions/v1/cliente-data';
 
-let projects=[],clients=[],globalNotices=[],appColumns=[{id:'Briefing',icon:'bi-clipboard',color:'#92623a'},{id:'Desenvolvimento',icon:'bi-pencil',color:'#ea580c'},{id:'Revisão',icon:'bi-search',color:'#2563eb'},{id:'Obra',icon:'bi-hammer',color:'#d97706'},{id:'Concluído',icon:'bi-check-circle',color:'#16a34a',isFinal:true}];
+let projects=[],clients=[],globalNotices=[],appColumns=[
+  {id:'Briefing',icon:'bi-clipboard',color:'#92623a'},
+  {id:'Desenvolvimento',icon:'bi-pencil',color:'#ea580c'},
+  {id:'Alteração',icon:'bi-arrow-repeat',color:'#d97706'},
+  {id:'Revisão',icon:'bi-search',color:'#2563eb'},
+  {id:'Concluído',icon:'bi-check-circle',color:'#16a34a',isFinal:true},
+  {id:'Finalizado',icon:'bi-folder',color:'#92623a',isFinal:false,hideClient:true}
+];
 const DEFAULT_COL_COLOR='#92623a';
 const DEFAULT_COL_ICON='bi-folder';
+
+function alignClientColumns(cols) {
+  let list = Array.isArray(cols) && cols.length ? cols.map(c => ({...c})) : [
+    {id:'Briefing',icon:'bi-clipboard',color:'#92623a'},
+    {id:'Desenvolvimento',icon:'bi-pencil',color:'#ea580c'},
+    {id:'Alteração',icon:'bi-arrow-repeat',color:'#d97706'},
+    {id:'Revisão',icon:'bi-search',color:'#2563eb'},
+    {id:'Concluído',icon:'bi-check-circle',color:'#16a34a',isFinal:true},
+    {id:'Finalizado',icon:'bi-folder',color:'#92623a',isFinal:false,hideClient:true}
+  ];
+  if (!list.some(c => c.id === 'Alteração')) {
+    const revIdx = list.findIndex(c => c.id === 'Revisão');
+    const altCol = { id: 'Alteração', icon: 'bi-arrow-repeat', color: '#d97706' };
+    if (revIdx !== -1) list.splice(revIdx, 0, altCol);
+    else list.push(altCol);
+  }
+  if (!list.some(c => c.id === 'Finalizado')) {
+    list.push({ id: 'Finalizado', icon: 'bi-folder', color: '#92623a', isFinal: false, hideClient: true });
+  }
+  const orderMap = {
+    'Briefing': 10,
+    'Desenvolvimento': 20,
+    'Alteração': 30,
+    'Revisão': 40,
+    'Concluído': 50,
+    'Finalizado': 60
+  };
+  return list.sort((a, b) => (orderMap[a.id] || 35) - (orderMap[b.id] || 35));
+}
+
 // Mesma lógica do painel admin: coluna final é marcada por isFinal, com
 // fallback pro nome "Concluído" pra compatibilidade com configs antigas.
 function isFinalColumn(colId){
@@ -229,7 +266,7 @@ async function loadData(){
           globalNotices = allGlobal.filter(gn => gn.active && (gn.targetAll || (gn.targetClients || []).some(n => (n||'').toLowerCase() === clientName.toLowerCase().trim())));
           
           const cfg = store.config || {};
-          if (cfg.columns?.length) appColumns = cfg.columns;
+          appColumns = alignClientColumns(cfg.columns);
           if (cfg.projectTypes?.length) projectTypes = cfg.projectTypes;
           applyTheme(cfg.theme || localStorage.getItem('mavic_theme') || 'light');
           clientDoc = cli.doc || '';
@@ -258,7 +295,7 @@ async function loadData(){
         projects      = payload.projects      || [];
         notifications = payload.notifications || [];
         globalNotices = payload.globalNotices || [];
-        if(payload.config?.columns?.length) appColumns=payload.config.columns;
+        appColumns    = alignClientColumns(payload.config?.columns);
         if(payload.config?.projectTypes?.length) projectTypes=payload.config.projectTypes;
         applyTheme(payload.config?.theme || localStorage.getItem('mavic_theme') || 'light');
 
@@ -282,7 +319,7 @@ async function loadData(){
     notifications = JSON.parse(localStorage.getItem('mavic_notifications_'+clientName)||'[]');
     globalNotices = JSON.parse(localStorage.getItem('mavic_global_notices')||'[]');
     const cfg=JSON.parse(localStorage.getItem('mavic_config')||'{}');
-    if(cfg.columns?.length) appColumns=cfg.columns;
+    appColumns    = alignClientColumns(cfg.columns);
     if(cfg.projectTypes?.length) projectTypes=cfg.projectTypes;
   }
 

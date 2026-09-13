@@ -4,8 +4,8 @@
 const INIT_COLS=[
   {id:'Briefing',icon:'bi-clipboard',color:'#92623a'},
   {id:'Desenvolvimento',icon:'bi-pencil',color:'#ea580c'},
+  {id:'Alteração',icon:'bi-arrow-repeat',color:'#d97706'},
   {id:'Revisão',icon:'bi-search',color:'#2563eb'},
-  {id:'Obra',icon:'bi-hammer',color:'#d97706'},
   {id:'Concluído',icon:'bi-check-circle',color:'#16a34a',isFinal:true},
   {id:'Finalizado',icon:'bi-folder',color:'#92623a',isFinal:false,hideClient:true}
 ];
@@ -1076,10 +1076,11 @@ function reconcileProjectFinancials(p) {
 function reconcileAllProjectsFinancials() {
   if (!Array.isArray(projects)) return false;
   let anyChanged = false;
-  const validColIds = (Array.isArray(appColumns) && appColumns.length) ? appColumns.map(c => c.id) : ['Briefing', 'Desenvolvimento', 'Revisão', 'Obra', 'Concluído', 'Finalizado'];
+  const validColIds = (Array.isArray(appColumns) && appColumns.length) ? appColumns.map(c => c.id) : ['Briefing', 'Desenvolvimento', 'Alteração', 'Revisão', 'Concluído', 'Finalizado'];
+  if (!validColIds.includes('Alteração')) validColIds.push('Alteração');
   if (!validColIds.includes('Finalizado')) validColIds.push('Finalizado');
   projects.forEach(p => {
-    if (p.column === 'Alteração' || (p.column && !validColIds.includes(p.column) && !p.archived)) {
+    if (p.column && !validColIds.includes(p.column) && !p.archived) {
       p.column = 'Desenvolvimento';
       anyChanged = true;
     }
@@ -1251,7 +1252,41 @@ function updateNavAlertBadges() {
   });
 }
 
-const CURRENT_SYNC_EPOCH = '20260913_v2';
+const CURRENT_SYNC_EPOCH = '20260913_v3';
+
+function alignAppColumns(cols) {
+  let list = Array.isArray(cols) && cols.length ? cols.map(c => ({...c})) : INIT_COLS.map(c => ({...c}));
+  if (!list.some(c => c.id === 'Alteração')) {
+    const revIdx = list.findIndex(c => c.id === 'Revisão');
+    const altCol = { id: 'Alteração', icon: 'bi-arrow-repeat', color: '#d97706', isFinal: false, hideClient: false };
+    if (revIdx !== -1) list.splice(revIdx, 0, altCol);
+    else list.push(altCol);
+  }
+  if (!list.some(c => c.id === 'Finalizado')) {
+    list.push({ id: 'Finalizado', icon: 'bi-folder', color: '#92623a', isFinal: false, hideClient: true });
+  }
+  const orderMap = {
+    'Briefing': 10,
+    'Desenvolvimento': 20,
+    'Alteração': 30,
+    'Revisão': 40,
+    'Concluído': 50,
+    'Finalizado': 60
+  };
+  return list.sort((a, b) => (orderMap[a.id] || 35) - (orderMap[b.id] || 35));
+}
+
+function alignVisibleColumns(vis, allCols) {
+  let list = Array.isArray(vis) && vis.length ? [...vis] : allCols.map(c => c.id);
+  if (!list.includes('Alteração')) list.push('Alteração');
+  if (!list.includes('Finalizado')) list.push('Finalizado');
+  const allOrder = allCols.map(c => c.id);
+  return list.sort((a, b) => {
+    const ia = allOrder.indexOf(a);
+    const ib = allOrder.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+}
 
 async function loadData(){
   // SyncGuard: se o dispositivo possuir cache ou sync pendente anterior a esta versão, descarta para forçar download limpo da nuvem
@@ -1278,14 +1313,8 @@ async function loadData(){
     budgets=map.budgets||[];
     services=map.services||[];
     const cfg=map.config||{};
-    appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
-    if (!appColumns.some(c => c.id === 'Finalizado')) {
-      appColumns.push({ id: 'Finalizado', icon: 'bi-folder', color: '#92623a', isFinal: false, hideClient: true });
-    }
-    visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
-    if (!visibleColumns.includes('Finalizado')) {
-      visibleColumns.push('Finalizado');
-    }
+    appColumns = alignAppColumns(cfg.columns);
+    visibleColumns = alignVisibleColumns(cfg.visibleColumns, appColumns);
     minimizedColumns=cfg.minimizedColumns||[];
     checkAndMigrateLegacyProducts();
     reconcileAllProjectsFinancials();
@@ -1313,14 +1342,8 @@ function loadLocal(){
   budgets=JSON.parse(localStorage.getItem('mavic_budgets')||'[]') || [];
   services=JSON.parse(localStorage.getItem('mavic_services')||'[]') || [];
   const cfg=JSON.parse(localStorage.getItem('mavic_config')||'{}') || {};
-  appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
-  if (!appColumns.some(c => c.id === 'Finalizado')) {
-    appColumns.push({ id: 'Finalizado', icon: 'bi-folder', color: '#92623a', isFinal: false, hideClient: true });
-  }
-  visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
-  if (!visibleColumns.includes('Finalizado')) {
-    visibleColumns.push('Finalizado');
-  }
+  appColumns = alignAppColumns(cfg.columns);
+  visibleColumns = alignVisibleColumns(cfg.visibleColumns, appColumns);
   minimizedColumns=cfg.minimizedColumns||[];
   checkAndMigrateLegacyProducts();
   reconcileAllProjectsFinancials();

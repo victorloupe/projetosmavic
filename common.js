@@ -1260,7 +1260,7 @@ function updateNavAlertBadges() {
   });
 }
 
-const CURRENT_SYNC_EPOCH = '20260913_v5';
+const CURRENT_SYNC_EPOCH = '20260913_v6';
 
 function alignAppColumns(cols) {
   let list = Array.isArray(cols) && cols.length ? cols.map(c => ({...c})) : INIT_COLS.map(c => ({...c}));
@@ -3579,269 +3579,269 @@ function injectSharedLayout() {
 }
 
 function injectSharedModals() {
-  if (document.getElementById('sharedModalsContainer')) return;
-  const wrap = document.createElement('div');
-  wrap.id = 'sharedModalsContainer';
-
-  let modalsHtml = '';
-
-  // Settings Overlay
-  if (!document.getElementById('settingsOverlay')) {
-    modalsHtml += `
-      <div class="overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings(true)">
-      <div class="mbox mmd">
-        <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-gear"></i> Configurações</h5><button class="btn-icon btn-sm" onclick="closeSettings(true)"><i class="bi bi-x-lg"></i></button></div>
-        <div class="mbody">
-          <div class="stgrp">
-            <div class="sec"><i class="bi bi-window"></i> Painel do Cliente</div>
-            <div class="fld"><label class="flbl">URL do cliente.html</label><input class="inp inp-sm" id="clientUrl" placeholder="cliente.html ou https://seusite.com/cliente.html"></div>
-          </div>
-          <div class="stgrp">
-            <div class="sec"><i class="bi bi-qr-code" style="color:var(--accent)"></i> Pagamento (PIX)</div>
-            <div class="fld"><label class="flbl">Chave PIX (CPF/CNPJ/e-mail/telefone)</label><input class="inp inp-sm" id="pixKey" placeholder="Ex: 350.605.018-41"></div>
-            <div class="row2">
-              <div class="fld"><label class="flbl">Titular</label><input class="inp inp-sm" id="pixName" placeholder="Nome do titular"></div>
-              <div class="fld"><label class="flbl">Banco / Instituição</label><input class="inp inp-sm" id="pixBank" placeholder="Ex: Nu Pagamentos"></div>
-            </div>
-          </div>
-          <div class="stgrp">
-            <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
-            <div class="fld">
-              <label class="flbl">Template de Mensagem</label>
-              <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Cliente}')" title="Primeiro nome do cliente">+ {Cliente}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Projeto}')" title="Nome do projeto">+ {Projeto}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Etapa}')" title="Etapa/Coluna">+ {Etapa}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Prazo}')" title="Prazo do projeto">+ {Prazo}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorTotal}')" title="Valor total">+ {ValorTotal}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorPago}')" title="Valor pago">+ {ValorPago}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{SaldoPendente}')" title="Saldo pendente">+ {SaldoPendente}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{TarefaAtual}')" title="Subtarefas em foco">+ {TarefaAtual}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Observacao}')" title="Observações">+ {Observacao}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkPainel}')" title="Painel do cliente">+ {LinkPainel}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkDrive}')" title="Pasta de arquivos">+ {LinkDrive}</button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{DadosPix}')" title="Dados PIX">+ {DadosPix}</button>
-              </div>
-              <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
-            </div>
-          </div>
-          <div class="stgrp">
-            <div class="sec"><i class="bi bi-building"></i> Dados do Emissor (para Recibos e Orçamentos)</div>
-            <div class="fld">
-              <label class="flbl">Nome / Razão Social</label>
-              <input class="inp inp-sm" id="companyName" placeholder="Ex: Victor Lourenço Pereira Ltda">
-            </div>
-            <div class="fld">
-              <label class="flbl">CPF / CNPJ do Emissor</label>
-              <input class="inp inp-sm" id="companyDoc" placeholder="Ex: 350.605.018-41" oninput="maskDocInput(this)" onblur="checkDocValidity(this)">
-            </div>
-            <div class="fld">
-              <label class="flbl">E-mail do Emissor</label>
-              <input class="inp inp-sm" id="companyEmail" placeholder="Ex: projetos.mavic@hotmail.com">
-            </div>
-            <div class="fld">
-              <label class="flbl">Instagram do Emissor</label>
-              <input class="inp inp-sm" id="companyInsta" placeholder="Ex: @mavic.arquitetuta">
-            </div>
-          </div>
-          <div class="stgrp">
-            <div class="sec"><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Valor Hora Operacional (Lucratividade)</div>
-            <div class="fld">
-              <label class="flbl">Valor Base por Hora (R$/h)</label>
-              <input class="inp inp-sm" id="hourlyRate" type="number" min="1" placeholder="80" style="max-width:180px">
-              <div style="font-size:11px;color:var(--text3);margin-top:4px">Utilizado para calcular o custo real e a margem de lucro nos projetos.</div>
-            </div>
-          </div>
-          <div class="stgrp">
-            <div class="sec"><i class="bi bi-shield-lock" style="color:var(--accent)"></i> Sessão & Segurança</div>
-            <div class="st-row"><span style="color:var(--text2)">Conectado como</span><strong id="stAdminEmail" style="color:var(--accent)">projetos.mavic@hotmail.com</strong></div>
-            <div class="st-row" style="margin-top: 10px; display: flex; justify-content: flex-end;">
-              <button type="button" class="btn-outline-danger" onclick="logoutAdmin()"><i class="bi bi-box-arrow-right"></i> Sair do Painel</button>
-            </div>
-          </div>
-          <div class="stgrp">
-            <div class="sec">Sistema</div>
-            <div class="st-row"><span style="color:var(--text2)">Projetos</span><strong id="stProjCnt">—</strong></div>
-            <div class="st-row"><span style="color:var(--text2)">Clientes</span><strong id="stCliCnt">—</strong></div>
-            <div class="st-row"><span style="color:var(--text2)">Banco de dados</span><strong style="color:var(--green)"><i class="bi bi-cloud-check"></i> Supabase conectado</strong></div>
-            <div class="st-row"><span style="color:var(--text2)">Versão</span><strong style="color:var(--accent)">MAVIC v3.1</strong></div>
-            <div class="st-row" style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end;">
-              <button class="btn btn-ghost btn-sm" onclick="exportBackup()"><i class="bi bi-download"></i> Exportar Backup</button>
-              <label class="btn btn-ghost btn-sm" style="margin:0; cursor:pointer">
-                <i class="bi bi-upload"></i> Importar Backup
-                <input type="file" accept=".json" onchange="importBackup(event)" style="display:none">
-              </label>
-            </div>
-          </div>
-        <div class="mftr" style="display:flex;justify-content:flex-end;gap:8px"><button class="btn btn-ghost" onclick="closeSettings(true)" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button><button class="btn btn-primary" onclick="saveSettings()" title="Salvar"><i class="bi bi-check2"></i> <span class="btn-txt">Salvar</span></button></div>
-      </div>
-      </div>
-    `;
-  }
-
-  // Global Notice Overlay
-  if (!document.getElementById('globalNoticeOverlay')) {
-    modalsHtml += `
-      <div class="overlay" id="globalNoticeOverlay" onclick="if(event.target===this)closeGlobalNoticeModal()">
-      <div class="mbox mxl">
-        <div class="mhdr">
-          <h5 style="color:var(--accent)"><i class="bi bi-megaphone"></i> Central de Avisos</h5>
-          <button class="btn-icon btn-sm" onclick="closeGlobalNoticeModal()"><i class="bi bi-x-lg"></i></button>
-        </div>
-        <div class="mbody" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-          <div style="display:flex;flex-direction:column">
-            <div class="sec" style="margin-bottom:10px">Avisos enviados</div>
-            <div id="gnList" style="display:flex;flex-direction:column;gap:6px;height:460px;overflow-y:auto;padding-right:6px"></div>
-          </div>
-          <div style="border-left:1px solid var(--border);padding-left:20px">
-            <div class="sec" style="margin-bottom:10px">Novo Aviso</div>
-            <div class="fld" style="display:flex;align-items:center;justify-content:space-between">
-              <label class="flbl" style="margin-bottom:0">Ativo ao publicar</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                <input type="checkbox" id="gnActive" checked onchange="updateGnPreview()" style="accent-color:var(--accent);width:15px;height:15px">
-                <span id="gnStatusLabel" style="font-size:13px;font-weight:600;color:var(--green)">Ativo</span>
-              </label>
-            </div>
-            <div class="fld">
-              <label class="flbl">Título *</label>
-              <input class="inp inp-sm" id="gnTitle" oninput="updateGnPreview()" placeholder="Ex: Recesso de Fim de Ano">
-            </div>
-            <div class="fld">
-              <label class="flbl">Mensagem *</label>
-              <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
-                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')"><b>N</b></button>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')"><i>I</i></button>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\\n')">↵ Linha</button>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')">• Tópico</button>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\\n\\n')">¶ Parágrafo</button>
-              </div>
-              <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Use os botões acima para formatar."></textarea>
-            </div>
-            <div class="fld">
-              <label class="flbl">Destinatários</label>
-              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:6px">
-                  <input type="checkbox" id="gnAllClients" checked onchange="toggleGnAllClients()">
-                  <span>Todos os clientes</span>
-                </label>
-                <div id="gnClientsContainer" style="display:none;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto"></div>
-              </div>
-            </div>
-            <div id="gnPreview" style="display:none;background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:10px;padding:11px;margin-bottom:12px">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--yellow);margin-bottom:4px"><i class="bi bi-megaphone"></i> Prévia:</div>
-              <div id="gnPreviewText" style="font-size:13px;font-weight:500;color:var(--text);line-height:1.6"></div>
-            </div>
-            <button class="btn btn-primary" style="width:100%" onclick="saveGlobalNotice()"><i class="bi bi-megaphone"></i> Publicar Aviso</button>
-          </div>
-        </div>
-      </div>
-      </div>
-    `;
-  }
-
-  // Archive Overlay
-  if (!document.getElementById('archiveOverlay')) {
-    modalsHtml += `
-      <div class="overlay" id="archiveOverlay" onclick="if(event.target===this)closeArchiveModal()">
-      <div class="mbox mmd">
-        <div class="mhdr"><h5><i class="bi bi-archive"></i> Projetos Arquivados</h5><button class="btn-icon btn-sm" onclick="closeArchiveModal()"><i class="bi bi-x-lg"></i></button></div>
-        <div class="mbody" id="archiveList" style="max-height:400px;overflow-y:auto"></div>
-      </div>
-      </div>
-    `;
-  }
-
-  // Time Tracker & Profitability Overlay
-  if (!document.getElementById('timeTrackerOverlay')) {
-    modalsHtml += `
-      <div class="overlay" id="timeTrackerOverlay" onclick="if(event.target===this)closeTimeTracker()">
-      <div class="mbox mlg" style="max-width:680px">
-        <div class="mhdr">
-          <h5 id="ttModalTitle"><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Apontamento de Horas</h5>
-          <button class="btn-icon btn-sm" onclick="closeTimeTracker()"><i class="bi bi-x-lg"></i></button>
-        </div>
-        <div class="mbody">
-          <div class="tt-kpi-grid" id="ttKpis"></div>
-          
-          <div id="ttTimerControls"></div>
-
-          <!-- Formulário de Lançamento Manual -->
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px">
-            <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:8px"><i class="bi bi-plus-circle"></i> Lançamento Manual de Horas</div>
-            <div class="tt-manual-form-grid">
-              <div class="fld" style="margin-bottom:0">
-                <label class="flbl">Data</label>
-                <input class="inp inp-sm" type="date" id="ttManualDate">
-              </div>
-              <div class="fld" style="margin-bottom:0">
-                <label class="flbl">Horas</label>
-                <input class="inp inp-sm" type="number" min="0" id="ttManualHours" placeholder="0">
-              </div>
-              <div class="fld" style="margin-bottom:0">
-                <label class="flbl">Minutos</label>
-                <input class="inp inp-sm" type="number" min="0" max="59" id="ttManualMinutes" placeholder="0">
-              </div>
-              <div class="fld tt-fld-desc" style="margin-bottom:0">
-                <label class="flbl">Descrição do que foi feito</label>
-                <input class="inp inp-sm" type="text" id="ttManualDesc" placeholder="Ex: Modelagem 3D, Reunião, Render…">
-              </div>
-              <div class="tt-fld-btn">
-                <button class="btn btn-primary btn-sm" onclick="saveManualTimeLog()" style="height:34px;white-space:nowrap;width:100%"><i class="bi bi-check2"></i> Salvar</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Histórico de Apontamentos -->
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:8px"><i class="bi bi-clock-history"></i> Histórico de Sessões</div>
-          <div id="ttLogsList" style="max-height:220px;overflow-y:auto;padding-right:4px"></div>
-        </div>
-        <div class="mftr" style="display:flex;justify-content:space-between;align-items:center">
-          <button class="btn btn-excel btn-sm" onclick="exportFullFinancialExcel()" title="Exportar Tudo (Excel)"><i class="bi bi-file-earmark-excel"></i> <span class="btn-txt">Exportar Tudo (Excel)</span></button>
-          <button class="btn btn-ghost" onclick="closeTimeTracker()" title="Fechar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Fechar</span></button>
-        </div>
-      </div>
-      </div>
-    `;
-  }
-
-  // Quick Select Project to Start Timer Overlay
-  if (!document.getElementById('selectProjectTimerOverlay')) {
-    modalsHtml += `
-      <div class="overlay" id="selectProjectTimerOverlay" onclick="if(event.target===this)closePromptStartTimer()">
-      <div class="mbox msm" style="max-width:440px">
-        <div class="mhdr">
-          <h5><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Iniciar Cronômetro</h5>
-          <button class="btn-icon btn-sm" onclick="closePromptStartTimer()"><i class="bi bi-x-lg"></i></button>
-        </div>
-        <div class="mbody">
-          <div class="fld">
-            <label class="flbl">Selecione o Projeto <span style="color:var(--red)">*</span></label>
-            <select class="inp" id="selTimerProjectId" onchange="onSelectTimerProjectChange()">
-              <option value="">Selecione um projeto…</option>
-            </select>
-          </div>
-          <div class="fld">
-            <label class="flbl">Etapa / Tarefa</label>
-            <input class="inp inp-sm" id="selTimerStage" placeholder="Ex: Modelagem 3D, Render, Revisão…">
-          </div>
-          <div class="fld" style="margin-bottom:0">
-            <label class="flbl">Descrição da Atividade (Opcional)</label>
-            <input class="inp inp-sm" id="selTimerDesc" placeholder="Ex: Ajustes na fachada, detalhamento…">
-          </div>
-        </div>
-        <div class="mftr" style="display:flex;justify-content:flex-end;gap:8px">
-          <button class="btn btn-ghost" onclick="closePromptStartTimer()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
-          <button class="btn btn-primary" onclick="confirmStartTimerFromModal()" title="Iniciar Cronômetro"><i class="bi bi-play-fill"></i> <span class="btn-txt">Iniciar Cronômetro</span></button>
-        </div>
-      </div>
-      </div>
-    `;
-  }
-
-  if (modalsHtml) {
-    wrap.innerHTML = modalsHtml;
+  let wrap = document.getElementById('sharedModalsContainer');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'sharedModalsContainer';
     document.body.appendChild(wrap);
   }
+
+  const appendIfMissing = (id, html) => {
+    if (!document.getElementById(id)) {
+      const temp = document.createElement('div');
+      temp.innerHTML = html.trim();
+      if (temp.firstElementChild) {
+        wrap.appendChild(temp.firstElementChild);
+      }
+    }
+  };
+
+  // Settings Overlay
+  appendIfMissing('settingsOverlay', `
+    <div class="overlay" id="settingsOverlay" onclick="if(event.target===this)closeSettings(true)">
+    <div class="mbox mmd">
+      <div class="mhdr"><h5 style="color:var(--accent)"><i class="bi bi-gear"></i> Configurações</h5><button class="btn-icon btn-sm" onclick="closeSettings(true)"><i class="bi bi-x-lg"></i></button></div>
+      <div class="mbody">
+        <div class="stgrp">
+          <div class="sec"><i class="bi bi-window"></i> Painel do Cliente</div>
+          <div class="fld"><label class="flbl">URL do cliente.html</label><input class="inp inp-sm" id="clientUrl" placeholder="cliente.html ou https://seusite.com/cliente.html"></div>
+        </div>
+        <div class="stgrp">
+          <div class="sec"><i class="bi bi-qr-code" style="color:var(--accent)"></i> Pagamento (PIX)</div>
+          <div class="fld"><label class="flbl">Chave PIX (CPF/CNPJ/e-mail/telefone)</label><input class="inp inp-sm" id="pixKey" placeholder="Ex: 350.605.018-41"></div>
+          <div class="row2">
+            <div class="fld"><label class="flbl">Titular</label><input class="inp inp-sm" id="pixName" placeholder="Nome do titular"></div>
+            <div class="fld"><label class="flbl">Banco / Instituição</label><input class="inp inp-sm" id="pixBank" placeholder="Ex: Nu Pagamentos"></div>
+          </div>
+        </div>
+        <div class="stgrp">
+          <div class="sec"><i class="bi bi-whatsapp" style="color:#25D366"></i> Template do WhatsApp</div>
+          <div class="fld">
+            <label class="flbl">Template de Mensagem</label>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Cliente}')" title="Primeiro nome do cliente">+ {Cliente}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Projeto}')" title="Nome do projeto">+ {Projeto}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Etapa}')" title="Etapa/Coluna">+ {Etapa}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Prazo}')" title="Prazo do projeto">+ {Prazo}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorTotal}')" title="Valor total">+ {ValorTotal}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{ValorPago}')" title="Valor pago">+ {ValorPago}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{SaldoPendente}')" title="Saldo pendente">+ {SaldoPendente}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{TarefaAtual}')" title="Subtarefas em foco">+ {TarefaAtual}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{Observacao}')" title="Observações">+ {Observacao}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkPainel}')" title="Painel do cliente">+ {LinkPainel}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{LinkDrive}')" title="Pasta de arquivos">+ {LinkDrive}</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="insertWaVar('{DadosPix}')" title="Dados PIX">+ {DadosPix}</button>
+            </div>
+            <textarea class="inp" id="waTemplate" rows="5" style="font-size:12.5px;line-height:1.4;resize:vertical"></textarea>
+          </div>
+        </div>
+        <div class="stgrp">
+          <div class="sec"><i class="bi bi-building"></i> Dados do Emissor (para Recibos e Orçamentos)</div>
+          <div class="fld">
+            <label class="flbl">Nome / Razão Social</label>
+            <input class="inp inp-sm" id="companyName" placeholder="Ex: Victor Lourenço Pereira Ltda">
+          </div>
+          <div class="fld">
+            <label class="flbl">CPF / CNPJ do Emissor</label>
+            <input class="inp inp-sm" id="companyDoc" placeholder="Ex: 350.605.018-41" oninput="maskDocInput(this)" onblur="checkDocValidity(this)">
+          </div>
+          <div class="fld">
+            <label class="flbl">E-mail do Emissor</label>
+            <input class="inp inp-sm" id="companyEmail" placeholder="Ex: projetos.mavic@hotmail.com">
+          </div>
+          <div class="fld">
+            <label class="flbl">Instagram do Emissor</label>
+            <input class="inp inp-sm" id="companyInsta" placeholder="Ex: @mavic.arquitetuta">
+          </div>
+        </div>
+        <div class="stgrp">
+          <div class="sec"><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Valor Hora Operacional (Lucratividade)</div>
+          <div class="fld">
+            <label class="flbl">Valor Base por Hora (R$/h)</label>
+            <input class="inp inp-sm" id="hourlyRate" type="number" min="1" placeholder="80" style="max-width:180px">
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">Utilizado para calcular o custo real e a margem de lucro nos projetos.</div>
+          </div>
+        </div>
+        <div class="stgrp">
+          <div class="sec"><i class="bi bi-shield-lock" style="color:var(--accent)"></i> Sessão & Segurança</div>
+          <div class="st-row"><span style="color:var(--text2)">Conectado como</span><strong id="stAdminEmail" style="color:var(--accent)">projetos.mavic@hotmail.com</strong></div>
+          <div class="st-row" style="margin-top: 10px; display: flex; justify-content: flex-end;">
+            <button type="button" class="btn-outline-danger" onclick="logoutAdmin()"><i class="bi bi-box-arrow-right"></i> Sair do Painel</button>
+          </div>
+        </div>
+        <div class="stgrp">
+          <div class="sec">Sistema</div>
+          <div class="st-row"><span style="color:var(--text2)">Projetos</span><strong id="stProjCnt">—</strong></div>
+          <div class="st-row"><span style="color:var(--text2)">Clientes</span><strong id="stCliCnt">—</strong></div>
+          <div class="st-row"><span style="color:var(--text2)">Banco de dados</span><strong style="color:var(--green)"><i class="bi bi-cloud-check"></i> Supabase conectado</strong></div>
+          <div class="st-row"><span style="color:var(--text2)">Versão</span><strong style="color:var(--accent)">MAVIC v3.1</strong></div>
+          <div class="st-row" style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end;">
+            <button class="btn btn-ghost btn-sm" onclick="exportBackup()"><i class="bi bi-download"></i> Exportar Backup</button>
+            <label class="btn btn-ghost btn-sm" style="margin:0; cursor:pointer">
+              <i class="bi bi-upload"></i> Importar Backup
+              <input type="file" accept=".json" onchange="importBackup(event)" style="display:none">
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="mftr" style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn btn-ghost" onclick="closeSettings(true)" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+        <button class="btn btn-primary" onclick="saveSettings()" title="Salvar"><i class="bi bi-check2"></i> <span class="btn-txt">Salvar</span></button>
+      </div>
+    </div>
+    </div>
+  `);
+
+  // Global Notice Overlay
+  appendIfMissing('globalNoticeOverlay', `
+    <div class="overlay" id="globalNoticeOverlay" onclick="if(event.target===this)closeGlobalNoticeModal()">
+    <div class="mbox mxl">
+      <div class="mhdr">
+        <h5 style="color:var(--accent)"><i class="bi bi-megaphone"></i> Central de Avisos</h5>
+        <button class="btn-icon btn-sm" onclick="closeGlobalNoticeModal()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="mbody" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div style="display:flex;flex-direction:column">
+          <div class="sec" style="margin-bottom:10px">Avisos enviados</div>
+          <div id="gnList" style="display:flex;flex-direction:column;gap:6px;height:460px;overflow-y:auto;padding-right:6px"></div>
+        </div>
+        <div style="border-left:1px solid var(--border);padding-left:20px">
+          <div class="sec" style="margin-bottom:10px">Novo Aviso</div>
+          <div class="fld" style="display:flex;align-items:center;justify-content:space-between">
+            <label class="flbl" style="margin-bottom:0">Ativo ao publicar</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="gnActive" checked onchange="updateGnPreview()" style="accent-color:var(--accent);width:15px;height:15px">
+              <span id="gnStatusLabel" style="font-size:13px;font-weight:600;color:var(--green)">Ativo</span>
+            </label>
+          </div>
+          <div class="fld">
+            <label class="flbl">Título *</label>
+            <input class="inp inp-sm" id="gnTitle" oninput="updateGnPreview()" placeholder="Ex: Recesso de Fim de Ano">
+          </div>
+          <div class="fld">
+            <label class="flbl">Mensagem *</label>
+            <div style="display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('*','*')"><b>N</b></button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="wrapGnText('_','_')"><i>I</i></button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\\n')">↵ Linha</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('• ')">• Tópico</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="insertGnText('\\n\\n')">¶ Parágrafo</button>
+            </div>
+            <textarea class="inp" id="gnMsg" rows="5" oninput="updateGnPreview()" placeholder="Use os botões acima para formatar."></textarea>
+          </div>
+          <div class="fld">
+            <label class="flbl">Destinatários</label>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:6px">
+                <input type="checkbox" id="gnAllClients" checked onchange="toggleGnAllClients()">
+                <span>Todos os clientes</span>
+              </label>
+              <div id="gnClientsContainer" style="display:none;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto"></div>
+            </div>
+          </div>
+          <div id="gnPreview" style="display:none;background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:10px;padding:11px;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--yellow);margin-bottom:4px"><i class="bi bi-megaphone"></i> Prévia:</div>
+            <div id="gnPreviewText" style="font-size:13px;font-weight:500;color:var(--text);line-height:1.6"></div>
+          </div>
+          <button class="btn btn-primary" style="width:100%" onclick="saveGlobalNotice()"><i class="bi bi-megaphone"></i> Publicar Aviso</button>
+        </div>
+      </div>
+    </div>
+    </div>
+  `);
+
+  // Archive Overlay
+  appendIfMissing('archiveOverlay', `
+    <div class="overlay" id="archiveOverlay" onclick="if(event.target===this)closeArchiveModal()">
+    <div class="mbox mmd">
+      <div class="mhdr"><h5><i class="bi bi-archive"></i> Projetos Arquivados</h5><button class="btn-icon btn-sm" onclick="closeArchiveModal()"><i class="bi bi-x-lg"></i></button></div>
+      <div class="mbody" id="archiveList" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+    </div>
+  `);
+
+  // Time Tracker & Profitability Overlay
+  appendIfMissing('timeTrackerOverlay', `
+    <div class="overlay" id="timeTrackerOverlay" onclick="if(event.target===this)closeTimeTracker()">
+    <div class="mbox mlg" style="max-width:680px">
+      <div class="mhdr">
+        <h5 id="ttModalTitle"><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Apontamento de Horas</h5>
+        <button class="btn-icon btn-sm" onclick="closeTimeTracker()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="mbody">
+        <div class="tt-kpi-grid" id="ttKpis"></div>
+        
+        <div id="ttTimerControls"></div>
+
+        <!-- Formulário de Lançamento Manual -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:8px"><i class="bi bi-plus-circle"></i> Lançamento Manual de Horas</div>
+          <div class="tt-manual-form-grid">
+            <div class="fld" style="margin-bottom:0">
+              <label class="flbl">Data</label>
+              <input class="inp inp-sm" type="date" id="ttManualDate">
+            </div>
+            <div class="fld" style="margin-bottom:0">
+              <label class="flbl">Horas</label>
+              <input class="inp inp-sm" type="number" min="0" id="ttManualHours" placeholder="0">
+            </div>
+            <div class="fld" style="margin-bottom:0">
+              <label class="flbl">Minutos</label>
+              <input class="inp inp-sm" type="number" min="0" max="59" id="ttManualMinutes" placeholder="0">
+            </div>
+            <div class="fld tt-fld-desc" style="margin-bottom:0">
+              <label class="flbl">Descrição do que foi feito</label>
+              <input class="inp inp-sm" type="text" id="ttManualDesc" placeholder="Ex: Modelagem 3D, Reunião, Render…">
+            </div>
+            <div class="tt-fld-btn">
+              <button class="btn btn-primary btn-sm" onclick="saveManualTimeLog()" style="height:34px;white-space:nowrap;width:100%"><i class="bi bi-check2"></i> Salvar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Histórico de Apontamentos -->
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:8px"><i class="bi bi-clock-history"></i> Histórico de Sessões</div>
+        <div id="ttLogsList" style="max-height:220px;overflow-y:auto;padding-right:4px"></div>
+      </div>
+      <div class="mftr" style="display:flex;justify-content:space-between;align-items:center">
+        <button class="btn btn-excel btn-sm" onclick="exportFullFinancialExcel()" title="Exportar Tudo (Excel)"><i class="bi bi-file-earmark-excel"></i> <span class="btn-txt">Exportar Tudo (Excel)</span></button>
+        <button class="btn btn-ghost" onclick="closeTimeTracker()" title="Fechar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Fechar</span></button>
+      </div>
+    </div>
+    </div>
+  `);
+
+  // Quick Select Project to Start Timer Overlay
+  appendIfMissing('selectProjectTimerOverlay', `
+    <div class="overlay" id="selectProjectTimerOverlay" onclick="if(event.target===this)closePromptStartTimer()">
+    <div class="mbox msm" style="max-width:440px">
+      <div class="mhdr">
+        <h5><i class="bi bi-stopwatch" style="color:var(--accent)"></i> Iniciar Cronômetro</h5>
+        <button class="btn-icon btn-sm" onclick="closePromptStartTimer()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="mbody">
+        <div class="fld">
+          <label class="flbl">Selecione o Projeto <span style="color:var(--red)">*</span></label>
+          <select class="inp" id="selTimerProjectId" onchange="onSelectTimerProjectChange()">
+            <option value="">Selecione um projeto…</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label class="flbl">Etapa / Tarefa</label>
+          <input class="inp inp-sm" id="selTimerStage" placeholder="Ex: Modelagem 3D, Render, Revisão…">
+        </div>
+        <div class="fld" style="margin-bottom:0">
+          <label class="flbl">Descrição da Atividade (Opcional)</label>
+          <input class="inp inp-sm" id="selTimerDesc" placeholder="Ex: Ajustes na fachada, detalhamento…">
+        </div>
+      </div>
+      <div class="mftr" style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn btn-ghost" onclick="closePromptStartTimer()" title="Cancelar"><i class="bi bi-x-lg"></i> <span class="btn-txt">Cancelar</span></button>
+        <button class="btn btn-primary" onclick="confirmStartTimerFromModal()" title="Iniciar Cronômetro"><i class="bi bi-play-fill"></i> <span class="btn-txt">Iniciar Cronômetro</span></button>
+      </div>
+    </div>
+    </div>
+  `);
 }
 
 // ══════════════════════════════════════════
@@ -4294,7 +4294,10 @@ function promptStartTimer() {
   const descInp = document.getElementById('selTimerDesc');
   if (descInp) descInp.value = '';
 
-  if (overlay) overlay.classList.add('open');
+  if (overlay) {
+    overlay.style.removeProperty('display');
+    overlay.classList.add('open');
+  }
 }
 
 function onSelectTimerProjectChange() {
@@ -4309,7 +4312,10 @@ function onSelectTimerProjectChange() {
 
 function closePromptStartTimer() {
   const overlay = document.getElementById('selectProjectTimerOverlay');
-  if (overlay) overlay.classList.remove('open');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.style.removeProperty('display');
+  }
 }
 
 function confirmStartTimerFromModal() {
@@ -4396,14 +4402,34 @@ function openTimeTracker(projectId) {
     injectSharedModals();
     overlay = document.getElementById('timeTrackerOverlay');
   }
+
+  if (!projectId) {
+    const active = typeof getActiveTimer === 'function' ? getActiveTimer() : null;
+    if (active && active.projectId) {
+      projectId = active.projectId;
+    }
+  }
+
+  if (!projectId) {
+    promptStartTimer();
+    return;
+  }
+
   currentTtProjectId = projectId;
   renderTimeTrackerModal(projectId);
-  if (overlay) overlay.classList.add('open');
+
+  if (overlay) {
+    overlay.style.removeProperty('display');
+    overlay.classList.add('open');
+  }
 }
 
 function closeTimeTracker() {
   const overlay = document.getElementById('timeTrackerOverlay');
-  if (overlay) overlay.classList.remove('open');
+  if (overlay) {
+    overlay.classList.remove('open');
+    overlay.style.removeProperty('display');
+  }
   currentTtProjectId = null;
 }
 
@@ -4863,9 +4889,9 @@ document.addEventListener('keydown', (e) => {
 
   // 3. Escape para fechar modais e dropdowns
   if (e.key === 'Escape') {
-    document.querySelectorAll('.overlay.open, .overlay[style*="display: flex"], .overlay[style*="display: block"]').forEach(ov => {
+    document.querySelectorAll('.overlay.open, .overlay[style*="display"]').forEach(ov => {
       ov.classList.remove('open');
-      ov.style.display = 'none';
+      ov.style.removeProperty('display');
     });
     document.querySelectorAll('.sort-menu.open, .table-action-dropdown.open').forEach(dd => dd.classList.remove('open'));
   }

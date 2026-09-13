@@ -2000,7 +2000,7 @@ body:has(.overlay.open) {
   position: fixed;
   inset: 0;
   background: rgba(12, 11, 10, 0.48);
-  z-index: 1000;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2015,6 +2015,7 @@ body:has(.overlay.open) {
 .overlay.open {
   opacity: 1;
   pointer-events: all;
+  z-index: 10000;
 }
 
 .mbox {
@@ -6081,7 +6082,7 @@ body:has(.overlay.open) {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 99999;
+  z-index: 990;
   display: flex;
   align-items: center;
   gap: 12px;

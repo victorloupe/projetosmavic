@@ -687,10 +687,10 @@ function createCardHTML(p, cardIdx=0){
           <span class="badge" style="background:${typeBg(p.type)};color:${typeColor(p.type)}">${p.type}</span>
           ${p.originBudgetNumber?`<a href="orcamento.html" class="proj-origin-badge" title="Orçamento de Origem #${p.originBudgetNumber}" onclick="event.stopPropagation()"><i class="bi bi-file-earmark-spreadsheet"></i> #${p.originBudgetNumber}</a>`:''}
           ${tagsHtml}
-          <span class="card-time-badge ${isRunningOnThis ? 'running' : ''}" onclick="openTimeTracker(${p.id});event.stopPropagation()" title="${isRunningOnThis ? 'Cronômetro ativo — clique para ver detalhes' : 'Total trabalhado: clique para apontar horas'}">
+          <span class="card-time-badge ${isRunningOnThis ? 'running' : ''}" onclick="openTimeTracker('${p.id}');event.stopPropagation()" title="${isRunningOnThis ? 'Cronômetro ativo — clique para ver detalhes' : 'Total trabalhado: clique para apontar horas'}">
             <i class="bi ${isRunningOnThis ? 'bi-stopwatch-fill' : 'bi-stopwatch'}"></i> ${pTimeStr}
           </span>
-          <button type="button" class="btn-card-timer ${isRunningOnThis ? 'active' : ''}" onclick="toggleGlobalTimer(${p.id});event.stopPropagation()" title="${isRunningOnThis ? 'Pausar/Ver cronômetro' : 'Iniciar cronômetro nesta etapa'}">
+          <button type="button" class="btn-card-timer ${isRunningOnThis ? 'active' : ''}" onclick="toggleGlobalTimer('${p.id}');event.stopPropagation()" title="${isRunningOnThis ? 'Pausar/Ver cronômetro' : 'Iniciar cronômetro nesta etapa'}">
             <i class="bi ${isRunningOnThis ? 'bi-pause-fill' : 'bi-play-fill'}"></i>
           </button>
         </div>
@@ -704,7 +704,7 @@ function createCardHTML(p, cardIdx=0){
       ${instBadge}
       ${finHtml}${checkHtml}${noteHtml}${revHtml}${latestClientRevNoteHtml}
       <div class="cact">
-        <button class="cbtn" style="color:var(--accent)" onclick="openTimeTracker(${p.id});event.stopPropagation()" title="Apontamento de Horas & Lucratividade"><i class="bi bi-stopwatch"></i></button>
+        <button class="cbtn" style="color:var(--accent)" onclick="openTimeTracker('${p.id}');event.stopPropagation()" title="Apontamento de Horas & Lucratividade"><i class="bi bi-stopwatch"></i></button>
         <button class="cbtn ntf" onclick="openNotifyModal(${p.id});event.stopPropagation()" title="Notificar cliente"><i class="bi bi-bell"></i></button>
         <button class="cbtn" style="color:#25D366" onclick="openWhatsApp(${p.id});event.stopPropagation()" title="Enviar WhatsApp"><i class="bi bi-whatsapp"></i></button>
         <button class="cbtn shr" onclick="shareLink(${p.id});event.stopPropagation()" title="Link do cliente"><i class="bi bi-share"></i></button>
@@ -739,7 +739,7 @@ function createCompactCardHTML(p){
   return `<div class="kcard-compact" data-id="${p.id}" draggable="true">
     <div class="kcard-compact-info" onclick="editProject(${p.id})">
       <div class="kcard-compact-name">${escapeHtml(p.name)}</div>
-      <div class="kcard-compact-sub">${escapeHtml(p.client||'—')} · ${escapeHtml(p.column)} <span class="card-time-badge" style="font-size:9.5px;padding:1px 4px;margin-left:4px" onclick="openTimeTracker(${p.id});event.stopPropagation()"><i class="bi bi-stopwatch"></i> ${pTimeStr}</span></div>
+      <div class="kcard-compact-sub">${escapeHtml(p.client||'—')} · ${escapeHtml(p.column)} <span class="card-time-badge" style="font-size:9.5px;padding:1px 4px;margin-left:4px" onclick="openTimeTracker('${p.id}');event.stopPropagation()"><i class="bi bi-stopwatch"></i> ${pTimeStr}</span></div>
     </div>
     <div class="kcard-compact-acts">
       <button class="btn btn-ghost btn-sm ${hasFolder ? 'has-local' : ''}" onclick="openCardFolder(event, ${p.id})" title="${folderTitle}"><i class="bi ${folderIcon}"></i></button>

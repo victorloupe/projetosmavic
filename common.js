@@ -1075,7 +1075,12 @@ function reconcileProjectFinancials(p) {
 function reconcileAllProjectsFinancials() {
   if (!Array.isArray(projects)) return false;
   let anyChanged = false;
+  const validColIds = (Array.isArray(appColumns) && appColumns.length) ? appColumns.map(c => c.id) : ['Briefing', 'Desenvolvimento', 'Revisão', 'Obra', 'Concluído', 'Finalizado'];
   projects.forEach(p => {
+    if (p.column === 'Alteração' || (p.column && !validColIds.includes(p.column) && !p.archived)) {
+      p.column = 'Desenvolvimento';
+      anyChanged = true;
+    }
     if (reconcileProjectFinancials(p)) {
       anyChanged = true;
     }

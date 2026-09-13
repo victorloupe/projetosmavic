@@ -1221,7 +1221,7 @@ function getRevisionTargetColumn() {
   if (altCol) return altCol.id;
   const devCol = cols.find(c => (c.id || '').toLowerCase().includes('desenv'));
   if (devCol) return devCol.id;
-  return 'Alteração';
+  return 'Desenvolvimento';
 }
 
 async function submitRevisionRequest() {

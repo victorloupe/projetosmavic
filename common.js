@@ -1084,6 +1084,14 @@ function reconcileAllProjectsFinancials() {
       p.column = 'Desenvolvimento';
       anyChanged = true;
     }
+    if (isFinalColumn(p.column) || p.column === 'Concluído') {
+      if (!p.clientApproved && !p.adminApproved) {
+        p.adminApproved = true;
+        p.adminApprovedAt = p.adminApprovedAt || new Date().toISOString();
+        p.concludedAt = p.concludedAt || new Date().toISOString();
+        anyChanged = true;
+      }
+    }
     if (reconcileProjectFinancials(p)) {
       anyChanged = true;
     }
@@ -1252,7 +1260,7 @@ function updateNavAlertBadges() {
   });
 }
 
-const CURRENT_SYNC_EPOCH = '20260913_v4';
+const CURRENT_SYNC_EPOCH = '20260913_v5';
 
 function alignAppColumns(cols) {
   let list = Array.isArray(cols) && cols.length ? cols.map(c => ({...c})) : INIT_COLS.map(c => ({...c}));

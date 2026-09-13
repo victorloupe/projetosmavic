@@ -608,6 +608,13 @@ function createCardHTML(p, cardIdx=0){
     bellClass = 'approved';
     bellIcon = 'bi-check-circle-fill';
     bellTitle = `✓ Aprovado pelo cliente${p.clientApprovedAt ? ' em ' + new Date(p.clientApprovedAt).toLocaleDateString('pt-BR') : ''}`;
+    bellOnClick = `openApprovalInfoModal(event, ${p.id})`;
+  } else if (isFinalColumn(p.column) || p.column === 'Concluído') {
+    bellClass = 'approved';
+    bellIcon = 'bi-check-circle-fill';
+    const appDate = p.adminApprovedAt || p.concludedAt;
+    bellTitle = `✓ Concluído / Aprovado por você${appDate ? ' em ' + new Date(appDate).toLocaleDateString('pt-BR') : ''}`;
+    bellOnClick = `openApprovalInfoModal(event, ${p.id})`;
   }
 
   const pTimeLogs = p.timeLogs || [];
@@ -898,6 +905,20 @@ function applyColumnChange(p, newCol, suppressToast = false, skipPrompt = false,
     setTimeout(() => {
       openSendReviewModal(p.id);
     }, 150);
+  }
+
+  if (isFinalColumn(newCol) || newCol === 'Concluído') {
+    p.pendingClientRevision = false;
+    if (!p.clientApproved) {
+      p.adminApproved = true;
+      p.adminApprovedAt = p.adminApprovedAt || new Date().toISOString();
+      p.concludedAt = p.concludedAt || new Date().toISOString();
+    }
+  } else if (!isHiddenColumn(newCol)) {
+    if (p.adminApproved && !p.clientApproved) {
+      p.adminApproved = false;
+      p.concludedAt = null;
+    }
   }
 
   if (isHiddenColumn(newCol) || newCol === 'Finalizado') {
@@ -1523,6 +1544,11 @@ function saveProject(){
     reviewNotes: existingProj?.reviewNotes || '',
     tags: (document.getElementById('projTags')?.value || '').split(',').map(s => s.trim()).filter(Boolean),
     column:document.getElementById('projCol').value,
+    clientApproved: existingProj?.clientApproved || false,
+    clientApprovedAt: existingProj?.clientApprovedAt || null,
+    adminApproved: existingProj?.adminApproved || false,
+    adminApprovedAt: existingProj?.adminApprovedAt || null,
+    concludedAt: existingProj?.concludedAt || null,
     date:document.getElementById('projDate').value,
     note:document.getElementById('projNote').value,
     subtasks:tempSubs,
@@ -1530,6 +1556,18 @@ function saveProject(){
     archived:false,
     createdAt:id?(projects.find(x=>x.id===parseInt(id))?.createdAt||Date.now()):Date.now()
   };
+  if (isFinalColumn(pData.column) || pData.column === 'Concluído') {
+    if (!pData.clientApproved) {
+      pData.adminApproved = true;
+      pData.adminApprovedAt = pData.adminApprovedAt || new Date().toISOString();
+      pData.concludedAt = pData.concludedAt || new Date().toISOString();
+    }
+  } else if (!isHiddenColumn(pData.column)) {
+    if (pData.adminApproved && !pData.clientApproved) {
+      pData.adminApproved = false;
+      pData.concludedAt = null;
+    }
+  }
   if (typeof reconcileProjectFinancials === 'function') reconcileProjectFinancials(pData);
   if(id){
     const idx=projects.findIndex(x=>x.id===parseInt(id));
@@ -2802,6 +2840,49 @@ function sendNotification(){
 // ══════════════════════════════════════════
 let tempReviewFiles = [];
 let currentSendReviewPreviewIdx = null;
+
+function openApprovalInfoModal(event, projId) {
+  if (event) event.stopPropagation();
+  const p = projects.find(x => x.id === projId);
+  if (!p) return;
+
+  const isClient = Boolean(p.clientApproved);
+  const title = isClient ? 'Aprovado pelo Cliente' : 'Concluído pelo Escritório';
+  const icon = isClient ? 'bi bi-check-circle-fill' : 'bi bi-check2-circle';
+  const dateStr = p.clientApprovedAt || p.adminApprovedAt || p.concludedAt;
+  const formattedDate = dateStr ? new Date(dateStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Recentemente';
+
+  const msg = `
+    <div style="text-align:left;display:flex;flex-direction:column;gap:12px;font-size:13px;color:var(--text)">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(22,163,74,0.1);border:1px solid rgba(22,163,74,0.3);border-radius:8px">
+        <i class="bi bi-check-circle-fill" style="color:var(--green);font-size:24px;flex-shrink:0"></i>
+        <div>
+          <div style="font-weight:700;font-size:14px;color:var(--green)">
+            ${isClient ? '✓ Aprovado pelo Cliente' : '✓ Concluído / Aprovado por Você'}
+          </div>
+          <div style="font-size:12px;color:var(--text2)">
+            ${isClient ? 'Aprovação confirmada diretamente pelo cliente no portal' : 'Projeto finalizado e marcado como concluído no quadro'}
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--surface2);padding:10px;border-radius:8px;font-size:12px">
+        <div><strong>Projeto:</strong> ${escapeHtml(p.name)}</div>
+        <div><strong>Cliente:</strong> ${escapeHtml(p.client || 'Sem cliente')}</div>
+        <div><strong>Etapa:</strong> ${escapeHtml(p.column || 'Concluído')}</div>
+        <div><strong>Data:</strong> ${formattedDate}</div>
+      </div>
+    </div>
+  `;
+
+  showConfirm(msg, () => {}, {
+    title,
+    icon,
+    okText: 'Fechar',
+    okIcon: 'bi bi-check-lg',
+    danger: false,
+    hideCancel: true
+  });
+}
 
 function toggleSendToClientReview(event, projId) {
   if (event) event.stopPropagation();

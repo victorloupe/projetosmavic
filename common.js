@@ -6,7 +6,8 @@ const INIT_COLS=[
   {id:'Desenvolvimento',icon:'bi-pencil',color:'#ea580c'},
   {id:'Revisão',icon:'bi-search',color:'#2563eb'},
   {id:'Obra',icon:'bi-hammer',color:'#d97706'},
-  {id:'Concluído',icon:'bi-check-circle',color:'#16a34a',isFinal:true}
+  {id:'Concluído',icon:'bi-check-circle',color:'#16a34a',isFinal:true},
+  {id:'Finalizado',icon:'bi-folder',color:'#92623a',isFinal:false,hideClient:true}
 ];
 const DEFAULT_COL_COLOR='#92623a';
 const DEFAULT_COL_ICON='bi-folder';
@@ -1076,6 +1077,7 @@ function reconcileAllProjectsFinancials() {
   if (!Array.isArray(projects)) return false;
   let anyChanged = false;
   const validColIds = (Array.isArray(appColumns) && appColumns.length) ? appColumns.map(c => c.id) : ['Briefing', 'Desenvolvimento', 'Revisão', 'Obra', 'Concluído', 'Finalizado'];
+  if (!validColIds.includes('Finalizado')) validColIds.push('Finalizado');
   projects.forEach(p => {
     if (p.column === 'Alteração' || (p.column && !validColIds.includes(p.column) && !p.archived)) {
       p.column = 'Desenvolvimento';
@@ -1275,12 +1277,18 @@ async function loadData(){
     globalNotices=map.global_notices||(map.global_notice?[map.global_notice]:[]);
     budgets=map.budgets||[];
     services=map.services||[];
-    checkAndMigrateLegacyProducts();
-    reconcileAllProjectsFinancials();
     const cfg=map.config||{};
     appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
+    if (!appColumns.some(c => c.id === 'Finalizado')) {
+      appColumns.push({ id: 'Finalizado', icon: 'bi-folder', color: '#92623a', isFinal: false, hideClient: true });
+    }
     visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
+    if (!visibleColumns.includes('Finalizado')) {
+      visibleColumns.push('Finalizado');
+    }
     minimizedColumns=cfg.minimizedColumns||[];
+    checkAndMigrateLegacyProducts();
+    reconcileAllProjectsFinancials();
     noteTemplates=cfg.noteTemplates?.length?cfg.noteTemplates:INIT_NOTE_TEMPLATES;
     quickMsgs=cfg.quickMsgs?.length?cfg.quickMsgs:INIT_QUICK_MSGS;
     projectTypes=cfg.projectTypes?.length?cfg.projectTypes:INIT_PROJECT_TYPES;
@@ -1304,12 +1312,18 @@ function loadLocal(){
   globalNotices=JSON.parse(localStorage.getItem('mavic_global_notices')||'[]') || [];
   budgets=JSON.parse(localStorage.getItem('mavic_budgets')||'[]') || [];
   services=JSON.parse(localStorage.getItem('mavic_services')||'[]') || [];
-  checkAndMigrateLegacyProducts();
-  reconcileAllProjectsFinancials();
   const cfg=JSON.parse(localStorage.getItem('mavic_config')||'{}') || {};
   appColumns=cfg.columns?.length?cfg.columns:INIT_COLS;
+  if (!appColumns.some(c => c.id === 'Finalizado')) {
+    appColumns.push({ id: 'Finalizado', icon: 'bi-folder', color: '#92623a', isFinal: false, hideClient: true });
+  }
   visibleColumns=cfg.visibleColumns||appColumns.map(c=>c.id);
+  if (!visibleColumns.includes('Finalizado')) {
+    visibleColumns.push('Finalizado');
+  }
   minimizedColumns=cfg.minimizedColumns||[];
+  checkAndMigrateLegacyProducts();
+  reconcileAllProjectsFinancials();
   noteTemplates=cfg.noteTemplates?.length?cfg.noteTemplates:INIT_NOTE_TEMPLATES;
   quickMsgs=cfg.quickMsgs?.length?cfg.quickMsgs:INIT_QUICK_MSGS;
   projectTypes=cfg.projectTypes?.length?cfg.projectTypes:INIT_PROJECT_TYPES;

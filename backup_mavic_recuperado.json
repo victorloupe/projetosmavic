@@ -1,0 +1,1350 @@
+{
+  "version": "2026.09.13_recovered",
+  "exportedAt": "2026-09-13T12:45:49.230Z",
+  "projects": [
+    {
+      "id": 1779108548336,
+      "date": "",
+      "name": "Laura Passos",
+      "note": "",
+      "paid": 450,
+      "type": "Residencial",
+      "image": "https://i.postimg.cc/NMzpq4fx/magnific-fotografia-arquitetonica-3001666711.png",
+      "value": "450.00",
+      "client": "Isabella Vieira",
+      "column": "Finalizado",
+      "product": "Projeto",
+      "archived": false,
+      "payments": [
+        {
+          "id": 1786301243210,
+          "date": "2026-06-05",
+          "amount": 450,
+          "method": "Pix"
+        }
+      ],
+      "priority": "Alta",
+      "products": [
+        {
+          "id": 1786301015234,
+          "name": "Projeto",
+          "price": 450
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1779108521351,
+          "done": true,
+          "text": "Fachada"
+        },
+        {
+          "id": 1779108529911,
+          "done": true,
+          "text": "Gourmet"
+        },
+        {
+          "id": 1779108547458,
+          "done": true,
+          "text": "Suite-Closet-Wc"
+        }
+      ],
+      "createdAt": 1779108548336
+    },
+    {
+      "id": 1779120438295,
+      "date": "",
+      "name": "Loja Samuel",
+      "note": "",
+      "paid": 0,
+      "type": "Comercial",
+      "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRCXne1q93Gb-eKo6oEv3Fy0-6x5r9HUJY0KA&s",
+      "value": "450",
+      "client": "Isabella Vieira",
+      "column": "Briefing",
+      "product": "",
+      "archived": true,
+      "payments": [],
+      "priority": "Alta",
+      "products": [],
+      "subtasks": [],
+      "createdAt": 1779120438295
+    },
+    {
+      "id": 1779120468872,
+      "date": "",
+      "name": "Alt Rancho Samuel",
+      "note": "",
+      "paid": 200,
+      "type": "Residencial",
+      "image": "https://axvliw1bcpyx.objectstorage.sa-vinhedo-1.oci.customer-oci.com/n/axvliw1bcpyx/b/ksi/o/1163/foto_/2025/31393/icem-rural-rancho-aldeia-dos-lagos-16-02-2025_17-25-00-0.webp",
+      "value": "200",
+      "client": "Isabella Vieira",
+      "column": "Finalizado",
+      "product": "",
+      "archived": false,
+      "payments": [
+        {
+          "id": 1779120468873,
+          "date": "2025-01-01",
+          "amount": 200
+        }
+      ],
+      "priority": "Alta",
+      "products": [],
+      "subtasks": [
+        {
+          "id": 1780435450001,
+          "done": true,
+          "text": "Arrumar arm�rio - Ar Condicionado"
+        },
+        {
+          "id": 1780435458197,
+          "done": true,
+          "text": "Renders Novos"
+        }
+      ],
+      "createdAt": 1779120468872
+    },
+    {
+      "id": 1779214302026,
+      "date": "",
+      "name": "Mateus Terli",
+      "note": "",
+      "paid": 350,
+      "type": "Residencial",
+      "image": "https://ygwrpwkkriaeqaeuuxan.supabase.co/storage/v1/object/public/mavic-images/projects/1780068502457.jpeg",
+      "value": "350",
+      "client": "Isabella Vieira",
+      "column": "Finalizado",
+      "product": "",
+      "archived": false,
+      "payments": [
+        {
+          "id": 1779214302027,
+          "date": "2025-01-01",
+          "amount": 350
+        }
+      ],
+      "priority": "Alta",
+      "products": [],
+      "subtasks": [],
+      "createdAt": 1779214302026
+    },
+    {
+      "id": 1783335931093,
+      "date": "",
+      "name": "Hermes & Denise",
+      "note": "",
+      "paid": 0,
+      "type": "Residencial",
+      "image": "",
+      "value": "300.00",
+      "client": "Ramiro Henrique",
+      "column": "Finalizado",
+      "product": "Fachada 3D",
+      "archived": true,
+      "payments": [],
+      "priority": "Alta",
+      "products": [
+        {
+          "id": 1783335922865,
+          "name": "Fachada 3D",
+          "price": 300
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1783456668850,
+          "done": true,
+          "text": "Fachada 3D"
+        }
+      ],
+      "createdAt": 1783335931093
+    },
+    {
+      "id": 1784719207395,
+      "date": "",
+      "name": "Thais Salustiano",
+      "note": "",
+      "paid": 1050,
+      "type": "Residencial",
+      "image": "",
+      "value": 1050,
+      "client": "Isabella Vieira",
+      "column": "Finalizado",
+      "product": "Fachada Residencial, Lavanderia, Sala de TV, Suite",
+      "archived": false,
+      "payments": [
+        {
+          "id": 1785582712482,
+          "date": "2026-08-01",
+          "amount": 250
+        },
+        {
+          "id": 1786834458067,
+          "date": "2026-08-15",
+          "desc": "Parcela",
+          "amount": 800,
+          "method": "Pix"
+        }
+      ],
+      "priority": "Alta",
+      "products": [
+        {
+          "id": 1784719116841,
+          "name": "Fachada Residencial",
+          "price": 350
+        },
+        {
+          "id": 1784719146196,
+          "name": "Lavanderia",
+          "price": 250
+        },
+        {
+          "id": 1784719159305,
+          "name": "Sala de TV",
+          "price": 300
+        },
+        {
+          "id": 1786618826625,
+          "name": "Suite",
+          "price": 150
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1784719167060,
+          "done": true,
+          "text": "Fachada Residencial",
+          "current": false
+        },
+        {
+          "id": 1784719171253,
+          "done": true,
+          "text": "Lavanderia",
+          "current": false
+        },
+        {
+          "id": 1784719174036,
+          "done": true,
+          "text": "Sala de TV",
+          "current": false
+        },
+        {
+          "id": 1785430118262,
+          "done": true,
+          "text": "Executivo",
+          "current": false
+        },
+        {
+          "id": 1786394316663,
+          "done": true,
+          "text": "Suite",
+          "current": false
+        }
+      ],
+      "createdAt": 1784719207395,
+      "driveLink": "https://drive.google.com/drive/folders/1oPXEVbJt9Dv_Eb-MuAk0tG88FGt9j_p0?usp=drive_link"
+    },
+    {
+      "id": 1784719356877,
+      "date": "",
+      "name": "Leticia Gil",
+      "note": "",
+      "paid": 1500,
+      "type": "Outro",
+      "image": "",
+      "value": 1500,
+      "client": "Isabella Vieira",
+      "column": "Finalizado",
+      "product": "Fachada Comercial, Recep��o, Salas de Atendimentos, Lavabo, Wc e Copinha",
+      "archived": false,
+      "payments": [
+        {
+          "id": 1786128591920,
+          "date": "2026-08-07",
+          "amount": 1500
+        }
+      ],
+      "priority": "Alta",
+      "products": [
+        {
+          "id": 1784719238865,
+          "name": "Fachada Comercial",
+          "price": 400
+        },
+        {
+          "id": 1784719259489,
+          "name": "Recep��o",
+          "price": 300
+        },
+        {
+          "id": 1784719282327,
+          "name": "Salas de Atendimentos",
+          "price": 350
+        },
+        {
+          "id": 1784719301047,
+          "name": "Lavabo, Wc e Copinha",
+          "price": 450
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1784719305569,
+          "done": true,
+          "text": "Fachada Comercial",
+          "current": false
+        },
+        {
+          "id": 1784719308292,
+          "done": true,
+          "text": "Recep��o",
+          "current": false
+        },
+        {
+          "id": 1784719325399,
+          "done": true,
+          "text": "Salas de Atendimentos I e II",
+          "current": false
+        },
+        {
+          "id": 1784719334782,
+          "done": true,
+          "text": "Salas de Atendimentos III",
+          "current": false
+        },
+        {
+          "id": 1784719339881,
+          "done": true,
+          "text": "Lavabo",
+          "current": false
+        },
+        {
+          "id": 1784719344936,
+          "done": true,
+          "text": "Wc",
+          "current": false
+        },
+        {
+          "id": 1784719350607,
+          "done": true,
+          "text": "Copinha",
+          "current": false
+        }
+      ],
+      "createdAt": 1784719356877,
+      "driveLink": "https://drive.google.com/drive/folders/1vl8-rQ-SiU292t3aqWci3vNnF4xxRDNo?usp=drive_link",
+      "localPath": "D:\\SERVI�OS\\_PROJETOS VICTOR\\_Isabella Martins\\PROJETOS\\LETICIA GIL",
+      "installments": [],
+      "originBudgetId": null,
+      "selectedFolders": [
+        "02. Renders",
+        "02. Renders/01. Prints",
+        "03. Outros"
+      ],
+      "paymentCondition": "",
+      "originBudgetNumber": null
+    },
+    {
+      "id": 1785355489866,
+      "date": "",
+      "name": "Rotat�ria Ic�m",
+      "note": "",
+      "paid": 400,
+      "type": "Urbanismo",
+      "image": "",
+      "value": 400,
+      "client": "Isabella Vieira",
+      "column": "Finalizado",
+      "product": "Projeto + Executivo",
+      "archived": false,
+      "payments": [
+        {
+          "id": 1786834486687,
+          "date": "2026-08-15",
+          "desc": "Parcela",
+          "amount": 400,
+          "method": "Pix"
+        }
+      ],
+      "priority": "Alta",
+      "products": [
+        {
+          "id": 1785422794899,
+          "name": "Projeto + Executivo",
+          "price": 400
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1785415350621,
+          "done": true,
+          "text": "Render",
+          "current": false
+        },
+        {
+          "id": 1785415356749,
+          "done": true,
+          "text": "Caderno",
+          "current": false
+        }
+      ],
+      "createdAt": 1785355489866,
+      "driveLink": "https://drive.google.com/drive/folders/1jrQDgbwP9s7lX20jQzuHJbx5-6iF-QP6?usp=drive_link"
+    },
+    {
+      "id": 1787340426148,
+      "date": "2026-09-05",
+      "name": "Projeto Casa Praia",
+      "note": "",
+      "paid": 800,
+      "type": "Residencial",
+      "image": "",
+      "value": 800,
+      "client": "Livia Mega",
+      "column": "Alteração",
+      "product": "Projeto 3D (Maquete e Render) (x1), Marca��o de Novos Pontos (El�trica e Hidrossanit�rio) (x1)",
+      "archived": false,
+      "payments": [
+        {
+          "id": 1787347960597,
+          "date": "2026-08-21",
+          "desc": "Quita��o Integral",
+          "amount": 800,
+          "method": "Pix"
+        }
+      ],
+      "priority": "Alta",
+      "products": [
+        {
+          "id": 1787340426148,
+          "name": "Projeto 3D (Maquete e Render) (x1)",
+          "price": 450
+        },
+        {
+          "id": 1787340426149,
+          "name": "Marca��o de Novos Pontos (El�trica e Hidrossanit�rio) (x1)",
+          "price": 350
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1787340426149,
+          "done": true,
+          "text": "Projeto 3D (Maquete e Render)",
+          "current": false
+        },
+        {
+          "id": 1787340426150,
+          "done": true,
+          "text": "Marca��o de Novos Pontos (El�trica e Hidrossanit�rio)",
+          "current": false
+        },
+        {
+          "id": 1787341753638,
+          "done": true,
+          "text": "Executivo Marcenaria",
+          "current": false
+        }
+      ],
+      "createdAt": 1787340426148,
+      "driveLink": "https://drive.google.com/drive/folders/1aaSshndWVdVHAEk7RZ466PxwWcvwt85q?usp=sharing",
+      "localPath": "D:\\SERVI�OS\\PROJETOS MAVIC\\LIVIA MEGA",
+      "installments": [
+        {
+          "id": 1788093441041,
+          "desc": "Pagamento Integral � Vista",
+          "amount": 800,
+          "method": "Pix",
+          "number": 1,
+          "status": "Pago",
+          "dueDate": "2026-08-21",
+          "paidDate": "2026-08-21"
+        }
+      ],
+      "paymentCondition": "vista",
+      "tags": [],
+      "revisions": 1,
+      "revisionLogs": [
+        {
+          "id": 1788100967505,
+          "timestamp": "2026-08-30T14:42:47.505Z",
+          "text": "Mudar a executivo",
+          "author": "Livia Mega"
+        }
+      ],
+      "originBudgetId": null,
+      "revisionsLimit": 2,
+      "selectedFolders": [
+        "03. Executivo",
+        "04. Renders",
+        "04. Renders/01. Prints",
+        "05. Outros",
+        "06. Cliente"
+      ],
+      "originBudgetNumber": null,
+      "pendingClientRevision": true
+    },
+    {
+      "id": 1787690125008,
+      "date": "2026-08-29",
+      "name": "Clinica Thafarel",
+      "note": "",
+      "paid": 0,
+      "type": "Comercial",
+      "image": "",
+      "value": 450,
+      "client": "Isabella Vieira",
+      "column": "Concluído",
+      "product": "Fachada Comercial",
+      "archived": false,
+      "payments": [],
+      "priority": "M�dia",
+      "products": [
+        {
+          "id": 1787690125008,
+          "name": "Fachada Comercial",
+          "price": 450
+        }
+      ],
+      "subtasks": [
+        {
+          "id": 1787690125009,
+          "done": true,
+          "text": "Fachada Comercial",
+          "current": false
+        }
+      ],
+      "createdAt": 1787690125008,
+      "driveLink": "https://drive.google.com/drive/folders/1xWHhSCBN7CF_Eho7y1O-o0LQcLqdeStw?usp=drive_link",
+      "localPath": "D:\\SERVI�OS\\_PROJETOS VICTOR\\_Isabella Martins\\PROJETOS\\CLINICA THAFAREL",
+      "installments": [
+        {
+          "id": 1787690107647,
+          "desc": "Pagamento Integral � Vista",
+          "amount": 450,
+          "method": null,
+          "number": 1,
+          "status": "Pendente",
+          "dueDate": "2026-09-26",
+          "paidDate": null
+        }
+      ],
+      "paymentCondition": "vista",
+      "tags": [],
+      "timeLogs": [],
+      "revisions": 0,
+      "revisionLogs": [],
+      "originBudgetId": null,
+      "revisionsLimit": 2,
+      "selectedFolders": [
+        "05. Renders",
+        "05. Renders/01. Prints",
+        "06. Outros",
+        "07. Cliente"
+      ],
+      "originBudgetNumber": null,
+      "clientApproved": true,
+      "clientApprovedAt": "2026-09-02T03:15:00.688Z"
+    }
+  ],
+  "clients": [
+    {
+      "id": 1001,
+      "name": "Isabella Vieira",
+      "phone": "17997082040",
+      "token": "isa2026",
+      "address": "",
+      "products": [
+        {
+          "id": 2001,
+          "desc": "",
+          "name": "Fachada Residencial",
+          "price": 350
+        },
+        {
+          "id": 2002,
+          "name": "Fachada Comercial",
+          "price": 450
+        },
+        {
+          "id": 2003,
+          "name": "Ambiente Interno",
+          "price": 200
+        },
+        {
+          "id": 2004,
+          "name": "Pacote Completo",
+          "price": 900
+        },
+        {
+          "id": 1779490875485,
+          "name": "Altera��o Simples",
+          "price": 150
+        },
+        {
+          "id": 1779490893882,
+          "name": "Fachada Simples",
+          "price": 350
+        },
+        {
+          "id": 1779490907494,
+          "name": "Projeto Caixa",
+          "price": 300
+        },
+        {
+          "id": 1779490944026,
+          "name": "�rea de Lazer (Piscina/Gourmet)",
+          "price": 350
+        },
+        {
+          "id": 1779490959140,
+          "name": "�rea de Lazer (Piscina/Gourmet) + Fachada Simples",
+          "price": 500
+        },
+        {
+          "id": 1779490967367,
+          "name": "�rea de Lazer (Piscina/Gourmet) + Fachada Elaborada",
+          "price": 550
+        },
+        {
+          "id": 1786734253545,
+          "desc": "",
+          "name": "Recep��o",
+          "price": 300
+        },
+        {
+          "id": 1786734268223,
+          "desc": "",
+          "name": "Salas de Atedimento",
+          "price": 150
+        },
+        {
+          "id": 1786734280643,
+          "desc": "",
+          "name": "Wc",
+          "price": 150
+        },
+        {
+          "id": 1787071183966,
+          "desc": "",
+          "name": "Cozinha/Sala",
+          "price": 300
+        },
+        {
+          "id": 1787071192950,
+          "desc": "",
+          "name": "Suite",
+          "price": 150
+        },
+        {
+          "id": 1787071207449,
+          "desc": "",
+          "name": "Dormitorio",
+          "price": 150
+        },
+        {
+          "id": 1787071240575,
+          "desc": "",
+          "name": "WCs",
+          "price": 200
+        }
+      ]
+    },
+    {
+      "id": 1783335852531,
+      "name": "Ramiro Henrique",
+      "phone": "(17) 99233-2368",
+      "token": "ramiro2026",
+      "address": "",
+      "products": [
+        {
+          "id": 1786368536903,
+          "desc": "",
+          "name": "Galp�o",
+          "price": 250
+        },
+        {
+          "id": 1786369171513,
+          "desc": "",
+          "name": "Projeto",
+          "price": 1500
+        }
+      ]
+    },
+    {
+      "id": 1786301962856,
+      "name": "Lucas Furlan",
+      "token": "rzzs9d97nq5f",
+      "products": [
+        {
+          "id": 1786301977975,
+          "desc": "",
+          "name": "Fachada 3D",
+          "price": 450
+        }
+      ]
+    },
+    {
+      "id": 1787336649150,
+      "doc": "",
+      "name": "Livia Mega",
+      "email": "",
+      "phone": "(11) 98589-5164",
+      "token": "livia2026",
+      "address": "",
+      "products": [
+        {
+          "id": 1787336741125,
+          "desc": "Sala de Tv e Estar + Cozinha + WC + Lavanderia",
+          "name": "Projeto 3D Interno",
+          "price": 400
+        },
+        {
+          "id": 1787336923248,
+          "desc": "Pontos de El�trica  e Pontos Hidrossanat�rio",
+          "name": "Projeto Executivo",
+          "price": 250
+        }
+      ]
+    }
+  ],
+  "budgets": [
+    {
+      "id": 1786735455211,
+      "date": "2026-08-14",
+      "items": [
+        {
+          "id": 1786734055112,
+          "qty": 1,
+          "desc": "Fachada Comercial",
+          "note": "",
+          "price": 450
+        },
+        {
+          "id": 1786734253545,
+          "qty": 1,
+          "desc": "Recep��o",
+          "note": "",
+          "price": 300
+        },
+        {
+          "id": 1786734268223,
+          "qty": 1,
+          "desc": "Salas de Atedimento",
+          "note": "",
+          "price": 450
+        },
+        {
+          "id": 1786734280643,
+          "qty": 1,
+          "desc": "Wc",
+          "note": "",
+          "price": 150
+        }
+      ],
+      "notes": "",
+      "title": "Clinica Thafarel",
+      "total": 1350,
+      "client": "Isabella Vieira",
+      "number": 25,
+      "status": "Pendente",
+      "discount": 0,
+      "validUntil": "2026-08-29",
+      "projectType": "Comercial"
+    },
+    {
+      "id": 1787071301468,
+      "date": "2026-08-18",
+      "items": [
+        {
+          "id": 1787071160161,
+          "qty": 1,
+          "desc": "Fachada Residencial",
+          "note": "",
+          "price": 350
+        },
+        {
+          "id": 1787071183966,
+          "qty": 1,
+          "desc": "Cozinha/Sala",
+          "note": "",
+          "price": 250
+        },
+        {
+          "id": 1787071192950,
+          "qty": 1,
+          "desc": "Suite",
+          "note": "",
+          "price": 150
+        },
+        {
+          "id": 1787071207449,
+          "qty": 1,
+          "desc": "Dormitório",
+          "note": "",
+          "price": 150
+        },
+        {
+          "id": 1787071240575,
+          "qty": 1,
+          "desc": "WCs",
+          "note": "",
+          "price": 200
+        }
+      ],
+      "notes": "",
+      "title": "Proj. Lucas",
+      "total": 1100,
+      "client": "Isabella Vieira",
+      "number": 1126,
+      "status": "Pendente",
+      "discount": 0,
+      "validUntil": "2026-09-02",
+      "attachments": [],
+      "projectType": "Residencial",
+      "showAttachments": false
+    },
+    {
+      "id": 1787336970266,
+      "date": "2026-08-21",
+      "items": [
+        {
+          "id": 1787336741125,
+          "qty": 1,
+          "desc": "Projeto 3D (Maquete e Render)",
+          "note": "Sala de Tv e Jantar + Cozinha + WC e Lavanderia",
+          "price": 450
+        },
+        {
+          "id": 1787336923248,
+          "qty": 1,
+          "desc": "Marcação de Novos Pontos (Elétrica e Hidrossanitário)",
+          "note": "Cozinha + Wc e Lavanderia",
+          "price": 350
+        }
+      ],
+      "notes": "1. FORMA DE PAGAMENTO:\n• 50% no ato do pedido e 50% no ato da entrega.\n• Pagamento em mais vezes consultar.\nTEMPO DE PRODUÇÃO:\n• A consultar.\n2. PRODUÇÃO:\n• Os itens acima fazem parte de um orçamento ao todo, não sendo possível a execução de somente um item ou mais separadamente.\n• Os Itens com * se torna opcional, porém se torna necessário realizar os anteriores.",
+      "title": "Projeto Casa Praia",
+      "total": 800,
+      "client": "Livia Mega",
+      "number": 1127,
+      "status": "Convertido",
+      "discount": 0,
+      "validUntil": "2026-09-05",
+      "attachments": [],
+      "projectType": "Residencial",
+      "showAttachments": false
+    }
+  ],
+  "services": [
+    {
+      "id": 2001,
+      "desc": "",
+      "name": "Fachada Residencial",
+      "price": 350,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 2002,
+      "desc": "",
+      "name": "Fachada Comercial",
+      "price": 450,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 2003,
+      "desc": "",
+      "name": "Ambiente Interno",
+      "price": 200,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 2004,
+      "desc": "",
+      "name": "Pacote Completo",
+      "price": 900,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1779490875485,
+      "desc": "",
+      "name": "Altera��o Simples",
+      "price": 150,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1779490893882,
+      "desc": "",
+      "name": "Fachada Simples",
+      "price": 350,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1779490907494,
+      "desc": "",
+      "name": "Projeto Caixa",
+      "price": 300,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1779490944026,
+      "desc": "",
+      "name": "�rea de Lazer (Piscina/Gourmet)",
+      "price": 350,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1779490959140,
+      "desc": "",
+      "name": "�rea de Lazer (Piscina/Gourmet) + Fachada Simples",
+      "price": 500,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1779490967367,
+      "desc": "",
+      "name": "�rea de Lazer (Piscina/Gourmet) + Fachada Elaborada",
+      "price": 550,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1784719146196,
+      "desc": "",
+      "name": "Lavanderia",
+      "price": 250,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1784719159305,
+      "desc": "",
+      "name": "Sala de TV",
+      "price": 300,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1784719282327,
+      "desc": "",
+      "name": "Salas de Atendimentos",
+      "price": 350,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1784719301047,
+      "desc": "",
+      "name": "Lavabo, Wc e Copinha",
+      "price": 450,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1785422794899,
+      "desc": "",
+      "name": "Projeto + Executivo",
+      "price": 400,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1786301977975,
+      "desc": "",
+      "name": "Fachada 3D",
+      "price": 450,
+      "category": "Geral",
+      "clientIds": [
+        1786301962856
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1786368536903,
+      "desc": "",
+      "name": "Galp�o",
+      "price": 250,
+      "category": "Geral",
+      "clientIds": [
+        1783335852531
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1786369171513,
+      "desc": "",
+      "name": "Projeto",
+      "price": 1500,
+      "category": "Geral",
+      "clientIds": [
+        1783335852531
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1786618826625,
+      "desc": "",
+      "name": "Suite",
+      "price": 150,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1786734253545,
+      "desc": "",
+      "name": "Recep��o",
+      "price": 300,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1786734268223,
+      "desc": "",
+      "name": "Salas de Atedimento",
+      "price": 150,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1786734280643,
+      "desc": "",
+      "name": "Wc",
+      "price": 150,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1789241093790,
+      "targetType": "selected"
+    },
+    {
+      "id": 1787071183966,
+      "desc": "",
+      "name": "Cozinha/Sala",
+      "price": 300,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1787142443117,
+      "targetType": "selected"
+    },
+    {
+      "id": 1787071207449,
+      "desc": "Dormit�rio",
+      "name": "Dormit�rio",
+      "price": 150,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1787142443117,
+      "targetType": "selected"
+    },
+    {
+      "id": 1787071240575,
+      "desc": "",
+      "name": "WCs",
+      "price": 200,
+      "category": "Geral",
+      "clientIds": [
+        1001
+      ],
+      "createdAt": 1787142443117,
+      "targetType": "selected"
+    },
+    {
+      "id": 1787336741125,
+      "desc": "Sala de Tv e Jantar + Cozinha + WC e Lavanderia",
+      "name": "Projeto 3D (Maquete e Render)",
+      "price": 400,
+      "category": "Geral",
+      "clientIds": [
+        1787336649150
+      ],
+      "createdAt": 1787339864569,
+      "targetType": "selected"
+    },
+    {
+      "id": 1787336923248,
+      "desc": "Cozinha + Wc e Lavanderia",
+      "name": "Marca��o de Novos Pontos (El�trica e Hidrossanit�rio)",
+      "price": 300,
+      "category": "Geral",
+      "clientIds": [
+        1787336649150
+      ],
+      "createdAt": 1787339864569,
+      "targetType": "selected"
+    },
+    {
+      "id": 1787340426148,
+      "desc": "",
+      "name": "Projeto 3D (Maquete e Render) (x1)",
+      "price": 450,
+      "category": "Geral",
+      "clientIds": [
+        1787336649150
+      ],
+      "createdAt": 1787340428815,
+      "targetType": "selected"
+    },
+    {
+      "id": 1787340426149,
+      "desc": "",
+      "name": "Marca��o de Novos Pontos (El�trica e Hidrossanit�rio) (x1)",
+      "price": 350,
+      "category": "Geral",
+      "clientIds": [
+        1787336649150
+      ],
+      "createdAt": 1787340428815,
+      "targetType": "selected"
+    }
+  ],
+  "notifications": [
+    {
+      "id": 1780359465734,
+      "read": false,
+      "title": "Etapa Concluída",
+      "message": "Etapa concluída com sucesso! ✅",
+      "createdAt": "2026-06-02T00:17:45.734Z",
+      "clientToken": "mavic2026isa",
+      "projectName": "Laura Passos"
+    },
+    {
+      "id": 1780519596501,
+      "read": false,
+      "title": "Andamento do Projeto",
+      "message": "Projeto em andamento! Em breve temos novidades.",
+      "createdAt": "2026-06-03T20:46:36.501Z",
+      "clientToken": "mavic2026isa",
+      "projectName": "Alt Rancho Samuel"
+    }
+  ],
+  "global_notices": [
+    {
+      "id": 1780359374106,
+      "active": true,
+      "readBy": [],
+      "message": "*Prezado cliente,*\n\n          Informamos que, a partir de agora, passaremos a utilizar geração de imagens por Inteligência Artificial em nossos projetos. Com essa atualização, os valores serão revistos para cobrir o custo de ferramentas externas que antes não faziam parte do nosso fluxo de trabalho.\nSobre as imagens geradas por IA:\n          As imagens produzidas por IA podem conter *pequenos erros ou imperfeições*, especialmente quando ocorrem alterações após a sua geração. *Por isso, pedimos que o material seja revisado e aprovado pelo cliente antes da finalização*, evitando retrabalho e garantindo a qualidade do resultado.\nResumo das mudanças:\n\n*Uso de ferramentas de IA para geração de imagens*\n• Reajuste nos valores dos projetos para cobrir os custos dessas ferramentas\n• Aprovação prévia do cliente antes da geração das imagens\n\nFicamos à disposição para esclarecer qualquer dúvida. Nosso objetivo é continuar entregando projetos com qualidade e transparência.\nAtenciosamente,\n*Equipe MAVIC*",
+      "createdAt": "2026-06-02T00:16:14.106Z",
+      "targetAll": true,
+      "targetClients": []
+    }
+  ],
+  "config": {
+    "columns": [
+      {
+        "id": "Briefing",
+        "icon": "bi-clipboard",
+        "color": "#92623a",
+        "isFinal": false,
+        "hideClient": false
+      },
+      {
+        "id": "Desenvolvimento",
+        "icon": "bi-pencil",
+        "color": "#ea580c",
+        "isFinal": false,
+        "hideClient": false
+      },
+      {
+        "id": "Revisão",
+        "icon": "bi-search",
+        "color": "#2563eb",
+        "isFinal": false,
+        "hideClient": false
+      },
+      {
+        "id": "Obra",
+        "icon": "bi-hammer",
+        "color": "#d97706",
+        "isFinal": false,
+        "hideClient": false
+      },
+      {
+        "id": "Concluído",
+        "icon": "bi-check-circle",
+        "color": "#16a34a",
+        "isFinal": true,
+        "hideClient": false
+      },
+      {
+        "id": "Finalizado",
+        "icon": "bi-folder",
+        "color": "#92623a",
+        "isFinal": false,
+        "hideClient": true
+      }
+    ],
+    "visibleColumns": [
+      "Briefing",
+      "Desenvolvimento",
+      "Revisão",
+      "Obra",
+      "Concluído",
+      "Finalizado"
+    ],
+    "minimizedColumns": [
+      "Finalizado"
+    ],
+    "noteTemplates": [
+      {
+        "id": "padrao",
+        "text": "1. FORMA DE PAGAMENTO:\n• 50% no ato do pedido e 50% no ato da entrega.\n• Pagamento em mais vezes consultar.\nTEMPO DE PRODUÇÃO:\n• A consultar.\n2. PRODUÇÃO:\n• Os itens acima fazem parte de um orçamento ao todo, não sendo possível a execução de somente um item ou mais separadamente.\n• Os Itens com * se torna opcional, porém se torna necessário realizar os anteriores.",
+        "title": "Padrão MAVIC (50% entrada + 50% entrega, prod. a consultar)"
+      },
+      {
+        "id": "vista",
+        "text": "1. FORMA DE PAGAMENTO:\n• 100% no ato do pedido (com 5% de desconto incluso).\nTEMPO DE PRODUÇÃO:\n• A consultar.",
+        "title": "Pagamento à Vista (100% no pedido, 5% desconto)"
+      },
+      {
+        "id": "parcelado",
+        "text": "1. FORMA DE PAGAMENTO:\n• Entrada de 40% + saldo em até 3x sem juros no cartão de crédito.\nTEMPO DE PRODUÇÃO:\n• A consultar.",
+        "title": "Parcelado (40% entrada + 3x sem juros no cartão)"
+      }
+    ],
+    "quickMsgs": [
+      {
+        "msg": "Projeto em andamento! Em breve temos novidades.",
+        "title": "Andamento do Projeto"
+      },
+      {
+        "msg": "Precisamos de sua aprovação para avançar.",
+        "title": "Aprovação Necessária"
+      },
+      {
+        "msg": "Documentos pendentes — por favor entre em contato.",
+        "title": "Documentos Pendentes"
+      },
+      {
+        "msg": "Etapa concluída com sucesso! ✅",
+        "title": "Etapa Concluída"
+      },
+      {
+        "msg": "Pagamento confirmado. Obrigado!",
+        "title": "Pagamento Confirmado"
+      },
+      {
+        "msg": "Prazo atualizado. Verifique as datas no painel.",
+        "title": "Prazo Atualizado"
+      }
+    ],
+    "projectTypes": [
+      {
+        "id": "Residencial",
+        "color": "#2563eb"
+      },
+      {
+        "id": "Comercial",
+        "color": "#7c3aed"
+      },
+      {
+        "id": "Estrutural",
+        "color": "#d97706"
+      },
+      {
+        "id": "Urbanismo",
+        "color": "#0d9488"
+      },
+      {
+        "id": "Outro",
+        "color": "#71717a"
+      }
+    ],
+    "waTemplate": "Olá, *{Cliente}*!\n\n*{Projeto}*\n\n*Etapa:* {Etapa}\n*Prazo:* {Prazo}\n*Valor contratado:* {ValorTotal}\n*Pago:* {ValorPago} | *Pendente:* {SaldoPendente}\n{TarefaAtual}\n{Observacao}\n\n_Equipe MAVIC Projetos_",
+    "companyName": "MAVIC - Estudio 3D",
+    "companyDoc": "350.605.018-41",
+    "pixKey": "350.605.018-41",
+    "pixName": "Victor Lourenço Pereira",
+    "pixBank": "Nu Pagamentos"
+  }
+}

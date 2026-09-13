@@ -1353,7 +1353,7 @@ async function syncCloud(){
   if(!sb){setSync('off');return;}
   setSync('sync');
   try{
-    await sb.from('mavic_store').upsert([
+    const { error } = await sb.from('mavic_store').upsert([
       {key:'projects',data:projects},{key:'clients',data:clients},
       {key:'notifications',data:notifications},
       {key:'global_notices',data:globalNotices},
@@ -1375,11 +1375,12 @@ async function syncCloud(){
         pixBank:localStorage.getItem('mavic_pixBank')||''
       }}
     ],{onConflict:'key'});
+    if (error) throw error;
     sessionStorage.setItem('mavic_last_local_save', String(Date.now()));
     localStorage.removeItem('mavic_pending_sync');
     setSync('ok');
     updateNavAlertBadges();
-  }catch(e){setSync('off');}
+  }catch(e){console.warn('Sync failed',e);setSync('off');}
 }
 
 function setSync(s){

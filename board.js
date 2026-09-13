@@ -293,6 +293,11 @@ function renderBoard(){
 
   renderBoardColPills(columnsWithCounts, total);
 
+  if (activeMobileCol !== 'all' && !visibleCols.some(c => c.id === activeMobileCol)) {
+    activeMobileCol = 'all';
+    sessionStorage.setItem('board_active_col', 'all');
+  }
+
   const colsToRender = (isMobile && activeMobileCol !== 'all')
     ? visibleCols.filter(c => c.id === activeMobileCol)
     : visibleCols;
@@ -2865,7 +2870,7 @@ function openApprovalInfoModal(event, projId) {
           </div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--surface2);padding:10px;border-radius:8px;font-size:12px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;background:var(--surface2);padding:10px;border-radius:8px;font-size:12px">
         <div><strong>Projeto:</strong> ${escapeHtml(p.name)}</div>
         <div><strong>Cliente:</strong> ${escapeHtml(p.client || 'Sem cliente')}</div>
         <div><strong>Etapa:</strong> ${escapeHtml(p.column || 'Concluído')}</div>

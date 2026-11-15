@@ -20,17 +20,31 @@ DROP POLICY IF EXISTS "Permitir escrita anonima" ON public.mavic_store;
 DROP POLICY IF EXISTS "Admin acesso total" ON public.mavic_store;
 DROP POLICY IF EXISTS "Allow authenticated full access" ON public.mavic_store;
 DROP POLICY IF EXISTS "Permitir acesso total publico" ON public.mavic_store;
+DROP POLICY IF EXISTS "Permitir tudo no mavic_store" ON public.mavic_store;
+DROP POLICY IF EXISTS "allow_all" ON public.mavic_store;
 
--- 4. Cria política de acesso para a aplicação (leitura e escrita)
-CREATE POLICY "Permitir acesso total publico"
+-- 4. Política de acesso: SOMENTE usuários logados no Supabase Auth (painel administrativo).
+--    O Portal do Cliente NÃO acessa esta tabela: ele passa pela Edge Function `cliente-data`,
+--    que usa a service role no servidor (a service role ignora RLS).
+--    A chave anon (pública, visível no config.js) não consegue mais ler nem gravar nada.
+CREATE POLICY "Admin autenticado acesso total"
 ON public.mavic_store
 FOR ALL
-TO public
+TO authenticated
 USING (true)
 WITH CHECK (true);
 
 -- 5. Habilita publicação em Realtime para atualizações automáticas entre abas e dispositivos
-ALTER PUBLICATION supabase_realtime ADD TABLE public.mavic_store;
+-- (idempotente: não dá erro se a tabela já estiver na publicação)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'mavic_store'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.mavic_store;
+  END IF;
+END $$;
 
 
 -- ==============================================================================
@@ -43,7 +57,7 @@ INSERT INTO storage.buckets (id, name, public, file_size_limit)
 VALUES ('mavic_files', 'mavic_files', true, 104857600)
 ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = 104857600;
 
--- Remove TODAS as políticas antigas ou conflitantes do Storage para o bucket mavic_files
+-- Remove TODAS as políticas antigas ou conflitantes (inclusive as públicas) do Storage para o bucket mavic_files
 DROP POLICY IF EXISTS "Storage Leitura Publica" ON storage.objects;
 DROP POLICY IF EXISTS "Storage Upload Autenticado" ON storage.objects;
 DROP POLICY IF EXISTS "Storage Update Autenticado" ON storage.objects;
@@ -57,26 +71,40 @@ DROP POLICY IF EXISTS "mavic_files_public_select" ON storage.objects;
 DROP POLICY IF EXISTS "mavic_files_public_insert" ON storage.objects;
 DROP POLICY IF EXISTS "mavic_files_public_update" ON storage.objects;
 DROP POLICY IF EXISTS "mavic_files_public_delete" ON storage.objects;
+DROP POLICY IF EXISTS "allow_all_images" ON storage.objects;
 
--- Políticas explícitas para SELECT, INSERT, UPDATE, DELETE no bucket mavic_files
--- Permite upload e visualização de fotos, renders de revisão e pranchas PDF
-CREATE POLICY "mavic_files_public_select"
+-- Políticas do bucket mavic_files:
+-- * O bucket continua PÚBLICO: links de imagens/PDFs (getPublicUrl) seguem abrindo para o cliente.
+--   URLs públicas não passam por estas políticas.
+-- * Listar, enviar, substituir e apagar arquivos: somente usuários autenticados (painel admin).
+DROP POLICY IF EXISTS "mavic_files_auth_select" ON storage.objects;
+DROP POLICY IF EXISTS "mavic_files_auth_insert" ON storage.objects;
+DROP POLICY IF EXISTS "mavic_files_auth_update" ON storage.objects;
+DROP POLICY IF EXISTS "mavic_files_auth_delete" ON storage.objects;
+
+CREATE POLICY "mavic_files_auth_select"
 ON storage.objects FOR SELECT
-TO public
+TO authenticated
 USING (bucket_id = 'mavic_files');
 
-CREATE POLICY "mavic_files_public_insert"
+CREATE POLICY "mavic_files_auth_insert"
 ON storage.objects FOR INSERT
-TO public
+TO authenticated
 WITH CHECK (bucket_id = 'mavic_files');
 
-CREATE POLICY "mavic_files_public_update"
+CREATE POLICY "mavic_files_auth_update"
 ON storage.objects FOR UPDATE
-TO public
+TO authenticated
 USING (bucket_id = 'mavic_files')
 WITH CHECK (bucket_id = 'mavic_files');
 
-CREATE POLICY "mavic_files_public_delete"
+CREATE POLICY "mavic_files_auth_delete"
 ON storage.objects FOR DELETE
-TO public
+TO authenticated
 USING (bucket_id = 'mavic_files');
+
+-- ==============================================================================
+-- 7. Desativar cadastro público no Supabase Auth (fazer no painel, não é SQL):
+--    Authentication → Sign In / Providers → desmarque "Allow new users to sign up".
+--    Sem isso, qualquer pessoa poderia criar uma conta e virar "authenticated".
+-- ==============================================================================

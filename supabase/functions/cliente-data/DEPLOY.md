@@ -53,3 +53,22 @@ Nada de visível. O painel continua igual. A diferença é que agora:
 - O token é validado no servidor (não pode ser bypassado)
 - Cada cliente recebe apenas seus próprios dados
 - A chave do Supabase não aparece mais no código do browser
+
+---
+
+## Atualização de segurança (nov/2026) — ORDEM OBRIGATÓRIA
+
+O banco deixou de ser público. Faça nesta ordem para não derrubar o portal:
+
+1. **Republicar esta Edge Function** com o `index.ts` atualizado
+   (Edge Functions → `cliente-data` → editar → colar → Deploy).
+   Mudanças: token agora é obrigatório, aprovação/ajuste corrigidos, notificação de ajuste para o painel.
+2. **Publicar o site** (push para a Vercel) com o novo `cliente.js` — o portal passa a usar só esta função.
+3. **Testar o portal** com o link de um cliente (abrir, aprovar/solicitar ajuste em um projeto de teste).
+4. **Desativar cadastro público**: Authentication → Sign In / Providers → desmarcar "Allow new users to sign up".
+5. **Rodar `supabase/schema_and_rls.sql`** no SQL Editor (fecha a tabela `mavic_store` e o Storage para quem não está logado).
+6. **Testar o painel**: sair e entrar de novo no login, abrir o quadro, mover um card, enviar uma imagem.
+
+Se algo der errado no passo 6, o painel volta a funcionar rodando temporariamente no SQL Editor:
+`CREATE POLICY "tmp_publico" ON public.mavic_store FOR ALL TO public USING (true) WITH CHECK (true);`
+(e apague essa política depois de corrigir).

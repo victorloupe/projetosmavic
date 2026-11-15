@@ -207,16 +207,12 @@ const params=new URLSearchParams(window.location.search);
 clientName=(params.get('nome')||'').trim();
 clientToken=(params.get('token')||'').trim();
 
-let sbClient = null;
-function getSupabaseClient() {
-  if (!sbClient && typeof window.supabase !== 'undefined' && typeof SB_URL !== 'undefined' && typeof SB_KEY !== 'undefined') {
-    try {
-      sbClient = window.supabase.createClient(SB_URL, SB_KEY);
-    } catch (e) {
-      console.warn('Erro ao inicializar Supabase:', e);
-    }
-  }
-  return sbClient;
+// O portal NUNCA acessa o banco diretamente: tudo passa pela Edge Function,
+// que valida o token no servidor e devolve só os dados deste cliente.
+function edgeHeaders(extra){
+  const h = Object.assign({}, extra || {});
+  if (typeof SB_KEY !== 'undefined' && SB_KEY) { h['apikey'] = SB_KEY; h['Authorization'] = 'Bearer ' + SB_KEY; }
+  return h;
 }
 
 // ══════════════════════════════════════════
@@ -247,49 +243,19 @@ async function loadData(){
 
   let loaded = false;
 
-  // 1. Tenta carregar direto do banco Supabase
-  const sb = getSupabaseClient();
-  if (sb) {
-    try {
-      const { data, error } = await sb.from('mavic_store').select('key,data');
-      if (!error && data && data.length) {
-        const store = {};
-        data.forEach(r => store[r.key] = r.data);
-        const allClients = store.clients || [];
-        const cli = allClients.find(c => (c.name || '').toLowerCase().trim() === clientName.toLowerCase().trim());
-        if (cli) {
-          const allProjects = store.projects || [];
-          projects = allProjects.filter(p => (p.client || '').toLowerCase().trim() === clientName.toLowerCase().trim());
-          const allNotifs = store.notifications || [];
-          notifications = allNotifs.filter(n => n.clientToken === cli.token);
-          const allGlobal = store.global_notices || [];
-          globalNotices = allGlobal.filter(gn => gn.active && (gn.targetAll || (gn.targetClients || []).some(n => (n||'').toLowerCase() === clientName.toLowerCase().trim())));
-          
-          const cfg = store.config || {};
-          appColumns = alignClientColumns(cfg.columns);
-          if (cfg.projectTypes?.length) projectTypes = cfg.projectTypes;
-          applyTheme(cfg.theme || localStorage.getItem('mavic_theme') || 'light');
-          clientDoc = cli.doc || '';
-          clientAddress = cli.address || '';
-          companyName = cfg.companyName || 'MAVIC Arquitetura e Engenharia';
-          companyDoc = cfg.companyDoc || '';
-          pixKey = cfg.pixKey || '';
-          pixName = cfg.pixName || '';
-          pixBank = cfg.pixBank || '';
-          loaded = true;
-        }
-      }
-    } catch (err) {
-      console.warn('Erro ao ler do Supabase, tentando Edge Function:', err);
-    }
-  }
-
-  // 2. Se não carregou do Supabase, tenta Edge Function
+  // 1. Carrega pela Edge Function (validação de token no servidor)
   if (!loaded) {
     try{
       const url=`${EDGE_FN}?nome=${encodeURIComponent(clientName)}${clientToken?'&token='+encodeURIComponent(clientToken):''}`;
-      const res=await fetch(url);
-      const payload=await res.json();
+      const res=await fetch(url,{headers:edgeHeaders()});
+      const payload=await res.json().catch(()=>({}));
+
+      if(res.status===401 || res.status===404){
+        if(rIcon) rIcon.classList.remove('spinning');
+        if(res.status===401) showError('bi-shield-lock','Link inválido ou expirado','Este link de acesso não é mais válido. Peça um novo link ao escritório.');
+        else showError('bi-person-x','Cliente não encontrado','Não encontramos projetos para este link. Confira o endereço ou fale com o escritório.');
+        return;
+      }
 
       if(res.ok){
         projects      = payload.projects      || [];
@@ -313,7 +279,7 @@ async function loadData(){
     }
   }
 
-  // 3. Fallback de cache local
+  // 2. Fallback de cache local (sem conexão)
   if (!loaded) {
     projects      = JSON.parse(localStorage.getItem('mavic_projects_'+clientName)||'[]');
     notifications = JSON.parse(localStorage.getItem('mavic_notifications_'+clientName)||'[]');
@@ -344,14 +310,14 @@ async function postEdgeFn(body){
   try{
     const res = await fetch(EDGE_FN,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:edgeHeaders({'Content-Type':'application/json'}),
       body:JSON.stringify({...body, nome:clientName, token:clientToken})
     });
     return !!(res && res.ok);
   }catch(e){console.warn('Falha ao sincronizar com Edge Function:', e); return false;}
 }
 
-// Retorna true se a mudança chegou ao servidor (Supabase direto ou Edge Function).
+// Retorna true se a mudança chegou ao servidor (via Edge Function).
 async function syncProjectChangeToServer(updatedProj) {
   let remoteOk = false;
 
@@ -383,58 +349,13 @@ async function syncProjectChangeToServer(updatedProj) {
     console.warn('Erro ao atualizar localStorage:', e);
   }
 
-  // 3. Atualiza diretamente no banco Supabase
-  const sb = getSupabaseClient();
-  if (sb) {
-    try {
-      const { data, error } = await sb.from('mavic_store').select('key,data');
-      if (!error && data) {
-        const pRow = data.find(r => r.key === 'projects');
-        if (pRow && Array.isArray(pRow.data)) {
-          const allProjs = pRow.data;
-          const pIdx = allProjs.findIndex(x => x.id === updatedProj.id);
-          if (pIdx >= 0) {
-            allProjs[pIdx] = {
-              ...allProjs[pIdx],
-              column: updatedProj.column,
-              revisions: updatedProj.revisions !== undefined ? updatedProj.revisions : allProjs[pIdx].revisions,
-              revisionLogs: updatedProj.revisionLogs || allProjs[pIdx].revisionLogs,
-              clientApproved: updatedProj.clientApproved !== undefined ? updatedProj.clientApproved : allProjs[pIdx].clientApproved,
-              clientApprovedAt: updatedProj.clientApprovedAt || allProjs[pIdx].clientApprovedAt
-            };
-
-            const upsertPayload = [{ key: 'projects', data: allProjs }];
-
-            if (updatedProj.column === 'Desenvolvimento' && updatedProj.notes) {
-              const notifRow = data.find(r => r.key === 'notifications');
-              const notifList = (notifRow && Array.isArray(notifRow.data)) ? [...notifRow.data] : [];
-              notifList.push({
-                id: Date.now(),
-                title: 'Ajuste Solicitado pelo Cliente',
-                message: `O cliente ${clientName} solicitou alteração no projeto "${allProjs[pIdx].name}": "${updatedProj.notes}"`,
-                projectName: allProjs[pIdx].name,
-                createdAt: new Date().toISOString(),
-                read: false
-              });
-              upsertPayload.push({ key: 'notifications', data: notifList });
-            }
-
-            const { error: upErr } = await sb.from('mavic_store').upsert(upsertPayload, { onConflict: 'key' });
-            if (!upErr) remoteOk = true;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Erro no sync direto com Supabase:', e);
-    }
-  }
-
-  // 4. Também notifica via Edge Function
+  // 3. Grava no servidor via Edge Function (única via de escrita do portal)
   try {
     const edgeOk = await postEdgeFn({
-      action: updatedProj.column === 'Desenvolvimento' ? 'request_revision' : 'approve_project',
+      action: updatedProj.clientApproved === true ? 'approve_project' : 'request_revision',
       projectId: updatedProj.id,
-      notes: updatedProj.notes
+      notes: updatedProj.notes,
+      pins: updatedProj.pins
     });
     if (edgeOk) remoteOk = true;
   } catch (e) {}

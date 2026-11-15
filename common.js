@@ -773,7 +773,11 @@ window.CLIENT_PANEL_URL=localStorage.getItem('mavic_clientUrl')||'cliente.html';
 // Compartilhado por todas as páginas que geram/copiam o link do cliente
 // (Board, Clientes, etc.) — antes só existia em clientes.js, quebrando
 // os botões de WhatsApp/compartilhar em páginas que não carregam esse arquivo.
-function genTokenStr(){return Math.random().toString(36).substring(2,10)+Math.random().toString(36).substring(2,6);}
+// Token do portal do cliente: aleatório criptográfico (não usar Math.random para segredos)
+function genTokenStr(){
+  if(window.crypto&&crypto.getRandomValues){const b=new Uint8Array(16);crypto.getRandomValues(b);return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');}
+  return Math.random().toString(36).substring(2,10)+Math.random().toString(36).substring(2,10)+Math.random().toString(36).substring(2,10);
+}
 function buildLink(name,token){return `${window.CLIENT_PANEL_URL}?nome=${encodeURIComponent(name)}&token=${token}`;}
 if(localStorage.getItem('mavic_pixKey')===null){
   localStorage.setItem('mavic_pixKey','350.605.018-41');
@@ -1166,52 +1170,7 @@ function initSupabase(){
   return false;
 }
 
-let sbRealtimeSubscribed = false;
-function setupSupabaseRealtime() {
-  if (!sb || sbRealtimeSubscribed) return;
-  try {
-    sb.channel('mavic_store_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mavic_store' }, async (payload) => {
-        const lastLocalSave = parseInt(sessionStorage.getItem('mavic_last_local_save') || '0', 10);
-        if (Date.now() - lastLocalSave < 2500) return;
-
-        try {
-          const { data, error } = await sb.from('mavic_store').select('key,data');
-          if (!error && data) {
-            const map = {};
-            data.forEach(r => map[r.key] = r.data);
-            projects = map.projects || [];
-            clients = map.clients || [];
-            notifications = map.notifications || [];
-            globalNotices = map.global_notices || (map.global_notice ? [map.global_notice] : []);
-            budgets = map.budgets || [];
-            services = map.services || [];
-            checkAndMigrateLegacyProducts();
-            reconcileAllProjectsFinancials();
-            syncLocal();
-            updateNavAlertBadges();
-
-            if (typeof renderBoard === 'function') renderBoard();
-            if (typeof renderDashboard === 'function') renderDashboard();
-            if (typeof renderOrcamentos === 'function') renderOrcamentos();
-            if (typeof renderPagamentos === 'function') { renderPagamentos(); if (typeof renderPendingInstallments === 'function') renderPendingInstallments(); }
-            if (typeof renderServicos === 'function') { if (typeof updateServKPIs === 'function') updateServKPIs(); renderServicos(); }
-            if (typeof renderRelatorios === 'function') renderRelatorios();
-            if (typeof renderClientList === 'function') renderClientList();
-          }
-        } catch (e) {
-          console.warn('[Realtime] Falha ao recarregar dados', e);
-        }
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          sbRealtimeSubscribed = true;
-        }
-      });
-  } catch (err) {
-    console.warn('[Realtime] Falha ao configurar canal', err);
-  }
-}
+// Realtime e sincronização por registro: ver sync.js
 
 function updateNavAlertBadges() {
   const active = (projects || []).filter(p => !p.archived && !isFinalColumn(p.column) && !isHiddenColumn(p.column) && p.date);
@@ -1310,17 +1269,34 @@ async function loadData(){
   try{hasSb=initSupabase();}catch(e){console.warn('initSupabase falhou',e);hasSb=false;}
   
   if(!hasSb){loadLocal();return;}
+
+  // Com RLS ativo, o banco só responde a usuários autenticados no Supabase Auth.
+  // Se a sessão do Supabase sumiu (mas a sessão local do painel ainda existe), volta para o login.
   try{
-    const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),8000));
-    const query=sb.from('mavic_store').select('key,data');
-    const{data,error}=await Promise.race([query,timeout]);
-    if(error)throw error;
-    const map={};(data||[]).forEach(r=>map[r.key]=r.data);
-    projects=map.projects||[];clients=map.clients||[];notifications=map.notifications||[];
-    globalNotices=map.global_notices||(map.global_notice?[map.global_notice]:[]);
-    budgets=map.budgets||[];
-    services=map.services||[];
-    const cfg=map.config||{};
+    const {data:sessData,error:sessErr}=await sb.auth.getSession();
+    if(!sessErr && !sessData?.session){
+      localStorage.removeItem('mavic_admin_session');
+      sessionStorage.removeItem('mavic_admin_session');
+      const file=window.location.pathname.split('/').pop()||'index.html';
+      window.location.replace('login.html?redirect='+encodeURIComponent(file+(window.location.search||'')));
+      return;
+    }
+  }catch(e){console.warn('Verificação de sessão falhou (offline?)',e);}
+
+  try{
+    const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),10000));
+    const state=await Promise.race([fetchCloudState(),timeout]);
+    const oldSnapshot=loadSyncSnapshot();
+    const cfg=state.config||{};
+    // Snapshot = exatamente o que está no servidor agora (base para calcular diferenças)
+    syncSnapshot=snapshotFromState(state.cols,cfg);
+    // Alterações locais ainda não enviadas são reaplicadas por cima, registro a registro
+    const pendingApplied=overlayPendingLocalChanges(state.cols,oldSnapshot);
+    saveSyncSnapshot();
+    projects=state.cols.projects;clients=state.cols.clients;notifications=state.cols.notifications;
+    globalNotices=state.cols.global_notices;
+    budgets=state.cols.budgets;
+    services=state.cols.services;
     appColumns = alignAppColumns(cfg.columns);
     visibleColumns = alignVisibleColumns(cfg.visibleColumns, appColumns);
     minimizedColumns=cfg.minimizedColumns||[];
@@ -1339,7 +1315,14 @@ async function loadData(){
     applyTheme(appTheme);syncLocal();
     updateNavAlertBadges();
     setupSupabaseRealtime();
-  }catch(e){console.warn('Supabase load failed',e);loadLocal();showToast('Modo offline — dados locais','warning');}
+    if(pendingApplied>0){console.log('[Sync] Reaplicando',pendingApplied,'alteração(ões) local(is) pendente(s)');scheduleSync();}
+    else localStorage.removeItem('mavic_pending_sync');
+  }catch(e){
+    console.warn('Supabase load failed',e);loadLocal();
+    // Offline: usa o último snapshot para enviar só as alterações deste aparelho quando a conexão voltar
+    if(!syncSnapshot) loadSyncSnapshot();
+    showToast('Modo offline — dados locais','warning');
+  }
 }
 
 function loadLocal(){
@@ -1399,43 +1382,7 @@ function scheduleSync(){
   syncTimer=setTimeout(syncCloud,900);
 }
 
-async function syncCloud(){
-  if(!sb){setSync('off');return;}
-  if(!Array.isArray(projects) || projects.length === 0){
-    console.warn('[SyncGuard] syncCloud abortado: lista de projetos vazia para evitar perda de dados.');
-    return;
-  }
-  setSync('sync');
-  try{
-    const { error } = await sb.from('mavic_store').upsert([
-      {key:'projects',data:projects},{key:'clients',data:clients},
-      {key:'notifications',data:notifications},
-      {key:'global_notices',data:globalNotices},
-      {key:'budgets',data:budgets},
-      {key:'services',data:services},
-      {key:'config',data:{
-        columns:appColumns,
-        visibleColumns,
-        minimizedColumns,
-        noteTemplates,
-        quickMsgs,
-        projectTypes,
-        theme:appTheme,
-        waTemplate:localStorage.getItem('mavic_waTemplate')||'',
-        companyName:localStorage.getItem('mavic_companyName')||'',
-        companyDoc:localStorage.getItem('mavic_companyDoc')||'',
-        pixKey:localStorage.getItem('mavic_pixKey')||'',
-        pixName:localStorage.getItem('mavic_pixName')||'',
-        pixBank:localStorage.getItem('mavic_pixBank')||''
-      }}
-    ],{onConflict:'key'});
-    if (error) throw error;
-    sessionStorage.setItem('mavic_last_local_save', String(Date.now()));
-    localStorage.removeItem('mavic_pending_sync');
-    setSync('ok');
-    updateNavAlertBadges();
-  }catch(e){console.warn('Sync failed',e);setSync('off');}
-}
+// syncCloud(): ver sync.js (envia só os registros alterados)
 
 function setSync(s){
   const el=document.getElementById('syncStatus');
@@ -4584,7 +4531,7 @@ function saveManualTimeLog() {
 // Ping Supabase every 30 mins to prevent database pausing
 setInterval(async()=>{
   if(!sb)return;
-  try{await sb.from('mavic_store').select('key').limit(1);}catch(e){}
+  try{await sb.from('mavic_records').select('id').limit(1);}catch(e){}
 },30*60*1000);
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -4795,6 +4742,7 @@ function importBackup(event) {
         notifications = data.notifications || [];
         globalNotices = data.global_notices || data.globalNotices || [];
         budgets = data.budgets || [];
+        if (Array.isArray(data.services)) services = data.services;
         if (data.config) {
           const cfg = data.config;
           if (cfg.columns) appColumns = cfg.columns;

@@ -7,6 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
 function json(body: unknown, status = 200) {
@@ -14,6 +15,41 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
   })
+}
+
+type Rec = Record<string, unknown>
+type Store = Record<string, unknown>
+
+// Lê os registros (um por linha em mavic_records) e monta o mesmo formato de antes:
+// store.projects = [...], store.clients = [...], ..., store.config = {...}
+// deno-lint-ignore no-explicit-any
+async function loadStore(supabase: any): Promise<Store | null> {
+  const store: Store = { clients: [], projects: [], notifications: [], global_notices: [] }
+  const PAGE = 1000
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase.from('mavic_records')
+      .select('collection,data')
+      .in('collection', ['clients', 'projects', 'notifications', 'global_notices'])
+      .order('collection').order('id')
+      .range(from, from + PAGE - 1)
+    if (error) return null
+    ;(data ?? []).forEach((r: { collection: string; data: unknown }) => { (store[r.collection] as unknown[]).push(r.data) })
+    if (!data || data.length < PAGE) break
+  }
+  const { data: cfgRow, error: cfgErr } = await supabase.from('mavic_store').select('data').eq('key', 'config').maybeSingle()
+  if (cfgErr) return null
+  store['config'] = cfgRow?.data ?? {}
+  return store
+}
+
+// Grava UM registro (não reescreve a coleção inteira)
+// deno-lint-ignore no-explicit-any
+async function saveRecords(supabase: any, rows: Array<{ collection: string; rec: Rec }>) {
+  const now = new Date().toISOString()
+  return await supabase.from('mavic_records').upsert(
+    rows.map(r => ({ collection: r.collection, id: String(r.rec.id), data: r.rec, updated_at: now })),
+    { onConflict: 'collection,id' },
+  )
 }
 
 Deno.serve(async (req) => {
@@ -32,19 +68,17 @@ Deno.serve(async (req) => {
 
     if (!nome) return json({ error: 'nome_required' }, 400)
 
-    const { data, error } = await supabase.from('mavic_store').select('key,data')
-    if (error) return json({ error: 'db_error' }, 500)
-
-    const store: Record<string, unknown[]> = {}
-    ;(data ?? []).forEach((r: { key: string; data: unknown }) => { store[r.key] = r.data as unknown[] })
+    const store = await loadStore(supabase) as Record<string, unknown[]> | null
+    if (!store) return json({ error: 'db_error' }, 500)
 
     const allClients: Record<string, string>[] = (store['clients'] ?? []) as Record<string, string>[]
     const cli = allClients.find(c => c.name?.toLowerCase().trim() === nome)
 
     if (!cli) return json({ error: 'client_not_found' }, 404)
 
-    // Validação de token (server-side — não pode ser bypassada)
-    if (cli.token && token !== cli.token) return json({ error: 'invalid_token' }, 401)
+    // Validação de token (server-side — não pode ser bypassada).
+    // Token é obrigatório: cliente sem token não acessa o portal (o admin gera um ao compartilhar o link).
+    if (!cli.token || !token || token !== cli.token) return json({ error: 'invalid_token' }, 401)
 
     // Filtrar projetos apenas deste cliente
     type Project = Record<string, unknown>
@@ -54,6 +88,9 @@ Deno.serve(async (req) => {
       .map(p => ({
         id:             p.id,
         name:           p.name,
+        client:         p.client,
+        createdAt:      p.createdAt,
+        pendingClientRevision: p.pendingClientRevision,
         column:         p.column,
         type:           p.type,
         priority:       p.priority,
@@ -89,7 +126,7 @@ Deno.serve(async (req) => {
       (gn.targetAll || (gn.targetClients as string[] | undefined)?.some(n => n.toLowerCase() === nome))
     )
 
-    const cfg = (store['config'] ?? {}) as Record<string, unknown>
+    const cfg = (store['config'] ?? {}) as unknown as Record<string, unknown>
 
     return json({
       projects:      myProjects,
@@ -123,17 +160,14 @@ Deno.serve(async (req) => {
 
     if (!nome) return json({ error: 'nome_required' }, 400)
 
-    const { data, error } = await supabase.from('mavic_store').select('key,data')
-    if (error) return json({ error: 'db_error' }, 500)
-
-    const store: Record<string, unknown[]> = {}
-    ;(data ?? []).forEach((r: { key: string; data: unknown }) => { store[r.key] = r.data as unknown[] })
+    const store = await loadStore(supabase) as Record<string, unknown[]> | null
+    if (!store) return json({ error: 'db_error' }, 500)
 
     const allClients: Record<string, string>[] = (store['clients'] ?? []) as Record<string, string>[]
     const cli = allClients.find(c => c.name?.toLowerCase().trim() === nome)
 
     if (!cli) return json({ error: 'client_not_found' }, 404)
-    if (cli.token && token !== cli.token) return json({ error: 'invalid_token' }, 401)
+    if (!cli.token || !token || token !== cli.token) return json({ error: 'invalid_token' }, 401)
 
     type Project = Record<string, unknown>
     const allProjects: Project[] = (store['projects'] ?? []) as Project[]
@@ -144,17 +178,16 @@ Deno.serve(async (req) => {
       if (!targetProj) return json({ error: 'project_not_found' }, 404)
       if ((targetProj.client as string)?.toLowerCase().trim() !== nome) return json({ error: 'forbidden' }, 403)
 
-      const updatedProjects = allProjects.map(p => {
-        if (p.id !== body.projectId) return p
-        return {
-          ...p,
-          column: 'Concluído',
-          clientApproved: true,
-          clientApprovedAt: new Date().toISOString()
-        }
-      })
+      const updatedProj: Rec = {
+        ...targetProj,
+        column: 'Concluído',
+        clientApproved: true,
+        clientApprovedAt: new Date().toISOString(),
+        pendingClientRevision: false
+      }
 
-      await supabase.from('mavic_store').upsert([{ key: 'projects', data: updatedProjects }], { onConflict: 'key' })
+      const { error: upErr } = await saveRecords(supabase, [{ collection: 'projects', rec: updatedProj }])
+      if (upErr) return json({ error: 'db_error' }, 500)
       return json({ ok: true })
     }
 
@@ -165,32 +198,48 @@ Deno.serve(async (req) => {
       if ((targetProj.client as string)?.toLowerCase().trim() !== nome) return json({ error: 'forbidden' }, 403)
 
       type Column = { id: string }
-      const cfg = (store['config'] ?? {}) as Record<string, unknown>
+      const cfg = (store['config'] ?? {}) as unknown as Record<string, unknown>
       const cols = (cfg.columns ?? []) as Column[]
       const altCol = cols.find(c => (c.id || '').toLowerCase().includes('altera'))?.id
       const devCol = cols.find(c => (c.id || '').toLowerCase().includes('desenv'))?.id
-      const targetColumn = altCol || devCol || 'Alteração'
+      const targetColumn = altCol || devCol || 'Desenvolvimento'
+      const notesText = (body.notes || '').toString().slice(0, 5000)
 
-      const updatedProjects = allProjects.map(p => {
-        if (p.id !== body.projectId) return p
+      const p = targetProj
+      const updatedProj: Rec = (() => {
         const currentRevs = Number(p.revisions || 0) + 1
         const logs = Array.isArray(p.revisionLogs) ? [...p.revisionLogs] : []
         logs.push({
           id: Date.now(),
           timestamp: new Date().toISOString(),
-          text: body.notes || 'Ajustes solicitados pelo cliente',
-          pins: Array.isArray(body.pins) ? body.pins : [],
+          text: notesText || 'Ajustes solicitados pelo cliente',
+          pins: Array.isArray(body.pins) ? body.pins.slice(0, 200) : [],
           author: cli.name || 'Cliente'
         })
         return {
           ...p,
           column: targetColumn,
           revisions: currentRevs,
-          revisionLogs: logs
+          revisionLogs: logs,
+          pendingClientRevision: true
         }
-      })
+      })()
 
-      await supabase.from('mavic_store').upsert([{ key: 'projects', data: updatedProjects }], { onConflict: 'key' })
+      // Notificação para o painel administrativo (sem clientToken = aviso interno do escritório)
+      const adminNotif: Rec = {
+        id: Date.now(),
+        title: 'Ajuste Solicitado pelo Cliente',
+        message: `O cliente ${cli.name} solicitou alteração no projeto "${targetProj.name}": "${notesText}"`,
+        projectName: targetProj.name,
+        createdAt: new Date().toISOString(),
+        read: false
+      }
+
+      const { error: upErr } = await saveRecords(supabase, [
+        { collection: 'projects', rec: updatedProj },
+        { collection: 'notifications', rec: adminNotif },
+      ])
+      if (upErr) return json({ error: 'db_error' }, 500)
       return json({ ok: true })
     }
 
@@ -201,8 +250,8 @@ Deno.serve(async (req) => {
       const target = notifications.find(n => n.id === body.notifId)
       if (!target) return json({ error: 'notification_not_found' }, 404)
       if (target.clientToken !== cli.token) return json({ error: 'forbidden' }, 403)
-      const updated = notifications.map(n => n.id === body.notifId ? { ...n, read: true } : n)
-      await supabase.from('mavic_store').upsert([{ key: 'notifications', data: updated }], { onConflict: 'key' })
+      const { error: upErr } = await saveRecords(supabase, [{ collection: 'notifications', rec: { ...target, read: true } }])
+      if (upErr) return json({ error: 'db_error' }, 500)
       return json({ ok: true })
     }
 
@@ -215,13 +264,10 @@ Deno.serve(async (req) => {
       const targetedAtMe = !!target.targetAll ||
         ((target.targetClients as string[] | undefined)?.some(n => n.toLowerCase() === nome))
       if (!targetedAtMe) return json({ error: 'forbidden' }, 403)
-      const updated = globalNotices.map(gn => {
-        if (gn.id !== body.noticeId) return gn
-        const readBy: string[] = Array.isArray(gn.readBy) ? [...gn.readBy as string[]] : []
-        if (!readBy.includes(cli.name)) readBy.push(cli.name)
-        return { ...gn, readBy }
-      })
-      await supabase.from('mavic_store').upsert([{ key: 'global_notices', data: updated }], { onConflict: 'key' })
+      const readBy: string[] = Array.isArray(target.readBy) ? [...target.readBy as string[]] : []
+      if (!readBy.includes(cli.name)) readBy.push(cli.name)
+      const { error: upErr } = await saveRecords(supabase, [{ collection: 'global_notices', rec: { ...target, readBy } }])
+      if (upErr) return json({ error: 'db_error' }, 500)
       return json({ ok: true })
     }
 
